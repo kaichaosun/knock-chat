@@ -55,11 +55,19 @@ type Snapshot = {
    */
   cursor: string | null
   messages: Message[]
-  /** Last time each thread was opened, for the unread count. */
-  readAt: Record<string, string>
+  /**
+   * How many incoming messages each thread held when it was last read.
+   *
+   * A count rather than a timestamp on purpose. Message times come from the
+   * relay and a "last read" time would come from the device, so comparing them
+   * would compare two clocks — a device running slightly behind the relay would
+   * see every message as permanently unread. Counting sidesteps clocks
+   * entirely, and works because local history only ever grows.
+   */
+  readCount: Record<string, number>
 }
 
-const EMPTY: Snapshot = { cursor: null, messages: [], readAt: {} }
+const EMPTY: Snapshot = { cursor: null, messages: [], readCount: {} }
 
 function storageKey(owner: string): string {
   return `knock:history:${compact(owner)}`
@@ -155,11 +163,22 @@ export function setStatus(
   }
 }
 
+/**
+ * Mark everything currently in `peer`'s thread as read.
+ *
+ * Returns the same snapshot when nothing changed, so callers can run this on
+ * every render of an open thread without causing writes or re-renders.
+ */
 export function markRead(snapshot: Snapshot, peer: string): Snapshot {
-  return {
-    ...snapshot,
-    readAt: { ...snapshot.readAt, [compact(peer)]: new Date().toISOString() },
-  }
+  const key = compact(peer)
+  const seen = incomingCount(snapshot.messages, key)
+  if (snapshot.readCount[key] === seen) return snapshot
+
+  return { ...snapshot, readCount: { ...snapshot.readCount, [key]: seen } }
+}
+
+function incomingCount(messages: Message[], peer: string): number {
+  return messages.filter((m) => m.peer === peer && m.direction === "in").length
 }
 
 function sorted(messages: Message[]): Message[] {
@@ -182,11 +201,12 @@ export function conversations(snapshot: Snapshot): Conversation[] {
 
   const result: Conversation[] = []
   for (const [peer, messages] of byPeer) {
-    const readAt = snapshot.readAt[peer] ?? ""
+    const incoming = messages.filter((m) => m.direction === "in").length
     result.push({
       peer,
       last: messages[messages.length - 1],
-      unread: messages.filter((m) => m.direction === "in" && m.at > readAt).length,
+      // Clamped: a thread read and then trimmed should show zero, not negative.
+      unread: Math.max(0, incoming - (snapshot.readCount[peer] ?? 0)),
     })
   }
   return result.sort((a, b) => b.last.at.localeCompare(a.last.at))

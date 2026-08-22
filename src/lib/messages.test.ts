@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { conversations, emptySnapshot, mergeIncoming, threadWith } from "./messages"
+import { conversations, emptySnapshot, markRead, mergeIncoming, threadWith } from "./messages"
 import type { Snapshot } from "./messages"
 import type { Envelope } from "./relay"
 
@@ -107,5 +107,58 @@ describe("conversations", () => {
       cursor(2),
     )
     expect(threadWith(snapshot, ALICE)).toHaveLength(1)
+  })
+})
+
+describe("markRead", () => {
+  const unreadFor = (snapshot: Snapshot, peer: string) =>
+    conversations(snapshot).find((c) => c.peer.replace(/\s+/g, "") === peer.replace(/\s+/g, ""))
+      ?.unread ?? 0
+
+  it("clears the badge for that thread only", () => {
+    let snapshot = mergeIncoming(
+      emptySnapshot(),
+      [envelope(1, "hi", ALICE), envelope(2, "hey", BOB)],
+      cursor(2),
+    )
+    snapshot = markRead(snapshot, ALICE)
+    expect(unreadFor(snapshot, ALICE)).toBe(0)
+    expect(unreadFor(snapshot, BOB)).toBe(1)
+  })
+
+  /**
+   * The bug this replaced: reading a thread, then having a message arrive while
+   * still looking at it, left the badge showing when you went back.
+   */
+  it("a message arriving after reading is unread again until re-read", () => {
+    let snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "first", ALICE)], cursor(1))
+    snapshot = markRead(snapshot, ALICE)
+    expect(unreadFor(snapshot, ALICE)).toBe(0)
+
+    snapshot = mergeIncoming(snapshot, [envelope(2, "second", ALICE, "id-2b")], cursor(2))
+    expect(unreadFor(snapshot, ALICE)).toBe(1)
+
+    snapshot = markRead(snapshot, ALICE)
+    expect(unreadFor(snapshot, ALICE)).toBe(0)
+  })
+
+  /** Idempotent, so an open thread can re-run it on every render for free. */
+  it("returns the same snapshot when nothing changed", () => {
+    const snapshot = markRead(
+      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
+      ALICE,
+    )
+    expect(markRead(snapshot, ALICE)).toBe(snapshot)
+  })
+
+  /** Counting incoming messages means the device clock never enters into it. */
+  it("ignores your own messages and does not consult a clock", () => {
+    const snapshot = markRead(
+      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
+      ALICE,
+    )
+    // An envelope timestamped far in the past still counts as new.
+    const backdated = { ...envelope(2, "late arrival", ALICE, "id-old"), created_at: new Date(2000, 0, 1).toISOString() }
+    expect(unreadFor(mergeIncoming(snapshot, [backdated], cursor(2)), ALICE)).toBe(1)
   })
 })

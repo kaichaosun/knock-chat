@@ -62,13 +62,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     return () => window.removeEventListener("popstate", onPop)
   }, [openPeer])
 
-  const openThread = useCallback(
-    (peer: string) => {
-      setOpenPeer(peer)
-      markRead(peer)
-    },
-    [markRead],
-  )
+  const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
+
+  const openMessages = openPeer ? threadWith(openPeer) : []
+
+  // Keep the open thread marked read as messages arrive, not only when it is
+  // opened — otherwise anything that lands while you are reading stays unread
+  // and the badge is waiting for you when you go back.
+  useEffect(() => {
+    if (openPeer) markRead(openPeer)
+  }, [openPeer, openMessages.length, markRead])
 
   const closeThread = useCallback(() => {
     // Unwind the entry pushed above so back doesn't need two presses.
@@ -136,7 +139,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       <>
         <Conversation
           peer={openPeer}
-          messages={threadWith(openPeer)}
+          messages={openMessages}
           onBack={closeThread}
           onSend={onSend}
           onRetry={onRetrySend}
