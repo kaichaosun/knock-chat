@@ -14,8 +14,19 @@ import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import type { Message } from "@/lib/messages"
 import { devIdentities } from "@/lib/wallet"
+import { ProbeScreen } from "@/probe/probe-screen"
 
 export default function App() {
+  // Diagnostics live behind `?probe=1` and are never linked from the app.
+  // Checked before any hook runs so the probes get a clean provider.
+  if (new URLSearchParams(window.location.search).has("probe")) {
+    return <ProbeScreen />
+  }
+
+  return <Messenger />
+}
+
+function Messenger() {
   const { state, retry } = useWallet()
   const address = state.status === "connected" ? state.wallet.address : null
 

@@ -32,7 +32,7 @@ export function ConnectScreen({
       <div className="flex flex-1 flex-col items-center justify-center text-center">
         <BrandMark className="size-20" />
 
-        <h1 className="mt-7 text-3xl font-extrabold tracking-tight">Nimiapp</h1>
+        <h1 className="mt-7 text-3xl font-extrabold tracking-tight">Knock</h1>
         <p className="text-muted-foreground mt-2 max-w-xs text-balance">
           Messages between Nimiq wallets, with spam priced out instead of guessed at.
         </p>

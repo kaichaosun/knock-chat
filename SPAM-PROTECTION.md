@@ -17,13 +17,13 @@ At NIM = $0.00039198 (checked 2026-08-22) and a ~0.005 NIM fee for a short data 
 | **100 NIM** | **$0.0392** | **$39.20** | **$39,198** | **0.0050%** |
 | 250 NIM | $0.0980 | $98.00 | $97,995 | 0.0020% |
 
-**100 NIM is the sweet spot.** Four cents to reach a stranger — refundable, so a legitimate
-sender pays nothing in practice. A million spam messages costs $39,198, which ends bulk
-spam as a business. And the network fee is 0.005% of the postage, so the mechanism costs
-essentially nothing to operate.
+**10 NIM is the chosen default** (recipients may set their own). Under half a cent to
+reach a stranger, while a million spam messages costs $3,920 — three orders of magnitude
+above the zero that makes bulk spam viable today. The network fee is 0.05% of the postage,
+so the mechanism costs essentially nothing to operate.
 
-On Ethereum the same 4-cent postage would carry a gas fee 10–50× larger than the postage
-itself. That inversion is why nobody has shipped this. Nimiq's near-zero fees plus ~1s
+On Ethereum that same sub-cent postage would carry a gas fee orders of magnitude larger
+than the postage itself. That inversion is why nobody has shipped this. Nimiq's near-zero fees plus ~1s
 finality are what make micro-postage viable — this is a genuinely Nimiq-shaped problem.
 
 ## Four tiers

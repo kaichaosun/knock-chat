@@ -7,6 +7,8 @@
  * the relay will accept too.
  */
 
+import { blake2b } from "@noble/hashes/blake2.js"
+
 const CCODE = "NQ"
 /** Nimiq's base32 alphabet omits I, O, W and Z to avoid transcription errors. */
 const ALPHABET = "0123456789ABCDEFGHJKLMNPQRSTUVXY"
@@ -68,4 +70,34 @@ export function shortenAddress(address: string): string {
 export function normalizeInput(input: string): string {
   const value = compact(input).toUpperCase().slice(0, 36)
   return value.match(/.{1,4}/g)?.join(" ") ?? value
+}
+
+/** Encode bytes with Nimiq's base32 alphabet. 20 bytes fills exactly 32 characters. */
+function encodeBase32(bytes: Uint8Array): string {
+  let bits = 0
+  let value = 0
+  let out = ""
+  for (const byte of bytes) {
+    value = (value << 8) | byte
+    bits += 8
+    while (bits >= 5) {
+      out += ALPHABET[(value >>> (bits - 5)) & 31]
+      bits -= 5
+    }
+  }
+  if (bits > 0) out += ALPHABET[(value << (5 - bits)) & 31]
+  return out
+}
+
+/**
+ * Derive the address of an Ed25519 public key: the first 20 bytes of its
+ * Blake2b-256 hash, in the user-friendly form.
+ *
+ * Mirrors `Address::from_public_key` in knock-relay, and the digest is pinned to
+ * the same vectors, so client and relay agree on who a public key belongs to.
+ */
+export function addressFromPublicKey(publicKey: Uint8Array): string {
+  const base32 = encodeBase32(blake2b(publicKey, { dkLen: 32 }).slice(0, 20))
+  const checksum = 98 - (ibanChecksum(`${CCODE}00${base32}`) ?? 0)
+  return formatAddress(`${CCODE}${String(checksum).padStart(2, "0")}${base32}`)
 }

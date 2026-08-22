@@ -1,5 +1,5 @@
 /**
- * Client for nimiapp-relay.
+ * Client for knock-relay.
  *
  * Requests go to `/api` by default, which the Vite dev server proxies to the
  * relay — so the same URL works from a phone on the same network as it does on

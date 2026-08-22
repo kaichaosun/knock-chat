@@ -1,5 +1,5 @@
 {
-  "name": "nimiapp",
+  "name": "knock",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@nimiq/mini-app-sdk": "^0.1.0",
+    "@noble/curves": "^2.3.0",
+    "@noble/hashes": "^2.3.0",
     "@radix-ui/react-avatar": "^1.2.6",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-scroll-area": "^1.2.18",

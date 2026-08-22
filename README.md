@@ -1,10 +1,10 @@
-# Nimiapp
+# Knock
 
 A Nimiq Pay Mini App for messaging between wallets, where spam is priced out
 instead of guessed at.
 
 > **Status: first slice.** Plain-text messages over
-> [nimiapp-relay](../nimiapp-relay). No authentication, no encryption, no
+> [knock-relay](../knock-relay). No authentication, no encryption, no
 > postage yet — see [Roadmap](#roadmap).
 
 ## Run it
@@ -12,8 +12,8 @@ instead of guessed at.
 Two processes. The relay first:
 
 ```sh
-cd ../nimiapp-relay
-NIMIAPP_RELAY_MEMORY=1 cargo run     # no database needed
+cd ../knock-relay
+KNOCK_RELAY_MEMORY=1 cargo run     # no database needed
 ```
 
 Then the app:
@@ -41,6 +41,21 @@ checksummed address vectors from the relay's test suite.
 mini-apps section of Nimiq Pay and enter `http://<your-ip>:5175`. The app
 detects the injected provider and uses the real wallet address instead of a dev
 identity.
+
+## Device probes
+
+Three questions block the next slices and none can be answered from a desktop browser.
+Open the app in Nimiq Pay at `?probe=1` to run them:
+
+| Probe | Answers |
+| --- | --- |
+| Signature semantics | Does `sign()` sign the raw UTF-8 bytes or wrap them first? Does the returned public key derive to the wallet's own address? Are signatures deterministic? |
+| Deeplink | Does `https://nimpay.app/miniapps/open/…` preserve a query string? Invite tokens depend on it. |
+| Minimum amount | Is there a floor under transaction values that would break 10 NIM postage? Sends to your own address, so only the fee is spent. |
+
+**Copy** puts the whole report on the clipboard so results can leave the phone.
+
+`src/probe/` is throwaway — delete it once SPEC.md §11 is settled.
 
 ## How it works
 

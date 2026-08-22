@@ -39,7 +39,7 @@ type Snapshot = {
 const EMPTY: Snapshot = { cursor: 0, messages: [], readAt: {} }
 
 function storageKey(owner: string): string {
-  return `nimiapp:history:${compact(owner)}`
+  return `knock:history:${compact(owner)}`
 }
 
 /**
