@@ -5,9 +5,11 @@ import { AddressAvatar } from "@/components/address-avatar"
 
 import { Conversation } from "@/components/conversation"
 import { Inbox } from "@/components/inbox"
-import { NewConversation } from "@/components/new-conversation"
-import { ProfileSheet } from "@/components/profile-sheet"
+import { KnockRequests } from "@/components/knock-requests"
+import { KnockSheet } from "@/components/knock-sheet"
+import { SettingsSheet } from "@/components/settings-sheet"
 import { Button } from "@/components/ui/button"
+import { useKnocks } from "@/hooks/use-knocks"
 import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
@@ -49,9 +51,11 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const { conversations, threadWith, send, retry: retrySend, markRead, relayStatus } =
     useMessages(owner, deviceSecretKey, session.invalidate)
 
+  const { knocks, reach, knock, accept, decline } = useKnocks(wallet, owner)
+
   const [openPeer, setOpenPeer] = useState<string | null>(null)
-  const [composing, setComposing] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [knocking, setKnocking] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Let the hardware/gesture back control leave a thread instead of the app.
   useEffect(() => {
@@ -167,8 +171,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setProfileOpen(true)}
-            aria-label="Your address"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Settings"
             className="size-10 rounded-full"
           >
             <AddressAvatar address={address} size="sm" />
@@ -177,18 +181,32 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <KnockRequests
+          knocks={knocks}
+          onAccept={async (id) => {
+            await accept(id)
+            toast.success("You're connected. Messages are free from here.")
+          }}
+          onDecline={decline}
+        />
         <Inbox
           conversations={conversations}
           onOpen={openThread}
-          onCompose={() => setComposing(true)}
+          onCompose={() => setKnocking(true)}
         />
       </div>
 
-      <NewConversation
-        open={composing}
-        onOpenChange={setComposing}
-        onStart={openThread}
+      <KnockSheet
+        open={knocking}
+        onOpenChange={setKnocking}
         myAddress={address}
+        onReach={reach}
+        onKnock={async (peer, body, policyLuna) => {
+          if (!deviceSecretKey) throw new Error("no device key")
+          await knock(peer, body, policyLuna, deviceSecretKey)
+          toast.success("Knocked. They'll see it next time they open Knock.")
+        }}
+        onOpenThread={openThread}
         suggestions={
           wallet?.mode === "dev"
             ? devIdentities.filter((identity) => compact(identity.address) !== compact(address))
@@ -196,9 +214,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         }
       />
 
-      <ProfileSheet
-        open={profileOpen}
-        onOpenChange={setProfileOpen}
+      <SettingsSheet
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
         address={address}
         mode={wallet?.mode ?? "nimiq-pay"}
         relayStatus={relayStatus}

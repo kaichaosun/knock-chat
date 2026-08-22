@@ -179,45 +179,65 @@ subtly broken complex one in three weeks.
 
 | Tier | Who | Cost |
 | --- | --- | --- |
-| **Contact** | Anyone you have replied to, or who used your invite | Free, both directions, permanently |
-| **Invited** | Holds a valid invite you minted | Free |
-| **Staker** | Has an active NIM stake above a threshold | Free, rate-limited `[v1.1]` |
-| **Stranger** | Everyone else | Postage |
+| **Open channel** | You accepted their knock, or they accepted yours | Free, both directions, permanently |
+| **Invited** | Holds a valid invite you minted | Opens a channel without paying |
+| **Stranger** | Everyone else | One knock, paid |
 
-The **staker lane** is the first thing cut if week 2 runs short. It is worth building
-because it is the only tier that leaks nothing — proving "I hold a stake" is a claim about
-account state, not a payment to the recipient — and because a thousand sybil identities
-require a thousand stakes behind an unstaking cooldown. `get_staker(address)` and
-`get_stakers([…])` are readable for any address, so verification is trustless.
+Once a channel is open there are no paid messages at all — which is what stops postage
+from taxing the reply.
 
-### 5.2 Postage `[v1]`
+The **staker lane** is cut. It would have let anyone holding an active NIM stake through
+free, which is attractive because it leaks nothing — proving "I hold a stake" is a claim
+about account state rather than a payment to the recipient. But `getStaker` is refused by
+both the public mainnet and testnet nodes, so it would mean self-hosting a node purely for
+that tier. Revisit if the relay ever runs its own node.
+
+### 5.2 Knocking `[v1]`
+
+**Reaching someone you have never spoken to is a single paid act.** You send a *knock*: a
+message plus proof of payment. If they accept, a channel opens and **both directions are
+free forever**. If they decline or ignore it, nothing more happens — and they keep the NIM
+either way.
 
 **The recipient sets the amount and keeps it. Default 10 NIM (~$0.004).**
 
-Postage is a payment, not a deposit. Ignoring a message means keeping the money — that is
-the point, since the sender consumed attention either way. A **manual refund** is offered
-in the thread as a courtesy but is never automatic.
+Postage is therefore the one-time cost of opening a channel, not a toll on every message.
+That distinction is load-bearing. A per-message toll would charge you to *answer* someone
+who had just paid for your attention — penalising the exact behaviour the payment was
+meant to buy, and killing the conversation it started. Paying once per relationship costs
+a real person almost nothing and still costs a spammer a million payments to reach a
+million people.
+
+It also bounds harassment. A stranger can leave **one pending knock**, however much they
+are willing to spend — not an unlimited stream of paid messages.
 
 The protocol:
 
-1. Sender fetches `GET /v1/policy/{address}` → `{ required, amount_luna, address }`.
-2. Sender picks a random 32-byte nonce `n`.
-3. Sender pays on-chain:
-   `sendBasicTransactionWithData({ recipient, value: amount, data: "knock1" || n })`
-   — a 38-byte payload, far inside the 2112-byte limit.
-4. Sender posts the envelope with `postage: { tx_hash, nonce }`.
-5. **The relay verifies before storing anything**, via the node's
-   `get_transaction_by_hash`: the transaction exists and is final, pays the policy
-   address, meets the amount, carries `"knock1" || n` as its data, and comes from the
-   envelope's declared sender. The nonce must be unused; it is then consumed.
-6. Accept, or answer **`402 Payment Required`** with the current policy so the client can
-   retry correctly.
+1. Sender fetches `GET /v1/policy/{address}`.
+2. Sender picks a random 32-byte nonce and pays on-chain, carrying a **commitment**:
+   `data = "knock:" ‖ hex( SHA256( sender_address ‖ nonce )[0..16] )`
+3. Sender posts the knock with `{ to, body, postage: { tx_hash, nonce } }`.
+4. **The relay verifies before storing anything**, via `getTransactionByHash`: the
+   transaction is final, pays the recipient, meets the amount, and carries exactly that
+   commitment. Otherwise **`402 Payment Required`**.
+5. Recipient accepts — the channel opens and the knock's message becomes the first in the
+   thread — or declines, and it is dropped.
 
-**Anti-replay:** the nonce is single-use behind a unique index, so one payment can never
-carry two messages. **Anti-forgery:** the payment must exist on-chain, paying the
-recipient — there is nothing to spoof.
+**Why a commitment rather than a plain nonce.** A payment is public the moment it lands,
+so "paid the right person the right amount" is not enough: anyone watching the chain could
+point at someone else's payment and claim it covers their message. The nonce travels only
+inside the knock, so an observer sees a hash they cannot reverse and cannot reuse.
+Revealing the nonce is what redeems the payment.
 
-**Why the relay enforces this rather than the client:** rejected mail never reaches the
+**Why the commitment names the sender, not the payer.** A Nimiq Pay wallet may sign with
+one account and pay from another — observed on a real device, where `sign()` used
+`NQ80 M6TC…` while the transaction came from `NQ86 MASJ…`. Requiring payer and sender to
+match would reject legitimate postage.
+
+**Anti-replay** is the `UNIQUE` constraint on the knock's transaction hash: one payment
+opens one door, with no separate spent-nonce table to keep in step.
+
+**Why the relay enforces this rather than the client:** a rejected knock never reaches the
 recipient's device at all. A client-side filter still downloads the spam.
 
 ### 5.3 The relay is not fully trusted
@@ -315,8 +335,8 @@ Sequenced by dependency, not by preference.
 | 1 | ~~**Auth**~~ ✅ | Done. Challenge, signature, session; an address can only act as itself |
 | 2 | ~~**Encryption**~~ ✅ | Done. X25519 + XChaCha20-Poly1305; the relay stores ciphertext only |
 | 3 | **Links and invites** | Cheap, and it is the growth loop |
-| 4 | **Postage and refund** | The differentiator; the chain plumbing dominates, and it is the only piece that can slip without leaving the app incoherent |
-| 5 | Staker lane | First thing cut if week 2 runs short |
+| 4 | **Knocks and postage** | The differentiator; the chain plumbing dominates, and it is the only piece that can slip without leaving the app incoherent |
+| 5 | ~~Staker lane~~ ❌ | Cut: `getStaker` is refused by public nodes |
 
 ---
 
@@ -336,8 +356,12 @@ Sequenced by dependency, not by preference.
 4. **Does the `nimpay.app/miniapps/open/…` deeplink preserve a query string?** Untested —
    it will not resolve a LAN address, so it needs the app on a public host. Blocks invite
    links (slice 3), not slice 1.
-5. **Which node does the relay watch** — a local `nimiq-client` with RPC, or a hosted one?
-   `subscribe_for_logs_by_addresses_and_types` gives a push stream, better than polling.
+5. ~~**Which node does the relay watch**~~ **Resolved: the public node.**
+   `rpc.nimiqwatch.com` and `rpc.testnet.nimiqwatch.com` both serve `getTransactionByHash`,
+   which is the only method postage needs — one call per knock. Configurable via
+   `KNOCK_NIMIQ_RPC`, so self-hosting later is a config change. Note the phone pays on
+   **mainnet** (`networkId: 24`) whatever the relay watches, so testnet is for relay-side
+   tests rather than end-to-end ones.
 6. ~~**Which account is "you"?**~~ **Resolved by dropping `listAccounts()`.** The client
    never asks the wallet to enumerate accounts; it signs, and the address is derived from
    the public key that came back. Whichever account the wallet signs with *is* the

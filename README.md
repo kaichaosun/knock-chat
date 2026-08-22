@@ -41,6 +41,24 @@ mini-apps section of Nimiq Pay and enter `http://<your-ip>:5175`. The app
 detects the injected provider and uses the real wallet address instead of a dev
 identity.
 
+## Reaching someone
+
+You cannot write to a stranger. You **knock** — a message plus payment — and they accept or
+they do not. Accepting opens a channel and everything after is free, in both directions,
+forever. Declining or ignoring keeps the NIM.
+
+That is why the cost sits on opening a channel rather than on each message: a per-message
+toll would charge you to *answer* someone who had just paid for your attention.
+
+## Settings
+
+Tap your avatar in the inbox header. **Cost to knock** is what a stranger pays to
+reach you — default 10 NIM, and you keep it whether or not you answer. Presets go down to
+**Free** (0), which is the one to use while testing: it removes the payment step entirely
+so knocks need no chain access.
+
+Set it to 1 NIM to exercise the real payment path for a fraction of a cent.
+
 ## Device probes
 
 Three questions block the next slices and none can be answered from a desktop browser.
@@ -83,6 +101,8 @@ cannot drift apart.
 | `lib/crypto.ts` | X25519 key agreement, HKDF-SHA256, XChaCha20-Poly1305. One conversation key per pair, derived independently by both sides. **No forward secrecy** — a device key opens that conversation's whole history. |
 | `lib/keys.ts` | This device's keypair, and peer certificates — **verified here, not trusted from the relay**, which is the entire point of end-to-end encryption. |
 | `lib/relay.ts` | Talks to the relay: send, fetch by cursor, ack. |
+| `lib/postage.ts` | The commitment a payment carries, pinned to the same cross-language vector the relay checks. |
+| `hooks/use-knocks.ts` | Knocking, and the knocks waiting for your answer. Pays first, then hands the relay the nonce that redeems it. |
 | `lib/messages.ts` | Local history. The relay only holds mail *for* a recipient, so a sender never gets its own messages back — the client keeps the thread and merges incoming envelopes into it, deduplicating on the relay-assigned `id`. |
 | `hooks/use-messages.ts` | Polls every 3s while the document is visible, sends optimistically, exposes conversations and threads. |
 

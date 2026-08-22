@@ -9,6 +9,7 @@
 
 import { blake2b } from "@noble/hashes/blake2.js"
 
+const ADDRESS_LEN = 20
 const CCODE = "NQ"
 /** Nimiq's base32 alphabet omits I, O, W and Z to avoid transcription errors. */
 const ALPHABET = "0123456789ABCDEFGHJKLMNPQRSTUVXY"
@@ -100,4 +101,26 @@ export function addressFromPublicKey(publicKey: Uint8Array): string {
   const base32 = encodeBase32(blake2b(publicKey, { dkLen: 32 }).slice(0, 20))
   const checksum = 98 - (ibanChecksum(`${CCODE}00${base32}`) ?? 0)
   return formatAddress(`${CCODE}${String(checksum).padStart(2, "0")}${base32}`)
+}
+
+/** Decode the user-friendly form back to its 20 raw bytes. */
+export function addressToBytes(address: string): Uint8Array {
+  const body = compact(address).slice(4)
+  const bytes = new Uint8Array(ADDRESS_LEN)
+
+  let bits = 0
+  let value = 0
+  let out = 0
+  for (const char of body) {
+    const index = ALPHABET.indexOf(char)
+    if (index < 0) throw new Error("not a Nimiq address")
+    value = (value << 5) | index
+    bits += 5
+    if (bits >= 8) {
+      bytes[out++] = (value >>> (bits - 8)) & 0xff
+      bits -= 8
+    }
+  }
+  if (out !== ADDRESS_LEN) throw new Error("not a Nimiq address")
+  return bytes
 }

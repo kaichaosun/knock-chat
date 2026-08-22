@@ -106,3 +106,60 @@ export function ackMessages(to: string, cursor: string) {
     body: JSON.stringify({ to, cursor }),
   })
 }
+
+// -- knocks and postage ----------------------------------------------------
+
+/** Luna per NIM. Amounts travel as integer luna and are shown as NIM. */
+export const LUNA_PER_NIM = 100_000
+
+export type Policy = { amount_luna: number }
+
+/** Everything a sender needs to decide between writing, knocking, or waiting. */
+export type Reachability = {
+  policy: Policy
+  channel_open: boolean
+  knock_pending: boolean
+}
+
+export type Knock = {
+  id: string
+  from: string
+  to: string
+  body: string
+  created_at: string
+}
+
+export function getReachability(address: string): Promise<Reachability> {
+  return request<Reachability>(`/v1/reachability/${encodeURIComponent(address)}`)
+}
+
+export function setPolicy(amountLuna: number): Promise<Policy> {
+  return request<Policy>("/v1/policy", {
+    method: "PUT",
+    body: JSON.stringify({ amount_luna: amountLuna }),
+  })
+}
+
+/** Knock on a door. `postage` is omitted only when the recipient waived it. */
+export function sendKnock(
+  to: string,
+  body: string,
+  postage: { tx_hash: string; nonce: string } | null,
+): Promise<Knock> {
+  return request<Knock>("/v1/knocks", {
+    method: "POST",
+    body: JSON.stringify({ to, body, postage }),
+  })
+}
+
+export function listKnocks(): Promise<{ knocks: Knock[] }> {
+  return request<{ knocks: Knock[] }>("/v1/knocks")
+}
+
+export function acceptKnock(id: string) {
+  return request<{ seq: number }>(`/v1/knocks/${id}/accept`, { method: "POST" })
+}
+
+export function declineKnock(id: string) {
+  return request<Knock>(`/v1/knocks/${id}/decline`, { method: "POST" })
+}
