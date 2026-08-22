@@ -103,8 +103,12 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   }, [])
 
   const copy = useCallback(async (text: string) => {
+    // Some WebViews simply will not give a page the clipboard. Say what to do
+    // instead of reporting a failure the user can do nothing about.
     const ok = await copyText(text)
-    toast[ok ? "success" : "error"](ok ? "Address copied" : "Couldn't copy address")
+    toast[ok ? "success" : "info"](
+      ok ? "Address copied" : "Couldn't reach the clipboard — long-press the address to select it",
+    )
   }, [])
 
   const onSend = useCallback(

@@ -79,7 +79,7 @@ export function ProfileSheet({
             <AddressAvatar address={address} size="lg" />
             <div className="min-w-0 flex-1">
               <p className="text-muted-foreground text-[11px]">Your address</p>
-              <p className="font-mono text-[13px] leading-relaxed font-semibold wrap-anywhere">
+              <p className="select-value font-mono text-[13px] leading-relaxed font-semibold wrap-anywhere">
                 {formatAddress(address)}
               </p>
               <Button

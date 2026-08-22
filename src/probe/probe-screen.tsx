@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { copyText } from "@/lib/clipboard"
 import { cn } from "@/lib/utils"
 import {
+  clipboardProbe,
   deeplinkProbe,
   environmentProbe,
   minimumAmountProbe,
@@ -112,6 +113,13 @@ export function ProbeScreen() {
                 }
               : undefined
           }
+        />
+
+        <Card
+          name="Clipboard"
+          report={reports.Clipboard}
+          note="Tests each copy mechanism separately. Paste afterwards to confirm."
+          action={{ label: "Run", onClick: () => run("Clipboard", clipboardProbe) }}
         />
 
         <Card name="Deeplink" report={reports.Deeplink} note="Open the links below from Nimiq Pay and watch for probe=42." />

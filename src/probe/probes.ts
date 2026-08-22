@@ -13,6 +13,7 @@ import { ed25519 } from "@noble/curves/ed25519.js"
 import type { NimiqProvider } from "@nimiq/mini-app-sdk"
 
 import { addressFromPublicKey, compact } from "@/lib/address"
+import { copyText } from "@/lib/clipboard"
 import { hexToBytes, verifySignedMessage } from "@/lib/signed-message"
 
 declare global {
@@ -200,5 +201,52 @@ export async function minimumAmountProbe(
         error: error instanceof Error ? error.message : String(error),
       },
     }
+  }
+}
+
+/**
+ * Whether this WebView will copy at all, and by which route.
+ *
+ * `execCommand` returns true in WebViews that copy nothing, so this reports
+ * what it claims separately from what can be trusted, and writes a marker you
+ * can paste to settle it.
+ */
+export async function clipboardProbe(): Promise<ProbeReport> {
+  const marker = `knock-clipboard-${Date.now()}`
+  const detail: Record<string, string> = {
+    "secure context": String(window.isSecureContext),
+    "navigator.clipboard": String(typeof navigator.clipboard),
+    "execCommand present": String(typeof document.execCommand),
+  }
+
+  let asyncApi = false
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(marker)
+      asyncApi = true
+    } catch (error) {
+      detail["clipboard.writeText error"] =
+        error instanceof Error ? error.message : String(error)
+    }
+  }
+  detail["navigator.clipboard.writeText"] = String(asyncApi)
+
+  // Goes through the app's own implementation rather than a copy of it — a
+  // probe that takes a different path can pass where the app fails, which is
+  // exactly how the modal focus-trap bug stayed hidden.
+  const viaFallback = !asyncApi ? await copyText(marker) : false
+  detail["execCommand (via lib/clipboard)"] = String(viaFallback)
+
+  detail["what to paste"] = marker
+  detail["how to confirm"] = "Paste somewhere. If it is not this marker, nothing was copied."
+
+  return {
+    outcome: asyncApi ? "pass" : viaFallback ? "info" : "fail",
+    headline: asyncApi
+      ? "Clipboard API works"
+      : viaFallback
+        ? "execCommand claimed success — paste the marker to see if it is true"
+        : "No clipboard access at all; long-press to select instead",
+    detail,
   }
 }
