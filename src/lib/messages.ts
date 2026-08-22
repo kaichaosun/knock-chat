@@ -65,9 +65,17 @@ type Snapshot = {
    * entirely, and works because local history only ever grows.
    */
   readCount: Record<string, number>
+  /**
+   * Threads hidden from the chat list.
+   *
+   * Closing a chat is tidying, not deleting: the channel stays open on the
+   * relay, the messages stay on the device, and a new message brings the thread
+   * straight back. Anything else would make "close" a trap.
+   */
+  closed?: string[]
 }
 
-const EMPTY: Snapshot = { cursor: null, messages: [], readCount: {} }
+const EMPTY: Snapshot = { cursor: null, messages: [], readCount: {}, closed: [] }
 
 function storageKey(owner: string): string {
   return `knock:history:${compact(owner)}`
@@ -141,9 +149,15 @@ export function mergeIncoming(
 
   if (added.length === 0 && snapshot.cursor === cursor) return snapshot
 
+  // Something arriving in a closed thread reopens it — a closed chat is not a
+  // mute, and silently swallowing new mail would lose messages.
+  const revived = new Set(added.map((m) => m.peer))
+  const closed = (snapshot.closed ?? []).filter((peer) => !revived.has(peer))
+
   return {
     ...snapshot,
     cursor,
+    closed,
     messages: added.length > 0 ? sorted([...snapshot.messages, ...added]) : snapshot.messages,
   }
 }
@@ -177,6 +191,22 @@ export function markRead(snapshot: Snapshot, peer: string): Snapshot {
   return { ...snapshot, readCount: { ...snapshot.readCount, [key]: seen } }
 }
 
+/** Hide a thread from the chat list. */
+export function closeThread(snapshot: Snapshot, peer: string): Snapshot {
+  const key = compact(peer)
+  const closed = snapshot.closed ?? []
+  if (closed.includes(key)) return snapshot
+  return { ...snapshot, closed: [...closed, key] }
+}
+
+/** Bring a closed thread back — explicitly, or because something arrived. */
+export function reopenThread(snapshot: Snapshot, peer: string): Snapshot {
+  const key = compact(peer)
+  const closed = snapshot.closed ?? []
+  if (!closed.includes(key)) return snapshot
+  return { ...snapshot, closed: closed.filter((c) => c !== key) }
+}
+
 function incomingCount(messages: Message[], peer: string): number {
   return messages.filter((m) => m.peer === peer && m.direction === "in").length
 }
@@ -192,8 +222,10 @@ export function threadWith(snapshot: Snapshot, peer: string): Message[] {
 
 /** One entry per peer, most recently active first. */
 export function conversations(snapshot: Snapshot): Conversation[] {
+  const closed = new Set(snapshot.closed ?? [])
   const byPeer = new Map<string, Message[]>()
   for (const message of snapshot.messages) {
+    if (closed.has(message.peer)) continue
     const bucket = byPeer.get(message.peer)
     if (bucket) bucket.push(message)
     else byPeer.set(message.peer, [message])

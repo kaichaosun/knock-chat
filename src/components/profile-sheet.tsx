@@ -14,7 +14,14 @@ import type { WalletMode } from "@/lib/wallet"
 /** Offered as taps because typing a number on a phone is a chore. */
 const PRESETS_NIM = [0, 1, 10, 100]
 
-export function SettingsSheet({
+/**
+ * Your profile: who you are here, and what it costs to reach you.
+ *
+ * Both are public — anyone can read your address and your price from the relay
+ * — which is what makes this a profile rather than settings. Preferences only
+ * you experience would belong somewhere else.
+ */
+export function ProfileSheet({
   open,
   onOpenChange,
   address,
@@ -64,7 +71,7 @@ export function SettingsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Settings</SheetTitle>
+          <SheetTitle>Your profile</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-7 pb-8">

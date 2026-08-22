@@ -50,10 +50,27 @@ forever. Declining or ignoring keeps the NIM.
 That is why the cost sits on opening a channel rather than on each message: a per-message
 toll would charge you to *answer* someone who had just paid for your attention.
 
-## Settings
+## Chats and Contacts
 
-Tap your avatar in the inbox header. **Cost to knock** is what a stranger pays to
-reach you — default 10 NIM, and you keep it whether or not you answer. Presets go down to
+Two tabs. **Chats** is recent activity, held on the device. **Contacts** is everyone you
+have an open channel with, read from the relay.
+
+They are deliberately different things. A channel is the durable record of who you can
+write to; a chat is only a view of it. Clear site data or sign in on a second device and
+your chats vanish while every channel is still open — Contacts is what makes those people
+findable again.
+
+**Closing a chat** (the ✕ in a conversation header) hides it from Chats. The channel stays
+open, the messages stay on the device, and anything new brings the thread straight back —
+closing is tidying, not deleting, and not a mute.
+
+## Your profile
+
+Tap your avatar in the header. It holds your address and **cost to knock** — both public,
+which is what makes it a profile rather than settings: anyone can read either from the
+relay.
+
+Cost to knock is what a stranger pays to reach you — default 10 NIM, and you keep it whether or not you answer. Presets go down to
 **Free** (0), which is the one to use while testing: it removes the payment step entirely
 so knocks need no chain access.
 

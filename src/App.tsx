@@ -5,9 +5,11 @@ import { AddressAvatar } from "@/components/address-avatar"
 
 import { Conversation } from "@/components/conversation"
 import { Inbox } from "@/components/inbox"
+import { Contacts } from "@/components/contacts"
 import { KnockRequests } from "@/components/knock-requests"
 import { KnockSheet } from "@/components/knock-sheet"
-import { SettingsSheet } from "@/components/settings-sheet"
+import { ProfileSheet } from "@/components/profile-sheet"
+import { TabBar, type Tab } from "@/components/tab-bar"
 import { Button } from "@/components/ui/button"
 import { useKnocks } from "@/hooks/use-knocks"
 import { useMessages } from "@/hooks/use-messages"
@@ -48,14 +50,23 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [wallet],
   )
 
-  const { conversations, threadWith, send, retry: retrySend, markRead, relayStatus } =
-    useMessages(owner, deviceSecretKey, session.invalidate)
+  const {
+    conversations,
+    threadWith,
+    send,
+    retry: retrySend,
+    markRead,
+    closeThread,
+    reopenThread,
+    relayStatus,
+  } = useMessages(owner, deviceSecretKey, session.invalidate)
 
   const { knocks, reach, knock, accept, decline } = useKnocks(wallet, owner)
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [knocking, setKnocking] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [tab, setTab] = useState<Tab>("chats")
+  const [profileOpen, setProfileOpen] = useState(false)
 
   // Let the hardware/gesture back control leave a thread instead of the app.
   useEffect(() => {
@@ -66,7 +77,15 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     return () => window.removeEventListener("popstate", onPop)
   }, [openPeer])
 
-  const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
+  const openThread = useCallback(
+    (peer: string) => {
+      // Opening from Contacts should bring a closed thread back rather than
+      // showing an empty chat that vanishes again on exit.
+      reopenThread(peer)
+      setOpenPeer(peer)
+    },
+    [reopenThread],
+  )
 
   const openMessages = openPeer ? threadWith(openPeer) : []
 
@@ -77,7 +96,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     if (openPeer) markRead(openPeer)
   }, [openPeer, openMessages.length, markRead])
 
-  const closeThread = useCallback(() => {
+  const closeThreadView = useCallback(() => {
     // Unwind the entry pushed above so back doesn't need two presses.
     if (window.history.state?.thread) window.history.back()
     else setOpenPeer(null)
@@ -144,10 +163,15 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         <Conversation
           peer={openPeer}
           messages={openMessages}
-          onBack={closeThread}
+          onBack={closeThreadView}
           onSend={onSend}
           onRetry={onRetrySend}
           onCopyAddress={copy}
+          onClose={() => {
+            closeThread(openPeer)
+            closeThreadView()
+            toast.success("Chat closed. They're still in Contacts.")
+          }}
         />
       </>
     )
@@ -162,7 +186,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               onClick={revealProbes}
               className="text-xl font-extrabold tracking-tight select-none"
             >
-              Messages
+              {tab === "chats" ? "Messages" : "Contacts"}
             </h1>
             {relayStatus === "offline" && (
               <span className="text-destructive text-[11px] font-semibold">offline</span>
@@ -171,8 +195,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Settings"
+            onClick={() => setProfileOpen(true)}
+            aria-label="Your profile"
             className="size-10 rounded-full"
           >
             <AddressAvatar address={address} size="sm" />
@@ -181,20 +205,32 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <KnockRequests
-          knocks={knocks}
-          onAccept={async (id) => {
-            await accept(id)
-            toast.success("You're connected. Messages are free from here.")
-          }}
-          onDecline={decline}
-        />
-        <Inbox
-          conversations={conversations}
-          onOpen={openThread}
-          onCompose={() => setKnocking(true)}
-        />
+        {tab === "chats" ? (
+          <>
+            <KnockRequests
+              knocks={knocks}
+              onAccept={async (id) => {
+                await accept(id)
+                toast.success("You're connected. Messages are free from here.")
+              }}
+              onDecline={decline}
+            />
+            <Inbox
+              conversations={conversations}
+              onOpen={openThread}
+              onCompose={() => setKnocking(true)}
+            />
+          </>
+        ) : (
+          <Contacts signedIn onOpen={openThread} />
+        )}
       </div>
+
+      <TabBar
+        active={tab}
+        onChange={setTab}
+        unread={conversations.reduce((total, c) => total + c.unread, 0) + knocks.length}
+      />
 
       <KnockSheet
         open={knocking}
@@ -214,9 +250,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         }
       />
 
-      <SettingsSheet
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
+      <ProfileSheet
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
         address={address}
         mode={wallet?.mode ?? "nimiq-pay"}
         relayStatus={relayStatus}

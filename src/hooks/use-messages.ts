@@ -151,13 +151,23 @@ export function useMessages(
     [update],
   )
 
+  const closeThread = useCallback(
+    (peer: string) => update((current) => history.closeThread(current, peer)),
+    [update],
+  )
+
+  const reopenThread = useCallback(
+    (peer: string) => update((current) => history.reopenThread(current, peer)),
+    [update],
+  )
+
   const conversations = useMemo(() => history.conversations(snapshot), [snapshot])
   const threadWith = useCallback(
     (peer: string) => history.threadWith(snapshot, peer),
     [snapshot],
   )
 
-  return { conversations, threadWith, send, retry, markRead, relayStatus }
+  return { conversations, threadWith, send, retry, markRead, closeThread, reopenThread, relayStatus }
 }
 
 /**

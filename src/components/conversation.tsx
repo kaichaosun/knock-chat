@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
-import { ChevronLeft, Copy } from "lucide-react"
+import { ChevronLeft, Copy, X } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Composer } from "@/components/composer"
@@ -16,6 +16,7 @@ export function Conversation({
   onSend,
   onRetry,
   onCopyAddress,
+  onClose,
 }: {
   peer: string
   messages: Message[]
@@ -23,6 +24,8 @@ export function Conversation({
   onSend: (body: string) => void
   onRetry: (message: Message) => void
   onCopyAddress: (address: string) => void
+  /** Hide this thread from the chat list. The channel and messages both stay. */
+  onClose: () => void
 }) {
   const bottom = useRef<HTMLDivElement>(null)
 
@@ -63,6 +66,16 @@ export function Conversation({
             className="size-10 shrink-0 rounded-full"
           >
             <Copy className="size-4" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Close chat"
+            className="size-10 shrink-0 rounded-full"
+          >
+            <X className="size-4" />
           </Button>
         </div>
       </header>

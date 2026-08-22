@@ -316,6 +316,20 @@ that copy is gone.
 Messages that will not open — sent to a key the device has since replaced — are kept and
 shown as unreadable rather than hidden, so a thread has no silent gaps.
 
+### 5.4 Channels are the record, chats are a view `[built]`
+
+`GET /v1/contacts` lists everyone you have an open channel with, derived from `channel`
+rather than from message history. That separation matters: history is device-local, so a
+fresh device shows an empty chat list while every relationship is still intact. Contacts is
+what makes them reachable again.
+
+Closing a chat is client-side and reversible — it hides a thread and nothing more. New mail
+reopens it, so a closed chat can never silently swallow a message.
+
+**Still missing: no way to close a channel.** Once someone is in, they are in permanently.
+Blocking and revocation are unbuilt, and that is the most significant gap left in the
+model.
+
 ## 9. Non-goals for v1
 
 Group chat (changes the envelope format — a genuine fork, deferred deliberately),

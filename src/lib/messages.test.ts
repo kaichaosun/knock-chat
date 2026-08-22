@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
 
-import { conversations, emptySnapshot, markRead, mergeIncoming, threadWith } from "./messages"
+import {
+  closeThread,
+  conversations,
+  emptySnapshot,
+  markRead,
+  mergeIncoming,
+  reopenThread,
+  threadWith,
+} from "./messages"
 import type { Snapshot } from "./messages"
 import type { Envelope } from "./relay"
 
@@ -160,5 +168,53 @@ describe("markRead", () => {
     // An envelope timestamped far in the past still counts as new.
     const backdated = { ...envelope(2, "late arrival", ALICE, "id-old"), created_at: new Date(2000, 0, 1).toISOString() }
     expect(unreadFor(mergeIncoming(snapshot, [backdated], cursor(2)), ALICE)).toBe(1)
+  })
+})
+
+describe("closing a chat", () => {
+  const listed = (snapshot: Snapshot) => conversations(snapshot).map((c) => c.peer)
+
+  it("hides the thread without touching its messages", () => {
+    let snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1))
+    expect(listed(snapshot)).toHaveLength(1)
+
+    snapshot = closeThread(snapshot, ALICE)
+    expect(listed(snapshot)).toHaveLength(0)
+    // The history is still there — closing is tidying, not deleting.
+    expect(threadWith(snapshot, ALICE)).toHaveLength(1)
+  })
+
+  it("reopens on request, with the messages intact", () => {
+    let snapshot = closeThread(
+      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
+      ALICE,
+    )
+    snapshot = reopenThread(snapshot, ALICE)
+    expect(listed(snapshot)).toHaveLength(1)
+    expect(threadWith(snapshot, ALICE)[0].body).toBe("hi")
+  })
+
+  /** A closed chat is not a mute — new mail must not vanish into it. */
+  it("reopens by itself when something new arrives", () => {
+    let snapshot = closeThread(
+      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
+      ALICE,
+    )
+    expect(listed(snapshot)).toHaveLength(0)
+
+    snapshot = mergeIncoming(snapshot, [envelope(2, "still there?", ALICE, "id-2b")], cursor(2))
+    expect(listed(snapshot)).toHaveLength(1)
+  })
+
+  it("closes only the thread asked for", () => {
+    const snapshot = closeThread(
+      mergeIncoming(
+        emptySnapshot(),
+        [envelope(1, "from alice", ALICE), envelope(2, "from bob", BOB)],
+        cursor(2),
+      ),
+      ALICE,
+    )
+    expect(listed(snapshot)).toEqual([BOB.replace(/\s+/g, "")])
   })
 })

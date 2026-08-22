@@ -163,3 +163,9 @@ export function acceptKnock(id: string) {
 export function declineKnock(id: string) {
   return request<Knock>(`/v1/knocks/${id}/decline`, { method: "POST" })
 }
+
+export type Contact = { address: string; opened_at: string }
+
+export function listContacts(): Promise<{ contacts: Contact[] }> {
+  return request<{ contacts: Contact[] }>("/v1/contacts")
+}
