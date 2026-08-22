@@ -1,0 +1,190 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Palette follows Nimiq's brand so the Mini App reads as part of Nimiq Pay
+ * rather than a stranger hosted inside it: navy #1F2348 for ink and dark
+ * surfaces, and the signature blue gradient (#265DD7 → #0582CA) for accent.
+ */
+:root {
+  --radius: 0.875rem;
+
+  --background: #ffffff;
+  --foreground: #1f2348;
+
+  --card: #ffffff;
+  --card-foreground: #1f2348;
+  --popover: #ffffff;
+  --popover-foreground: #1f2348;
+
+  --primary: #0582ca;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f1f3f9;
+  --secondary-foreground: #1f2348;
+
+  --muted: #f1f3f9;
+  --muted-foreground: #656e94;
+
+  --accent: #eaf4fb;
+  --accent-foreground: #04618f;
+
+  --destructive: #d94432;
+  --destructive-foreground: #ffffff;
+
+  --success: #21bca5;
+  --warning: #e9b213;
+
+  --border: #e3e6f0;
+  --input: #e3e6f0;
+  --ring: #0582ca;
+
+  /* Brand gradient, used for the mark and outgoing bubbles. */
+  --brand-from: #265dd7;
+  --brand-to: #0582ca;
+}
+
+.dark {
+  --background: #101438;
+  --foreground: #eef0f8;
+
+  --card: #191e4a;
+  --card-foreground: #eef0f8;
+  --popover: #191e4a;
+  --popover-foreground: #eef0f8;
+
+  --primary: #3ea2e0;
+  --primary-foreground: #06152b;
+
+  --secondary: #222860;
+  --secondary-foreground: #eef0f8;
+
+  --muted: #1c2252;
+  --muted-foreground: #98a1cc;
+
+  --accent: #222860;
+  --accent-foreground: #bcd9ef;
+
+  --destructive: #f0654f;
+  --destructive-foreground: #1a0806;
+
+  --success: #35d3ba;
+  --warning: #f0c236;
+
+  --border: #2a3169;
+  --input: #2a3169;
+  --ring: #3ea2e0;
+
+  --brand-from: #3b6ee0;
+  --brand-to: #1f97dc;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: "Mulish", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    /* The WebView must not rubber-band the whole page; only lists scroll. */
+    height: 100%;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    min-height: 100%;
+    display: flex;
+    justify-content: center;
+    /* A tap should never select text or flash a highlight in a native shell. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /*
+   * Inside Nimiq Pay the WebView is already phone-width, so this is a no-op.
+   * On a desktop browser it keeps the app in a phone-shaped column instead of
+   * stretching line lengths across a monitor.
+   */
+  #root {
+    position: relative;
+    width: 100%;
+    max-width: 30rem;
+    height: 100dvh;
+    overflow: hidden;
+    background: var(--background);
+  }
+
+  @media (min-width: 30rem) {
+    body {
+      background: color-mix(in srgb, var(--muted) 70%, var(--background));
+    }
+
+    #root {
+      border-inline: 1px solid var(--border);
+    }
+  }
+
+  /* Inputs below 16px make iOS zoom on focus, which looks broken in a WebView. */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
+}
+
+@utility brand-gradient {
+  background-image: linear-gradient(
+    135deg,
+    var(--brand-from) 0%,
+    var(--brand-to) 100%
+  );
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Respect the notch and home indicator; these are 0 outside a native shell. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
