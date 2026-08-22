@@ -15,7 +15,7 @@ export type RelayStatus = "connecting" | "online" | "offline"
  * arrives into local storage, and sends optimistically so the composer never
  * feels like it is waiting on the network.
  */
-export function useMessages(owner: string | null) {
+export function useMessages(owner: string | null, onUnauthorized?: () => void) {
   const [snapshot, setSnapshot] = useState<Snapshot>(() =>
     owner ? history.load(owner) : { cursor: 0, messages: [], readAt: {} },
   )
@@ -58,6 +58,10 @@ export function useMessages(owner: string | null) {
         }
       } catch (error) {
         if (cancelled) return
+        if (error instanceof RelayError && error.status === 401) {
+          onUnauthorized?.()
+          return
+        }
         setRelayStatus(error instanceof RelayError && error.status === 0 ? "offline" : "online")
       }
     }
@@ -72,7 +76,7 @@ export function useMessages(owner: string | null) {
       window.clearInterval(timer)
       document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [owner, update])
+  }, [owner, update, onUnauthorized])
 
   const send = useCallback(
     async (peer: string, body: string) => {
@@ -93,11 +97,14 @@ export function useMessages(owner: string | null) {
         setRelayStatus("online")
       } catch (error) {
         update((current) => history.setStatus(current, message.id, "failed"))
-        if (error instanceof RelayError && error.status === 0) setRelayStatus("offline")
+        if (error instanceof RelayError) {
+          if (error.status === 0) setRelayStatus("offline")
+          if (error.status === 401) onUnauthorized?.()
+        }
         throw error
       }
     },
-    [owner, update],
+    [owner, update, onUnauthorized],
   )
 
   const retry = useCallback(

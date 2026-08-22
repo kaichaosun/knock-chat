@@ -3,9 +3,8 @@
 A Nimiq Pay Mini App for messaging between wallets, where spam is priced out
 instead of guessed at.
 
-> **Status: first slice.** Plain-text messages over
-> [knock-relay](../knock-relay). No authentication, no encryption, no
-> postage yet — see [Roadmap](#roadmap).
+> **Status.** Authenticated plain-text messages over [knock-relay](../knock-relay).
+> No encryption or postage yet — see [Roadmap](#roadmap).
 
 ## Run it
 
@@ -45,7 +44,15 @@ identity.
 ## Device probes
 
 Three questions block the next slices and none can be answered from a desktop browser.
-Open the app in Nimiq Pay at `?probe=1` to run them:
+Open the app in Nimiq Pay and reach the probes any of these ways — whether the host
+preserves a query string is itself one of the open questions, so there is a route that
+does not depend on the URL at all:
+
+- `http://<ip>:5175/?probe=1`
+- `http://<ip>:5175/#probe`
+- `http://<ip>:5175/probe`
+- **Tap the "Messages" title five times** — works no matter what the host does to the URL.
+
 
 | Probe | Answers |
 | --- | --- |
@@ -61,7 +68,8 @@ Open the app in Nimiq Pay at `?probe=1` to run them:
 
 | Layer | What it does |
 | --- | --- |
-| `lib/wallet.ts` | Waits for Nimiq Pay to inject `window.nimiq` via `@nimiq/mini-app-sdk`; falls back to a dev identity outside it. |
+| `lib/wallet.ts` | Waits for Nimiq Pay to inject `window.nimiq` via `@nimiq/mini-app-sdk`; falls back to a dev identity outside it. Dev identities are **real Ed25519 keypairs** from fixed seeds, so they sign relay challenges for real and the relay needs no test-only bypass. |
+| `lib/auth.ts` | Challenge, sign, verify. Caches the session per address so `sign()` prompts once per device rather than once per request. |
 | `lib/relay.ts` | Talks to the relay: send, fetch by cursor, ack. |
 | `lib/messages.ts` | Local history. The relay only holds mail *for* a recipient, so a sender never gets its own messages back — the client keeps the thread and merges incoming envelopes into it. |
 | `hooks/use-messages.ts` | Polls every 3s while the document is visible, sends optimistically, exposes conversations and threads. |
@@ -93,10 +101,7 @@ that constraint is a no-op.
 
 ## Roadmap
 
-1. **Authentication.** The relay serves any address's queue to anyone who asks.
-   Fetches get gated on an Ed25519 challenge signed by the wallet, with the
-   caller's address derived from the returned public key.
-2. **Encryption.** Bodies are plain text and readable by the relay. They become
+1. **Encryption.** Bodies are plain text and readable by the relay. They become
    ciphertext under a per-conversation key.
 3. **NIM postage.** Strangers attach a small refundable payment the relay
    verifies on-chain before accepting; contacts and stakers are exempt. See

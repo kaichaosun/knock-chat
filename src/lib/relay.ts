@@ -28,6 +28,16 @@ export type FetchResult = {
   next: number
 }
 
+/**
+ * The current session token, attached to every request. Held here rather than
+ * threaded through each call because there is exactly one session at a time.
+ */
+let authToken: string | null = null
+
+export function setAuthToken(token: string | null): void {
+  authToken = token
+}
+
 /** An error carrying whatever the relay said, so the UI can show something real. */
 export class RelayError extends Error {
   // Declared as a field rather than a constructor parameter property, which
@@ -41,12 +51,16 @@ export class RelayError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
     response = await fetch(`${BASE}${path}`, {
       ...init,
-      headers: { "content-type": "application/json", ...init?.headers },
+      headers: {
+        "content-type": "application/json",
+        ...(authToken ? { authorization: `Bearer ${authToken}` } : {}),
+        ...init?.headers,
+      },
     })
   } catch {
     throw new RelayError("Can't reach the relay. Is it running?", 0)

@@ -13,6 +13,7 @@ import { ed25519 } from "@noble/curves/ed25519.js"
 import type { NimiqProvider } from "@nimiq/mini-app-sdk"
 
 import { addressFromPublicKey, compact } from "@/lib/address"
+import { hexToBytes, verifySignedMessage } from "@/lib/signed-message"
 
 declare global {
   interface Window {
@@ -29,19 +30,6 @@ export type ProbeReport = {
   headline: string
   /** Raw values, shown verbatim and included in the copied report. */
   detail: Record<string, string>
-}
-
-/** Accept hex with or without the 0x prefix; the provider's format is unconfirmed. */
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.trim().replace(/^0x/i, "")
-  if (clean.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(clean)) {
-    throw new Error(`not hex: ${hex.slice(0, 24)}…`)
-  }
-  const bytes = new Uint8Array(clean.length / 2)
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16)
-  }
-  return bytes
 }
 
 /** What the app is running inside, and what survived the trip. */
@@ -105,17 +93,15 @@ export async function signatureProbe(provider: NimiqProvider): Promise<ProbeRepo
   const publicKey = hexToBytes(first.publicKey)
   const signature = hexToBytes(first.signature)
 
-  let verifiesOverRawBytes = false
-  let verifyError = ""
-  try {
-    verifiesOverRawBytes = ed25519.verify(
-      signature,
-      new TextEncoder().encode(message),
-      publicKey,
-    )
-  } catch (error) {
-    verifyError = error instanceof Error ? error.message : String(error)
-  }
+  // Nimiq wraps and hashes before signing; verify over that construction.
+  const verifiesAsSignedMessage = verifySignedMessage(message, signature, publicKey)
+  const verifiesOverRawBytes = (() => {
+    try {
+      return ed25519.verify(signature, new TextEncoder().encode(message), publicKey)
+    } catch {
+      return false
+    }
+  })()
 
   const accounts = await provider.listAccounts()
   const walletAddress = Array.isArray(accounts) ? (accounts[0] ?? "") : ""
@@ -126,16 +112,16 @@ export async function signatureProbe(provider: NimiqProvider): Promise<ProbeRepo
   const deterministic = first.signature === second.signature
 
   return {
-    outcome: verifiesOverRawBytes && addressMatches ? "pass" : "fail",
-    headline: verifiesOverRawBytes
+    outcome: verifiesAsSignedMessage && addressMatches ? "pass" : "fail",
+    headline: verifiesAsSignedMessage
       ? addressMatches
-        ? "Signs raw UTF-8, and the key derives to the wallet address"
-        : "Signs raw UTF-8, but the derived address does NOT match"
-      : "Signature does NOT verify over the raw message — something wraps it",
+        ? "Nimiq signed-message construction confirmed; key derives to the wallet address"
+        : "Construction confirmed, but the derived address does NOT match"
+      : "Does not verify under the known construction — the format changed",
     detail: {
       "message signed": message,
+      "verifies as Nimiq signed message": String(verifiesAsSignedMessage),
       "verifies over raw UTF-8": String(verifiesOverRawBytes),
-      ...(verifyError ? { "verify error": verifyError } : {}),
       "public key": first.publicKey,
       "public key bytes": String(publicKey.length),
       "signature": first.signature,

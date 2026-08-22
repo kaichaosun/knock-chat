@@ -46,7 +46,7 @@ offers no decrypt or shared-secret method, so a message encrypted to a Nimiq add
 never be decrypted by its owner. An app-held X25519 subkey is therefore not a workaround
 but the only construction the platform permits.
 
-### 2.1 Authentication `[v1]`
+### 2.1 Authentication `[built]`
 
 1. Client requests a challenge: `POST /v1/auth/challenge` → `{ nonce, expires_at }`.
 2. Client calls `nimiq.sign(nonce)`, which returns `{ publicKey, signature }`.
@@ -57,10 +57,18 @@ but the only construction the platform permits.
 The address derivation is `[built]` and pinned to independently computed vectors in
 `knock-relay/src/address.rs`.
 
-> **Open:** whether Nimiq Pay's `sign()` prefixes or wraps the message before signing. If
-> it does, the relay must verify over the same wrapped bytes. This must be confirmed
-> against a real device before the auth slice is written — it is the single cheapest
-> unknown left in the design.
+**Confirmed on device.** `sign()` does not sign the message it is given. It wraps and
+hashes first:
+
+```text
+digest = SHA256( 0x16 ‖ "Nimiq Signed Message:\n" ‖ ascii(byte_len) ‖ message )
+```
+
+An EIP-191-style guard, so a signing request can never be tricked into authorising a
+transaction. The relay verifies over exactly these bytes — `knock-relay/src/signature.rs`
+and `src/lib/signed-message.ts`, both pinned to a signature captured from Nimiq Pay on
+iOS. Signatures are deterministic, and the returned public key derives to the address the
+wallet displays.
 
 Sessions are cached so `sign()` prompts once per device, not once per request. A modal
 confirmation on every fetch would be fatal to the onboarding experience.
@@ -260,8 +268,8 @@ Sequenced by dependency, not by preference.
 
 | # | Slice | Why here |
 | --- | --- | --- |
-| 0 | Confirm `sign()` semantics on a device | Everything downstream assumes it |
-| 1 | **Auth** | The key directory needs an authenticated identity to hang off |
+| 0 | ~~Confirm `sign()` semantics on a device~~ ✅ | Done; see §2.1 |
+| 1 | ~~**Auth**~~ ✅ | Done. Challenge, signature, session; an address can only act as itself |
 | 2 | **Encryption** | Credibility floor; a readable messenger will be noticed |
 | 3 | **Links and invites** | Cheap, and it is the growth loop |
 | 4 | **Postage and refund** | The differentiator; the chain plumbing dominates, and it is the only piece that can slip without leaving the app incoherent |
@@ -271,14 +279,31 @@ Sequenced by dependency, not by preference.
 
 ## 11. Open questions
 
-1. Does `sign()` wrap the message before signing, and is the prompt tolerable once per
-   device? Blocks slice 1.
-2. Does the Nimiq Pay deeplink preserve query parameters? Blocks invite links.
-3. Is there a minimum transaction amount in Nimiq Pay that would break 10 NIM postage?
-   More pressing at 10 NIM than it was at 100 — if a floor exists, the default moves up to
-   clear it rather than the mechanism changing.
-4. Which node does the relay watch — a local `nimiq-client` with RPC, or a hosted one?
-   `subscribe_for_logs_by_addresses_and_types` gives a push stream, which is better than
-   polling for confirming postage.
-5. Does a judge with an empty wallet have a path through the app? If not, the free tiers
-   are the demo path and must be reachable in the first sixty seconds.
+### Answered on device — Nimiq Pay, iOS 18.1.1
+
+1. **`sign()` semantics.** Wraps and hashes before signing; see §2.1. Signatures are
+   deterministic, and the public key derives to the wallet's own address, which also
+   validates `Address::from_public_key` against real data. Slice 1 is unblocked.
+2. **Minimum transaction amount.** None at 1 NIM — a self-send of 100,000 luna was
+   accepted and returned a transaction hash. 10 NIM postage is comfortably clear.
+3. **Query strings survive** when a URL is typed into Nimiq Pay's mini-apps field.
+
+### Still open
+
+4. **Does the `nimpay.app/miniapps/open/…` deeplink preserve a query string?** Untested —
+   it will not resolve a LAN address, so it needs the app on a public host. Blocks invite
+   links (slice 3), not slice 1.
+5. **Which node does the relay watch** — a local `nimiq-client` with RPC, or a hosted one?
+   `subscribe_for_logs_by_addresses_and_types` gives a push stream, better than polling.
+6. **Which account is "you"?** The wallet returned **two** accounts; the client currently
+   takes the first. Either the user picks once during onboarding, or every account shares
+   one inbox. This is a product decision and it affects the key certificate.
+7. **Does a judge with an empty wallet have a path through the app?** If not, the free
+   tiers are the demo path and must be reachable in the first sixty seconds.
+
+### Environment notes that shaped the code
+
+The Nimiq Pay WebView is **not a secure context** — `crypto.randomUUID` and
+`navigator.clipboard` are both unavailable. The fallbacks in `lib/messages.ts` and
+`lib/clipboard.ts` are load-bearing, not defensive, and anything added later that assumes
+a secure context will fail silently on device.

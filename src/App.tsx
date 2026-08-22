@@ -14,24 +14,32 @@ import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import type { Message } from "@/lib/messages"
 import { devIdentities } from "@/lib/wallet"
+import { SignInScreen } from "@/components/sign-in-screen"
+import { useSession } from "@/hooks/use-session"
 import { ProbeScreen } from "@/probe/probe-screen"
+import { probeRequested, useSecretTap } from "@/probe/entry"
 
 export default function App() {
-  // Diagnostics live behind `?probe=1` and are never linked from the app.
-  // Checked before any hook runs so the probes get a clean provider.
-  if (new URLSearchParams(window.location.search).has("probe")) {
-    return <ProbeScreen />
-  }
+  // Diagnostics are never linked from the app. Reachable by `?probe`, `#probe`
+  // or `/probe`, and — because whether the host preserves any of those is one of
+  // the open questions — by tapping the inbox title five times.
+  const [showProbes, setShowProbes] = useState(probeRequested)
 
-  return <Messenger />
+  if (showProbes) return <ProbeScreen />
+  return <Messenger onRevealProbes={() => setShowProbes(true)} />
 }
 
-function Messenger() {
+function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
+  const revealProbes = useSecretTap(onRevealProbes)
   const { state, retry } = useWallet()
-  const address = state.status === "connected" ? state.wallet.address : null
+  const wallet = state.status === "connected" ? state.wallet : null
+
+  const session = useSession(wallet)
+  // Only poll once there is a session; the relay would answer 401 otherwise.
+  const address = session.state.status === "active" ? session.state.session.address : null
 
   const { conversations, threadWith, send, retry: retrySend, markRead, relayStatus } =
-    useMessages(address)
+    useMessages(address, session.invalidate)
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
@@ -88,7 +96,7 @@ function Messenger() {
     [retrySend],
   )
 
-  if (state.status !== "connected") {
+  if (state.status !== "connected" || !wallet) {
     return (
       <ConnectScreen
         connecting={state.status === "connecting"}
@@ -98,7 +106,16 @@ function Messenger() {
     )
   }
 
-  const { wallet } = state
+  if (session.state.status !== "active") {
+    return (
+      <SignInScreen
+        address={wallet.address}
+        signing={session.state.status === "signing" || session.state.status === "restoring"}
+        error={session.state.status === "error" ? session.state.message : undefined}
+        onSignIn={session.authenticate}
+      />
+    )
+  }
 
   if (openPeer) {
     return (
@@ -120,7 +137,12 @@ function Messenger() {
       <header className="bg-background/85 sticky top-0 z-10 border-b backdrop-blur-xl pt-safe">
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-baseline gap-2">
-            <h1 className="text-xl font-extrabold tracking-tight">Messages</h1>
+            <h1
+              onClick={revealProbes}
+              className="text-xl font-extrabold tracking-tight select-none"
+            >
+              Messages
+            </h1>
             {relayStatus === "offline" && (
               <span className="text-destructive text-[11px] font-semibold">offline</span>
             )}
