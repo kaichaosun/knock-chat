@@ -110,8 +110,9 @@ function EmptyInbox({ onCompose }: { onCompose: () => void }) {
         <MessageSquarePlus className="size-9" strokeWidth={1.5} />
       </div>
       <h2 className="mt-6 text-xl font-bold tracking-tight">No messages yet</h2>
-      <p className="text-muted-foreground mt-2 max-w-[17rem] text-balance">
-        Start a conversation with any Nimiq address — they don't need an account here.
+      <p className="text-muted-foreground mt-2 max-w-[18rem] text-balance">
+        Start a conversation with anyone who has opened Knock. Messages are encrypted
+        to their device.
       </p>
       <Button onClick={onCompose} size="lg" className="mt-7 h-12 rounded-2xl px-6">
         <PenLine />

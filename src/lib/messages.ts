@@ -10,10 +10,25 @@
 import { compact } from "./address"
 import type { Envelope } from "./relay"
 
+/**
+ * An envelope after decryption: the body is plaintext, or the message is
+ * flagged as one this device cannot open.
+ */
+export type OpenedEnvelope = Omit<Envelope, "body"> & {
+  body: string
+  undecryptable?: boolean
+}
+
 export type MessageStatus = "sending" | "sent" | "failed"
 
 export type Message = {
   id: string
+  /**
+   * Set when a message arrived but could not be decrypted — usually because it
+   * was sent to a key this device has since replaced. Shown as such rather than
+   * hidden, so history has no silent gaps.
+   */
+  undecryptable?: boolean
   /** The other party, whichever direction the message went. */
   peer: string
   direction: "in" | "out"
@@ -97,7 +112,7 @@ export function save(owner: string, snapshot: Snapshot): void {
  */
 export function mergeIncoming(
   snapshot: Snapshot,
-  envelopes: Envelope[],
+  envelopes: OpenedEnvelope[],
   cursor: string,
 ): Snapshot {
   const known = new Set(snapshot.messages.map((m) => m.id))
@@ -112,6 +127,7 @@ export function mergeIncoming(
       body: envelope.body,
       at: envelope.created_at,
       status: "sent",
+      ...(envelope.undecryptable ? { undecryptable: true } : {}),
     })
   }
 

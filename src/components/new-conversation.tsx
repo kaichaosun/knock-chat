@@ -48,7 +48,8 @@ export function NewConversation({
         <SheetHeader className="px-0">
           <SheetTitle>New message</SheetTitle>
           <SheetDescription>
-            Enter any Nimiq address. They don't need to have used this app before.
+            Enter a Nimiq address. They need to have opened Knock at least once, so
+            there is a key to encrypt to.
           </SheetDescription>
         </SheetHeader>
 

@@ -1,0 +1,159 @@
+/**
+ * Device keys and peer key lookup.
+ *
+ * This device holds an X25519 keypair whose private half never leaves it. The
+ * wallet vouches for the public half by signing it — and that vouching is
+ * folded into sign-in, so certifying a key costs no extra confirmation dialog.
+ *
+ * To write to someone you need their certificate. It is **verified here**, not
+ * trusted from the relay: the whole point of end-to-end encryption is that the
+ * relay is not part of the trust boundary.
+ */
+
+import { addressFromPublicKey, compact, formatAddress } from "./address"
+import { conversationKey, fromHex, generateKeyPair, publicKeyFrom, toHex } from "./crypto"
+import { request } from "./relay"
+import { hexToBytes, verifySignedMessage } from "./signed-message"
+
+/** Certificates as the relay stores them: the signed statement, kept verbatim. */
+export type KeyCertificate = {
+  address: string
+  /** The exact bytes the wallet signed — the sign-in challenge. */
+  statement: string
+  public_key: string
+  signature: string
+}
+
+/** Thrown when someone cannot be written to because they have never signed in. */
+export class NoKeyError extends Error {
+  // A field rather than a constructor parameter property, which
+  // `erasableSyntaxOnly` disallows.
+  address: string
+
+  constructor(address: string) {
+    super("They haven't opened Knock yet, so there's no key to encrypt to.")
+    this.name = "NoKeyError"
+    this.address = address
+  }
+}
+
+function deviceKeyStorageKey(scope: string): string {
+  return `knock:devicekey:${scope}`
+}
+
+/**
+ * This device's keypair, generated on first use and kept thereafter.
+ *
+ * Losing it means losing the ability to read existing conversations, which is
+ * the accepted cost of holding the private half nowhere else.
+ */
+export function deviceKeyPair(scope: string): { secretKey: Uint8Array; publicKey: Uint8Array } {
+  try {
+    const stored = localStorage.getItem(deviceKeyStorageKey(scope))
+    if (stored) {
+      const secretKey = fromHex(stored)
+      if (secretKey.length === 32) {
+        // Re-derived rather than stored, so the two cannot disagree.
+        return { secretKey, publicKey: publicKeyFrom(secretKey) }
+      }
+    }
+  } catch {
+    // Unreadable or corrupt — mint a fresh one rather than failing to start.
+  }
+
+  const pair = generateKeyPair()
+  try {
+    localStorage.setItem(deviceKeyStorageKey(scope), toHex(pair.secretKey))
+  } catch {
+    // Private mode: the key works for this session but re-keys on reload.
+  }
+  return pair
+}
+
+/** The line in a signed statement that carries the key. */
+const KEY_PREFIX = "Encryption key: "
+
+/**
+ * Read the encryption key out of a signed statement.
+ *
+ * Taken from the signed bytes rather than a field beside them, so a relay
+ * cannot serve a statement vouching for one key while claiming another.
+ */
+export function encryptionKeyOf(statement: string): string | null {
+  for (const line of statement.split("\n")) {
+    if (!line.startsWith(KEY_PREFIX)) continue
+    const value = line.slice(KEY_PREFIX.length).trim()
+    return /^[0-9a-f]{64}$/i.test(value) ? value : null
+  }
+  return null
+}
+
+/**
+ * Check a certificate really binds its address to its key, and return the key.
+ *
+ * Three things must hold: the statement carries a well-formed key, the
+ * signature covers that statement, and the signing key derives to the address
+ * being claimed. Any of them failing means someone is trying to read your mail.
+ */
+export function verifyCertificate(certificate: KeyCertificate): string | null {
+  const key = encryptionKeyOf(certificate.statement)
+  if (!key) return null
+
+  if (!verifySignedMessage(certificate.statement, certificate.signature, certificate.public_key)) {
+    return null
+  }
+
+  try {
+    const signer = addressFromPublicKey(hexToBytes(certificate.public_key))
+    if (compact(signer) !== compact(certificate.address)) return null
+  } catch {
+    return null
+  }
+  return key
+}
+
+/** Verified peer keys, so a thread does not re-fetch on every poll. */
+const peerKeys = new Map<string, Uint8Array>()
+
+/** Forget cached keys — used when the signed-in identity changes. */
+export function clearPeerKeys(): void {
+  peerKeys.clear()
+}
+
+/**
+ * The conversation key for talking to `peer`, fetching and verifying their
+ * certificate if this device has not seen it yet.
+ *
+ * Throws [`NoKeyError`] when the peer has never signed in, because there is
+ * genuinely nothing to encrypt to — an unavoidable consequence of end-to-end
+ * encryption, not a bug to work around.
+ */
+export async function keyForPeer(
+  peer: string,
+  mySecretKey: Uint8Array,
+): Promise<Uint8Array> {
+  const cacheKey = compact(peer)
+  const cached = peerKeys.get(cacheKey)
+  if (cached) return conversationKey(mySecretKey, cached)
+
+  let certificate: KeyCertificate
+  try {
+    certificate = await request<KeyCertificate>(
+      `/v1/keys/${encodeURIComponent(formatAddress(peer))}`,
+    )
+  } catch (error) {
+    if (error instanceof Error && "status" in error && error.status === 404) {
+      throw new NoKeyError(peer)
+    }
+    throw error
+  }
+
+  const key = verifyCertificate(certificate)
+  if (!key) {
+    throw new Error("That address's encryption key failed verification. Not sending.")
+  }
+
+  const bytes = fromHex(key)
+  peerKeys.set(cacheKey, bytes)
+  return conversationKey(mySecretKey, bytes)
+}

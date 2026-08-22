@@ -3,8 +3,8 @@
 A Nimiq Pay Mini App for messaging between wallets, where spam is priced out
 instead of guessed at.
 
-> **Status.** Authenticated plain-text messages over [knock-relay](../knock-relay).
-> No encryption or postage yet — see [Roadmap](#roadmap).
+> **Status.** Authenticated, end-to-end encrypted messages over
+> [knock-relay](../knock-relay). No postage yet — see [Roadmap](#roadmap).
 
 ## Run it
 
@@ -79,7 +79,9 @@ cannot drift apart.
 | Layer | What it does |
 | --- | --- |
 | `lib/wallet.ts` | Waits for Nimiq Pay to inject `window.nimiq` via `@nimiq/mini-app-sdk`; falls back to a dev identity outside it. A wallet here is **only a signer** — it carries no address, because `sign()` returns the public key and the address derives from that. Dev identities are **real Ed25519 keypairs** from fixed seeds, so they sign challenges for real and the relay needs no test-only bypass. |
-| `lib/auth.ts` | Challenge, sign, verify. Caches the session per address so `sign()` prompts once per device rather than once per request. |
+| `lib/auth.ts` | Challenge, sign, verify. The challenge carries this device's encryption key, so one signature both proves identity and publishes the key. Caches the session so `sign()` prompts once per device, not once per request. |
+| `lib/crypto.ts` | X25519 key agreement, HKDF-SHA256, XChaCha20-Poly1305. One conversation key per pair, derived independently by both sides. **No forward secrecy** — a device key opens that conversation's whole history. |
+| `lib/keys.ts` | This device's keypair, and peer certificates — **verified here, not trusted from the relay**, which is the entire point of end-to-end encryption. |
 | `lib/relay.ts` | Talks to the relay: send, fetch by cursor, ack. |
 | `lib/messages.ts` | Local history. The relay only holds mail *for* a recipient, so a sender never gets its own messages back — the client keeps the thread and merges incoming envelopes into it, deduplicating on the relay-assigned `id`. |
 | `hooks/use-messages.ts` | Polls every 3s while the document is visible, sends optimistically, exposes conversations and threads. |

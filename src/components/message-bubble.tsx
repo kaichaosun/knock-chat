@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Clock } from "lucide-react"
+import { AlertCircle, Check, Clock, LockKeyhole } from "lucide-react"
 
 import type { Message } from "@/lib/messages"
 import { clockTime } from "@/lib/time"
@@ -13,6 +13,19 @@ export function MessageBubble({
 }) {
   const outgoing = message.direction === "out"
   const failed = message.status === "failed"
+
+  // Kept and shown rather than hidden: a message this device cannot read is
+  // still evidence someone wrote, and dropping it would leave a silent gap.
+  if (message.undecryptable) {
+    return (
+      <div className="flex w-full justify-start">
+        <div className="bg-muted/60 text-muted-foreground flex max-w-[80%] items-center gap-2 rounded-2xl rounded-bl-md px-3.5 py-2.5 text-[13px] italic">
+          <LockKeyhole className="size-3.5 shrink-0" />
+          Can't be opened on this device
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={cn("flex w-full", outgoing ? "justify-end" : "justify-start")}>

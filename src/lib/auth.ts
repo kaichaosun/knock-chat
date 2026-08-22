@@ -7,6 +7,8 @@
  * costs a wallet confirmation the user has to tap.
  */
 
+import { toHex } from "./crypto"
+import { clearPeerKeys, deviceKeyPair } from "./keys"
 import { request, setAuthToken } from "./relay"
 import type { Signer } from "./wallet"
 
@@ -65,7 +67,14 @@ export function clearSession(scope: string): void {
  * signed — so this call is what establishes identity, not just what proves it.
  */
 export async function signIn(scope: string, sign: Signer): Promise<Session> {
-  const challenge = await request<ChallengeResponse>("/v1/auth/challenge", { method: "POST" })
+  // The challenge carries this device's encryption key, so the one signature
+  // that proves identity also publishes the key. Two prompts for what is really
+  // one act — registering this device — would be one prompt too many.
+  const device = deviceKeyPair(scope)
+  const challenge = await request<ChallengeResponse>("/v1/auth/challenge", {
+    method: "POST",
+    body: JSON.stringify({ encryption_key: toHex(device.publicKey) }),
+  })
   const { publicKey, signature } = await sign(challenge.message)
 
   const verified = await request<VerifyResponse>("/v1/auth/verify", {
@@ -80,5 +89,7 @@ export async function signIn(scope: string, sign: Signer): Promise<Session> {
   }
   saveSession(scope, session)
   setAuthToken(session.token)
+  // Cached peer keys belong to whoever was signed in before.
+  clearPeerKeys()
   return session
 }

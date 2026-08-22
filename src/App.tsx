@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -13,6 +13,8 @@ import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import type { Message } from "@/lib/messages"
+import { NoKeyError } from "@/lib/keys"
+import { deviceKeyPair } from "@/lib/keys"
 import { devIdentities } from "@/lib/wallet"
 import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
 import { useSession } from "@/hooks/use-session"
@@ -38,8 +40,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // Only poll once there is a session; the relay would answer 401 otherwise.
   const owner = session.state.status === "active" ? session.state.session.address : null
 
+  // This device's private half, needed to open incoming mail and seal outgoing.
+  const deviceSecretKey = useMemo(
+    () => (wallet ? deviceKeyPair(wallet.scope).secretKey : null),
+    [wallet],
+  )
+
   const { conversations, threadWith, send, retry: retrySend, markRead, relayStatus } =
-    useMessages(owner, session.invalidate)
+    useMessages(owner, deviceSecretKey, session.invalidate)
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
@@ -79,7 +87,15 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       try {
         await send(openPeer, body)
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Message failed to send")
+        // Someone who has never opened Knock has published no key, so there is
+        // nothing to encrypt to. Say that plainly instead of "failed to send".
+        toast.error(
+          error instanceof NoKeyError
+            ? "They haven't joined Knock yet — nothing to encrypt to."
+            : error instanceof Error
+              ? error.message
+              : "Message failed to send",
+        )
       }
     },
     [openPeer, send],

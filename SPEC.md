@@ -78,17 +78,22 @@ wallet displays.
 Sessions are cached so `sign()` prompts once per device, not once per request. A modal
 confirmation on every fetch would be fatal to the onboarding experience.
 
-### 2.2 Encryption keys `[v1]`
+### 2.2 Encryption keys `[built]`
 
 The wallet key cannot perform a key exchange, so Knock uses the standard
 identity-key-certifies-subkey pattern — PGP subkeys, Signal prekeys:
 
 - On first run the client generates an **X25519 keypair** and keeps the private half on
   the device.
-- It publishes a **key certificate** — `{ address, x25519_pub, created_at }` — signed by
-  the wallet key.
-- The relay serves certificates at `GET /v1/keys/{address}`. Anyone can verify one: the
-  signature must verify against a public key that derives to the claimed address.
+- **The sign-in challenge carries that public key**, so the one signature that proves
+  identity also certifies the key. Publishing it separately would have meant a second
+  wallet confirmation for what is really one act — registering a device.
+- A certificate is therefore the signed challenge kept verbatim. The key is read back
+  **out of the signed bytes**, never from a field beside them, so the two cannot disagree
+  and a relay cannot vouch for one key while serving another.
+- `GET /v1/keys/{address}` serves them. Clients verify three things themselves: the
+  statement carries a well-formed key, the signature covers that statement, and the
+  signing key derives to the claimed address.
 
 This requires **no assumption that `sign()` is deterministic**, which is why it is
 preferred over deriving the encryption key from a signature.
@@ -144,7 +149,7 @@ not an archive. Long-term history lives on the device.
 
 ---
 
-## 4. Encryption `[v1]`
+## 4. Encryption `[built]`
 
 - **Key agreement:** X25519 ECDH between the two parties' certified subkeys. Both sides
   derive the same key independently; no secret is ever transmitted. There is no ratchet
@@ -280,6 +285,17 @@ economic filter, not a moral one.
 
 ---
 
+### 4.1 What encryption costs the product `[built]`
+
+**You cannot message someone who has never opened Knock.** They have published no key, so
+there is nothing to encrypt to. This is inherent to end-to-end encryption rather than a
+gap to paper over, and the interface says so plainly instead of failing with "couldn't
+send". It also contradicts the earlier copy promising you could write to any address, so
+that copy is gone.
+
+Messages that will not open — sent to a key the device has since replaced — are kept and
+shown as unreadable rather than hidden, so a thread has no silent gaps.
+
 ## 9. Non-goals for v1
 
 Group chat (changes the envelope format — a genuine fork, deferred deliberately),
@@ -297,7 +313,7 @@ Sequenced by dependency, not by preference.
 | --- | --- | --- |
 | 0 | ~~Confirm `sign()` semantics on a device~~ ✅ | Done; see §2.1 |
 | 1 | ~~**Auth**~~ ✅ | Done. Challenge, signature, session; an address can only act as itself |
-| 2 | **Encryption** | Credibility floor; a readable messenger will be noticed |
+| 2 | ~~**Encryption**~~ ✅ | Done. X25519 + XChaCha20-Poly1305; the relay stores ciphertext only |
 | 3 | **Links and invites** | Cheap, and it is the growth loop |
 | 4 | **Postage and refund** | The differentiator; the chain plumbing dominates, and it is the only piece that can slip without leaving the app incoherent |
 | 5 | Staker lane | First thing cut if week 2 runs short |
