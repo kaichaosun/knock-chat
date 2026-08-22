@@ -29,14 +29,22 @@ export type Conversation = {
 }
 
 type Snapshot = {
-  /** Highest relay seq already merged, so fetches resume rather than replay. */
-  cursor: number
+  /**
+   * Where to resume delivery — issued by the relay, handed straight back, never
+   * interpreted here.
+   *
+   * Whether a cursor is still meaningful is a question only the relay can
+   * answer: it knows which sequence space it is in and how far that sequence
+   * has got. A rebuilt or restored relay simply serves from the beginning
+   * again, and because message ids are stable the replay deduplicates away.
+   */
+  cursor: string | null
   messages: Message[]
   /** Last time each thread was opened, for the unread count. */
   readAt: Record<string, string>
 }
 
-const EMPTY: Snapshot = { cursor: 0, messages: [], readAt: {} }
+const EMPTY: Snapshot = { cursor: null, messages: [], readAt: {} }
 
 function storageKey(owner: string): string {
   return `knock:history:${compact(owner)}`
@@ -51,6 +59,11 @@ export function messageId(): string {
     return crypto.randomUUID()
   }
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** A snapshot for someone with no stored history yet. */
+export function emptySnapshot(): Snapshot {
+  return { ...EMPTY }
 }
 
 export function load(owner: string): Snapshot {
@@ -74,14 +87,23 @@ export function save(owner: string, snapshot: Snapshot): void {
   }
 }
 
-/** Merge freshly fetched envelopes, ignoring any already present. */
-export function mergeIncoming(snapshot: Snapshot, envelopes: Envelope[]): Snapshot {
-  if (envelopes.length === 0) return snapshot
-
+/**
+ * Merge freshly fetched envelopes, ignoring any already present, and remember
+ * where to resume.
+ *
+ * The cursor advances even when every envelope was a duplicate — a relay that
+ * rewound and replayed has still told us where it got to, and refusing to
+ * advance would replay forever.
+ */
+export function mergeIncoming(
+  snapshot: Snapshot,
+  envelopes: Envelope[],
+  cursor: string,
+): Snapshot {
   const known = new Set(snapshot.messages.map((m) => m.id))
   const added: Message[] = []
   for (const envelope of envelopes) {
-    const id = `relay:${envelope.seq}`
+    const id = `relay:${envelope.id}`
     if (known.has(id)) continue
     added.push({
       id,
@@ -92,12 +114,13 @@ export function mergeIncoming(snapshot: Snapshot, envelopes: Envelope[]): Snapsh
       status: "sent",
     })
   }
-  if (added.length === 0) return snapshot
+
+  if (added.length === 0 && snapshot.cursor === cursor) return snapshot
 
   return {
     ...snapshot,
-    cursor: Math.max(snapshot.cursor, ...envelopes.map((e) => e.seq)),
-    messages: sorted([...snapshot.messages, ...added]),
+    cursor,
+    messages: added.length > 0 ? sorted([...snapshot.messages, ...added]) : snapshot.messages,
   }
 }
 

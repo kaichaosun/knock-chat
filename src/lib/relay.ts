@@ -11,11 +11,15 @@ const BASE = (import.meta.env.VITE_RELAY_URL as string | undefined) ?? "/api"
 export type RelayInfo = {
   name: string
   version: string
+  /** Identifies the relay's sequence space; see `lib/messages.ts`. */
+  instance: string
   max_body_len: number
   authenticated: boolean
 }
 
 export type Envelope = {
+  /** Stable and unique for all time; the client deduplicates on this. */
+  id: string
   seq: number
   from: string
   to: string
@@ -25,7 +29,8 @@ export type Envelope = {
 
 export type FetchResult = {
   messages: Envelope[]
-  next: number
+  /** Opaque — hand it straight back next time and never interpret it. */
+  next: string
 }
 
 /**
@@ -89,14 +94,15 @@ export function sendMessage(from: string, to: string, body: string) {
   })
 }
 
-export function fetchMessages(to: string, since: number): Promise<FetchResult> {
-  const params = new URLSearchParams({ to, since: String(since) })
+export function fetchMessages(to: string, cursor: string | null): Promise<FetchResult> {
+  const params = new URLSearchParams({ to })
+  if (cursor) params.set("cursor", cursor)
   return request<FetchResult>(`/v1/messages?${params}`)
 }
 
-export function ackMessages(to: string, through: number) {
+export function ackMessages(to: string, cursor: string) {
   return request<{ acked: number }>("/v1/messages/ack", {
     method: "POST",
-    body: JSON.stringify({ to, through }),
+    body: JSON.stringify({ to, cursor }),
   })
 }

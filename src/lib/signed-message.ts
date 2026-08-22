@@ -44,15 +44,21 @@ export function hexToBytes(hex: string): Uint8Array {
   return bytes
 }
 
-/** Verify a `nimiq.sign()` result against the message it claims to cover. */
+/**
+ * Verify a `nimiq.sign()` result against the message it claims to cover.
+ *
+ * Never throws. Callers treat anything that isn't `true` as a failed signature,
+ * and malformed hex is just another way of failing — parsing sits inside the
+ * guard for that reason.
+ */
 export function verifySignedMessage(
   message: string,
   signature: string | Uint8Array,
   publicKey: string | Uint8Array,
 ): boolean {
-  const sig = typeof signature === "string" ? hexToBytes(signature) : signature
-  const key = typeof publicKey === "string" ? hexToBytes(publicKey) : publicKey
   try {
+    const sig = typeof signature === "string" ? hexToBytes(signature) : signature
+    const key = typeof publicKey === "string" ? hexToBytes(publicKey) : publicKey
     return ed25519.verify(sig, signedMessageDigest(message), key)
   } catch {
     return false

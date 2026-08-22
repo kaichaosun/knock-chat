@@ -47,13 +47,25 @@ export type WalletMode = "nimiq-pay" | "dev"
 export type SignedMessage = { publicKey: string; signature: string }
 export type Signer = (message: string) => Promise<SignedMessage>
 
+/**
+ * A wallet is only a signer here.
+ *
+ * It deliberately carries no address: `sign()` returns the public key, and the
+ * address derives from that, so asking the wallet who it is *before* proving it
+ * would be a second round trip and a second permission prompt for information
+ * the signature already contains. Identity arrives with the session.
+ */
 export type Wallet = {
-  address: string
   mode: WalletMode
   /** Present only inside Nimiq Pay. */
   provider: NimiqProvider | null
   /** Signs a relay challenge. Prompts the user inside Nimiq Pay. */
   sign: Signer
+  /**
+   * Which stored session belongs to this wallet. One per dev identity so two
+   * browser tabs can hold separate sessions against the same origin.
+   */
+  scope: string
   /** ISO 639-1 code the host is set to, when it tells us. */
   language: string
 }
@@ -74,7 +86,6 @@ function devSigner(name: string): Signer {
 export type ConnectResult =
   | { ok: true; wallet: Wallet }
   | { ok: false; reason: "no-host"; message: string }
-  | { ok: false; reason: "no-accounts"; message: string }
 
 /** Dev identities offered as quick picks when running outside Nimiq Pay. */
 export const devIdentities: Array<{ label: string; address: string }> = Object.keys(
@@ -103,10 +114,10 @@ export async function connect(): Promise<ConnectResult> {
       return {
         ok: true,
         wallet: {
-          address: devAddress(asked),
           mode: "dev",
           provider: null,
           sign: devSigner(asked),
+          scope: `dev:${asked}`,
           language: language(),
         },
       }
@@ -118,19 +129,13 @@ export async function connect(): Promise<ConnectResult> {
     }
   }
 
-  const accounts = await provider.listAccounts()
-  if (!Array.isArray(accounts) || accounts.length === 0) {
-    return {
-      ok: false,
-      reason: "no-accounts",
-      message: "Nimiq Pay did not return an account. Create one and try again.",
-    }
-  }
-
+  // Note the absence of a `listAccounts()` call: the signature carries the
+  // public key, and whichever account the wallet chooses to sign with is the
+  // account the user meant — which also settles "which of my accounts is this?"
+  // without us guessing at index zero.
   return {
     ok: true,
     wallet: {
-      address: accounts[0],
       mode: "nimiq-pay",
       provider,
       sign: async (message) => {
@@ -138,6 +143,7 @@ export async function connect(): Promise<ConnectResult> {
         if ("error" in result) throw new Error(result.error.message)
         return { publicKey: result.publicKey, signature: result.signature }
       },
+      scope: "wallet",
       language: language(),
     },
   }

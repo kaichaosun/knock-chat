@@ -29,7 +29,7 @@ export function useSession(wallet: Wallet | null) {
       return
     }
 
-    const cached = loadSession(wallet.address)
+    const cached = loadSession(wallet.scope)
     if (cached) {
       setAuthToken(cached.token)
       setState({ status: "active", session: cached })
@@ -43,7 +43,7 @@ export function useSession(wallet: Wallet | null) {
     if (!wallet) return
     setState({ status: "signing" })
     try {
-      setState({ status: "active", session: await signIn(wallet.address, wallet.sign) })
+      setState({ status: "active", session: await signIn(wallet.scope, wallet.sign) })
     } catch (error) {
       setState({
         status: "error",
@@ -54,7 +54,7 @@ export function useSession(wallet: Wallet | null) {
 
   /** Drop the session — used when the relay rejects the token as stale. */
   const invalidate = useCallback(() => {
-    if (wallet) clearSession(wallet.address)
+    if (wallet) clearSession(wallet.scope)
     setState({ status: "needed" })
   }, [wallet])
 

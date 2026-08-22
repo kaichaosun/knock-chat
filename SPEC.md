@@ -48,11 +48,16 @@ but the only construction the platform permits.
 
 ### 2.1 Authentication `[built]`
 
-1. Client requests a challenge: `POST /v1/auth/challenge` → `{ nonce, expires_at }`.
-2. Client calls `nimiq.sign(nonce)`, which returns `{ publicKey, signature }`.
+1. Client requests a challenge: `POST /v1/auth/challenge` → `{ nonce, message, expires_at }`.
+2. Client passes `message` verbatim to `nimiq.sign()`, which returns `{ publicKey, signature }`.
 3. Client posts both back. The relay verifies the Ed25519 signature and derives the
    caller's address as `Blake2b-256(publicKey)[0..20]`.
 4. The relay issues a bearer session token, cached on the device.
+
+**The client never calls `listAccounts()`.** The signature already carries the public key,
+so asking the wallet who it is beforehand would be a second round trip and a second
+permission prompt for information the signature contains. Sign-in is one screen, one tap,
+one wallet dialog.
 
 The address derivation is `[built]` and pinned to independently computed vectors in
 `knock-relay/src/address.rs`.
@@ -110,7 +115,29 @@ storage. Ordering is total and gap-free per recipient.
 Knock runs a single relay operated by us. Federation is `[later]`. The submission will
 say this plainly rather than describing the roadmap as though it shipped.
 
-### 3.3 Retention `[v1]`
+### 3.3 The read cursor `[built]`
+
+A client resumes delivery from a cursor the relay issued, and hands it back unchanged.
+**The cursor is opaque by contract**, because whether one is still meaningful is a question
+only the relay can answer: it alone knows which sequence space it is in and how far that
+sequence has got.
+
+Two ways a cursor goes stale, both caught server-side:
+
+| | instance | sequence | detected by |
+| --- | --- | --- | --- |
+| Relay rebuilt | differs | restarts at 1 | instance mismatch |
+| Restored from backup | matches | rewinds | cursor is past the highest seq issued |
+
+Either way the relay replays from the beginning rather than returning nothing. That is safe
+because every message carries a stable `id` which never repeats, so the client
+deduplicates a replay away. Returning nothing is *not* safe: it is silent, permanent, and
+indistinguishable from having no new mail — the failure mode this design exists to remove.
+
+A stale cursor on `ack` is refused rather than reinterpreted, since deleting the wrong
+messages cannot be undone.
+
+### 3.4 Retention `[v1]`
 
 The relay holds ciphertext until the recipient acks it, then drops it. It is a mailbox,
 not an archive. Long-term history lives on the device.
@@ -295,9 +322,11 @@ Sequenced by dependency, not by preference.
    links (slice 3), not slice 1.
 5. **Which node does the relay watch** — a local `nimiq-client` with RPC, or a hosted one?
    `subscribe_for_logs_by_addresses_and_types` gives a push stream, better than polling.
-6. **Which account is "you"?** The wallet returned **two** accounts; the client currently
-   takes the first. Either the user picks once during onboarding, or every account shares
-   one inbox. This is a product decision and it affects the key certificate.
+6. ~~**Which account is "you"?**~~ **Resolved by dropping `listAccounts()`.** The client
+   never asks the wallet to enumerate accounts; it signs, and the address is derived from
+   the public key that came back. Whichever account the wallet signs with *is* the
+   identity — the choice belongs to the wallet's own dialog rather than to us guessing at
+   index zero. One fewer permission prompt, and one fewer screen.
 7. **Does a judge with an empty wallet have a path through the app?** If not, the free
    tiers are the demo path and must be reachable in the first sixty seconds.
 

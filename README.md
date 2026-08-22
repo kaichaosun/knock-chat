@@ -64,18 +64,34 @@ does not depend on the URL at all:
 
 `src/probe/` is throwaway — delete it once SPEC.md §11 is settled.
 
+## Tests
+
+```sh
+npm test
+```
+
+Covers the message store's merge and cursor logic, and the Nimiq signed-message
+construction — pinned to the same real-wallet vector as the relay, so the two sides
+cannot drift apart.
+
 ## How it works
 
 | Layer | What it does |
 | --- | --- |
-| `lib/wallet.ts` | Waits for Nimiq Pay to inject `window.nimiq` via `@nimiq/mini-app-sdk`; falls back to a dev identity outside it. Dev identities are **real Ed25519 keypairs** from fixed seeds, so they sign relay challenges for real and the relay needs no test-only bypass. |
+| `lib/wallet.ts` | Waits for Nimiq Pay to inject `window.nimiq` via `@nimiq/mini-app-sdk`; falls back to a dev identity outside it. A wallet here is **only a signer** — it carries no address, because `sign()` returns the public key and the address derives from that. Dev identities are **real Ed25519 keypairs** from fixed seeds, so they sign challenges for real and the relay needs no test-only bypass. |
 | `lib/auth.ts` | Challenge, sign, verify. Caches the session per address so `sign()` prompts once per device rather than once per request. |
 | `lib/relay.ts` | Talks to the relay: send, fetch by cursor, ack. |
-| `lib/messages.ts` | Local history. The relay only holds mail *for* a recipient, so a sender never gets its own messages back — the client keeps the thread and merges incoming envelopes into it. |
+| `lib/messages.ts` | Local history. The relay only holds mail *for* a recipient, so a sender never gets its own messages back — the client keeps the thread and merges incoming envelopes into it, deduplicating on the relay-assigned `id`. |
 | `hooks/use-messages.ts` | Polls every 3s while the document is visible, sends optimistically, exposes conversations and threads. |
 
 **History lives on the device.** Clearing site data clears the conversation.
 That changes when encryption lands and the relay can retain ciphertext.
+
+**The read cursor is opaque and validated server-side.** The client stores whatever the
+relay last returned and hands it straight back — it never interprets it. If the relay was
+rebuilt or restored, it notices its own cursor is stale and replays from the beginning
+rather than returning nothing, and the stable per-message `id` makes that replay a no-op
+for anything already held. The client has no reconcile logic at all.
 
 ## Design notes
 

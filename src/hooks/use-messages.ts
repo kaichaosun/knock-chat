@@ -17,7 +17,7 @@ export type RelayStatus = "connecting" | "online" | "offline"
  */
 export function useMessages(owner: string | null, onUnauthorized?: () => void) {
   const [snapshot, setSnapshot] = useState<Snapshot>(() =>
-    owner ? history.load(owner) : { cursor: 0, messages: [], readAt: {} },
+    owner ? history.load(owner) : history.emptySnapshot(),
   )
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("connecting")
 
@@ -37,7 +37,7 @@ export function useMessages(owner: string | null, onUnauthorized?: () => void) {
 
   // Swap histories when the identity changes (dev identity switch).
   useEffect(() => {
-    const loaded = owner ? history.load(owner) : { cursor: 0, messages: [], readAt: {} }
+    const loaded = owner ? history.load(owner) : history.emptySnapshot()
     snapshotRef.current = loaded
     setSnapshot(loaded)
   }, [owner])
@@ -50,12 +50,14 @@ export function useMessages(owner: string | null, onUnauthorized?: () => void) {
     const poll = async () => {
       if (document.hidden) return
       try {
+        // The cursor goes back exactly as it arrived. If it is stale — the
+        // relay was rebuilt, or restored to an earlier point — the relay
+        // notices and replays from the beginning, and the stable message ids
+        // make the replay a no-op for anything already held.
         const result = await fetchMessages(owner, snapshotRef.current.cursor)
         if (cancelled) return
         setRelayStatus("online")
-        if (result.messages.length > 0) {
-          update((current) => history.mergeIncoming(current, result.messages))
-        }
+        update((current) => history.mergeIncoming(current, result.messages, result.next))
       } catch (error) {
         if (cancelled) return
         if (error instanceof RelayError && error.status === 401) {

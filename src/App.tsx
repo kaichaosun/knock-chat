@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
-import { ConnectScreen } from "@/components/connect-screen"
+
 import { Conversation } from "@/components/conversation"
 import { Inbox } from "@/components/inbox"
 import { NewConversation } from "@/components/new-conversation"
@@ -14,7 +14,7 @@ import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import type { Message } from "@/lib/messages"
 import { devIdentities } from "@/lib/wallet"
-import { SignInScreen } from "@/components/sign-in-screen"
+import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
 import { useSession } from "@/hooks/use-session"
 import { ProbeScreen } from "@/probe/probe-screen"
 import { probeRequested, useSecretTap } from "@/probe/entry"
@@ -36,10 +36,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
   const session = useSession(wallet)
   // Only poll once there is a session; the relay would answer 401 otherwise.
-  const address = session.state.status === "active" ? session.state.session.address : null
+  const owner = session.state.status === "active" ? session.state.session.address : null
 
   const { conversations, threadWith, send, retry: retrySend, markRead, relayStatus } =
-    useMessages(address, session.invalidate)
+    useMessages(owner, session.invalidate)
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
@@ -96,26 +96,24 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [retrySend],
   )
 
-  if (state.status !== "connected" || !wallet) {
+  if (session.state.status !== "active") {
     return (
-      <ConnectScreen
-        connecting={state.status === "connecting"}
-        message={state.status === "unavailable" ? state.message : undefined}
+      <WelcomeScreen
+        status={welcomeStatus(state.status, session.state.status)}
+        message={
+          state.status === "unavailable"
+            ? state.message
+            : session.state.status === "error"
+              ? session.state.message
+              : undefined
+        }
+        onSignIn={session.authenticate}
         onRetry={retry}
       />
     )
   }
 
-  if (session.state.status !== "active") {
-    return (
-      <SignInScreen
-        address={wallet.address}
-        signing={session.state.status === "signing" || session.state.status === "restoring"}
-        error={session.state.status === "error" ? session.state.message : undefined}
-        onSignIn={session.authenticate}
-      />
-    )
-  }
+  const address = session.state.session.address
 
   if (openPeer) {
     return (
@@ -154,7 +152,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             aria-label="Your address"
             className="size-10 rounded-full"
           >
-            <AddressAvatar address={wallet.address} size="sm" />
+            <AddressAvatar address={address} size="sm" />
           </Button>
         </div>
       </header>
@@ -171,12 +169,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         open={composing}
         onOpenChange={setComposing}
         onStart={openThread}
-        myAddress={wallet.address}
+        myAddress={address}
         suggestions={
-          wallet.mode === "dev"
-            ? devIdentities.filter(
-                ({ address }) => compact(address) !== compact(wallet.address),
-              )
+          wallet?.mode === "dev"
+            ? devIdentities.filter((identity) => compact(identity.address) !== compact(address))
             : []
         }
       />
@@ -184,11 +180,23 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       <ProfileSheet
         open={profileOpen}
         onOpenChange={setProfileOpen}
-        address={wallet.address}
-        mode={wallet.mode}
+        address={address}
+        mode={wallet?.mode ?? "nimiq-pay"}
         relayStatus={relayStatus}
         onCopy={copy}
       />
     </div>
   )
+}
+
+/** Collapse the wallet and session state machines into one screen's status. */
+function welcomeStatus(
+  wallet: "connecting" | "connected" | "unavailable",
+  session: "restoring" | "needed" | "signing" | "error",
+): WelcomeStatus {
+  if (wallet === "unavailable") return "no-host"
+  if (wallet === "connecting" || session === "restoring") return "detecting"
+  if (session === "signing") return "signing"
+  if (session === "error") return "error"
+  return "ready"
 }
