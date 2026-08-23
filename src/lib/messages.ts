@@ -174,6 +174,25 @@ export function appendOutgoing(snapshot: Snapshot, message: Message): Snapshot {
   return { ...snapshot, messages: sorted([...snapshot.messages, message]) }
 }
 
+/**
+ * Mark a message as on its way again, and restamp it to now.
+ *
+ * A resend happens now, not when it was first typed. Leaving the original time
+ * on it would file it back among messages written after it — and the recipient
+ * receives it at the new time regardless, so the two sides would disagree.
+ */
+export function resend(snapshot: Snapshot, id: string): Snapshot {
+  const at = new Date().toISOString()
+  return {
+    ...snapshot,
+    messages: sorted(
+      snapshot.messages.map((m) =>
+        m.id === id ? { ...m, at, status: "sending" as const } : m,
+      ),
+    ),
+  }
+}
+
 export function setStatus(
   snapshot: Snapshot,
   id: string,

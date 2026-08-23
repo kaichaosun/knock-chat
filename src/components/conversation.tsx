@@ -95,7 +95,12 @@ export function Conversation({
               </div>
               <div className="space-y-2">
                 {group.messages.map((message) => (
-                  <MessageBubble key={message.id} message={message} onRetry={onRetry} />
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    onRetry={onRetry}
+                    channelOpen={!shut}
+                  />
                 ))}
               </div>
             </section>

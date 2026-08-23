@@ -137,13 +137,16 @@ export function useMessages(
   const retry = useCallback(
     async (message: Message) => {
       if (!owner || !deviceSecretKey) return
-      update((current) => history.setStatus(current, message.id, "sending"))
+      update((current) => history.resend(current, message.id))
       try {
         const key = await keyForPeer(message.peer, deviceSecretKey)
         await sendMessage(owner, message.peer, encryptBody(message.body, key, owner, message.peer))
         update((current) => history.setStatus(current, message.id, "sent"))
       } catch (error) {
-        update((current) => history.setStatus(current, message.id, "failed"))
+        const shut = error instanceof RelayError && error.status === 402
+        update((current) =>
+          history.setStatus(current, message.id, shut ? "blocked" : "failed"),
+        )
         throw error
       }
     },

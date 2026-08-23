@@ -7,9 +7,12 @@ import { cn } from "@/lib/utils"
 export function MessageBubble({
   message,
   onRetry,
+  channelOpen,
 }: {
   message: Message
   onRetry: (message: Message) => void
+  /** Whether messages can get through at all right now. */
+  channelOpen: boolean
 }) {
   const outgoing = message.direction === "out"
   const failed = message.status === "failed" || message.status === "blocked"
@@ -50,7 +53,9 @@ export function MessageBubble({
           )}
         >
           <span className="tabular-nums">{clockTime(message.at)}</span>
-          {outgoing && <DeliveryState message={message} onRetry={onRetry} />}
+          {outgoing && (
+            <DeliveryState message={message} onRetry={onRetry} channelOpen={channelOpen} />
+          )}
         </div>
       </div>
     </div>
@@ -60,16 +65,18 @@ export function MessageBubble({
 function DeliveryState({
   message,
   onRetry,
+  channelOpen,
 }: {
   message: Message
   onRetry: (message: Message) => void
+  channelOpen: boolean
 }) {
   if (message.status === "sending") {
     return <Clock className="size-3 animate-pulse" aria-label="Sending" />
   }
-  if (message.status === "blocked") {
-    // Deliberately not a button: there is nothing to tap that would help. The
-    // way through is the knock prompt above the composer.
+  if (message.status === "blocked" && !channelOpen) {
+    // Deliberately not a button: there is nothing to tap that would help while
+    // the door is shut. The way through is the knock prompt above the composer.
     return (
       <span className="text-destructive flex items-center gap-1 font-medium">
         <AlertCircle className="size-3" />
@@ -77,7 +84,9 @@ function DeliveryState({
       </span>
     )
   }
-  if (message.status === "failed") {
+  // Once the door is open again, a message the door had blocked can go through,
+  // so it stops being dead and becomes retryable like any other failure.
+  if (message.status === "failed" || message.status === "blocked") {
     return (
       <button
         type="button"

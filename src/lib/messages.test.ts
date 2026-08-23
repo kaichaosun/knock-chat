@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import {
   conversations,
@@ -7,6 +7,8 @@ import {
   markRead,
   mergeIncoming,
   recordOutgoing,
+  resend,
+  setStatus,
   threadWith,
 } from "./messages"
 import type { Snapshot } from "./messages"
@@ -223,5 +225,80 @@ describe("recordOutgoing", () => {
   it("does not count as unread for the sender", () => {
     const snapshot = recordOutgoing(emptySnapshot(), ALICE, "let me in", "knock:abc")
     expect(conversations(snapshot)[0].unread).toBe(0)
+  })
+})
+
+describe("resend", () => {
+  /** The bug this fixes: a retried message kept its original time and so sorted
+   *  back among messages written long after it. */
+  it("moves a retried message to the end of the thread", () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-01-01T12:00:00.000Z"))
+    let snapshot = emptySnapshot()
+    snapshot = recordOutgoing(snapshot, ALICE, "first", "local:1")
+    snapshot = setStatus(snapshot, "local:1", "failed")
+    vi.setSystemTime(new Date("2026-01-01T12:01:00.000Z"))
+    snapshot = recordOutgoing(snapshot, ALICE, "second", "local:2")
+    vi.setSystemTime(new Date("2026-01-01T12:02:00.000Z"))
+    snapshot = recordOutgoing(snapshot, ALICE, "third", "local:3")
+
+    expect(threadWith(snapshot, ALICE).map((m) => m.body)).toEqual([
+      "first",
+      "second",
+      "third",
+    ])
+
+    vi.setSystemTime(new Date("2026-01-01T12:03:00.000Z"))
+    snapshot = resend(snapshot, "local:1")
+    vi.useRealTimers()
+
+    expect(threadWith(snapshot, ALICE).map((m) => m.body)).toEqual([
+      "second",
+      "third",
+      "first",
+    ])
+  })
+
+  it("marks it as on its way and restamps it to now", () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date("2026-01-01T12:00:00.000Z"))
+      let snapshot = recordOutgoing(emptySnapshot(), ALICE, "hello", "local:1")
+      snapshot = setStatus(snapshot, "local:1", "blocked")
+      expect(threadWith(snapshot, ALICE)[0].at).toBe("2026-01-01T12:00:00.000Z")
+
+      vi.setSystemTime(new Date("2026-01-01T12:05:00.000Z"))
+      snapshot = resend(snapshot, "local:1")
+      const message = threadWith(snapshot, ALICE)[0]
+
+      expect(message.status).toBe("sending")
+      expect(message.at).toBe("2026-01-01T12:05:00.000Z")
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("leaves every other message alone", () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-01-01T12:00:00.000Z"))
+    let snapshot = recordOutgoing(emptySnapshot(), ALICE, "keep", "local:1")
+    vi.setSystemTime(new Date("2026-01-01T12:01:00.000Z"))
+    snapshot = recordOutgoing(snapshot, ALICE, "retry me", "local:2")
+    const untouched = threadWith(snapshot, ALICE)[0]
+
+    vi.setSystemTime(new Date("2026-01-01T12:02:00.000Z"))
+    snapshot = resend(snapshot, "local:2")
+    vi.useRealTimers()
+    const after = threadWith(snapshot, ALICE)[0]
+
+    expect(after.at).toBe(untouched.at)
+    expect(after.status).toBe(untouched.status)
+  })
+
+  it("is a no-op when the id is not there", () => {
+    const snapshot = recordOutgoing(emptySnapshot(), ALICE, "hello", "local:1")
+    expect(threadWith(resend(snapshot, "local:missing"), ALICE)).toEqual(
+      threadWith(snapshot, ALICE),
+    )
   })
 })
