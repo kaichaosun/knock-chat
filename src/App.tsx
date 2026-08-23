@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -37,6 +37,9 @@ export default function App() {
   return <Messenger onRevealProbes={() => setShowProbes(true)} />
 }
 
+/** How long to wait before re-asking whether a shut thread has opened, per attempt. */
+const REACH_BACKOFF_MS = [10_000, 20_000, 40_000, 80_000]
+
 function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const revealProbes = useSecretTap(onRevealProbes)
   const { state, retry } = useWallet()
@@ -60,7 +63,6 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     markRead,
     deleteThread,
     recordOutgoing,
-    refresh: refreshMessages,
     relayStatus,
   } = useMessages(owner, deviceSecretKey, session.invalidate)
 
@@ -107,32 +109,32 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const openMessages = openPeer ? threadWith(openPeer) : []
 
   // Accepting a knock delivers the message to the *recipient*, so the person who
-  // knocked is told nothing when their door is opened, and their composer would
-  // stay shut. Rather than poll the relay for a thing that changes once, take the
-  // two signals that already exist: anything arriving from them means the door
-  // must be open, and a pull on the thread asks outright.
-  //
-  // Only while the door is shut. Once it is open an arriving message says nothing
-  // new, so an open conversation costs no reachability calls at all however busy
-  // it gets — and the one call this does make is what closes the gate.
+  // knocked is told nothing at all when their door is opened, and their composer
+  // would stay shut until they left the thread and came back. So ask — but on a
+  // backoff, because this is a thing that changes once, if ever. A thread left
+  // open settles at one call every eighty seconds rather than hammering the relay.
   const doorShut = openReach !== null && !openReach.channel_open
-  const incoming = openMessages.filter((message) => message.direction === "in").length
-  const seenIncoming = useRef<{ peer: string | null; count: number }>({
-    peer: null,
-    count: 0,
-  })
-  useEffect(() => {
-    const previous = seenIncoming.current
-    // Recorded even when nothing is asked, so reopening a thread never counts
-    // messages that were already there as newly arrived.
-    seenIncoming.current = { peer: openPeer, count: incoming }
-    if (!doorShut) return
-    if (previous.peer === openPeer && incoming > previous.count) void refreshReach()
-  }, [openPeer, incoming, doorShut, refreshReach])
+  const [reachAttempt, setReachAttempt] = useState(0)
 
-  const refreshThread = useCallback(async () => {
-    await Promise.all([refreshMessages({ evenIfHidden: true }), refreshReach()])
-  }, [refreshMessages, refreshReach])
+  // Nothing is asked of a backgrounded app; coming back starts the backoff over.
+  const [visible, setVisible] = useState(() => !document.hidden)
+  useEffect(() => {
+    const onChange = () => setVisible(!document.hidden)
+    document.addEventListener("visibilitychange", onChange)
+    return () => document.removeEventListener("visibilitychange", onChange)
+  }, [])
+
+  useEffect(() => setReachAttempt(0), [openPeer, visible])
+
+  useEffect(() => {
+    if (!doorShut || !visible) return
+    const delay = REACH_BACKOFF_MS[Math.min(reachAttempt, REACH_BACKOFF_MS.length - 1)]
+    const timer = window.setTimeout(() => {
+      void refreshReach()
+      setReachAttempt((attempt) => attempt + 1)
+    }, delay)
+    return () => window.clearTimeout(timer)
+  }, [doorShut, visible, reachAttempt, refreshReach])
 
 
   // Keep the open thread marked read as messages arrive, not only when it is
@@ -259,7 +261,6 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onBack={closeThreadView}
           onSend={onSend}
           onKnock={knockOnOpenPeer}
-          onRefresh={refreshThread}
           onRetry={onRetrySend}
           onCopyAddress={copy}
         />

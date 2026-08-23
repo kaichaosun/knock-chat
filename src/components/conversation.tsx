@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, Clock, Copy, DoorClosed, RefreshCw } from "lucide-react"
+import { useEffect, useMemo, useRef } from "react"
+import { ChevronLeft, Clock, Copy, DoorClosed } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Composer } from "@/components/composer"
@@ -10,11 +10,6 @@ import type { Message } from "@/lib/messages"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { dayLabel } from "@/lib/time"
-import { cn } from "@/lib/utils"
-
-/** How far to drag before a release refreshes, and how far the pull can travel. */
-const PULL_TRIGGER_PX = 64
-const PULL_MAX_PX = 88
 
 export function Conversation({
   peer,
@@ -23,7 +18,6 @@ export function Conversation({
   onBack,
   onSend,
   onKnock,
-  onRefresh,
   onRetry,
   onCopyAddress,
 }: {
@@ -35,28 +29,10 @@ export function Conversation({
   onSend: (body: string) => void
   /** Open the knock sheet for this peer. */
   onKnock: () => void
-  /** Pull down to ask the relay for anything new, including whether the door opened. */
-  onRefresh: () => Promise<void>
   onRetry: (message: Message) => void
   onCopyAddress: (address: string) => void
 }) {
   const bottom = useRef<HTMLDivElement>(null)
-  const scroller = useRef<HTMLDivElement>(null)
-
-  // Pull-to-refresh. Only meaningful from the top of the thread, so the drag is
-  // ignored unless the list is already scrolled there.
-  const pullFrom = useRef<number | null>(null)
-  const [pull, setPull] = useState(0)
-  const [refreshing, setRefreshing] = useState(false)
-
-  const runRefresh = async () => {
-    setRefreshing(true)
-    try {
-      await onRefresh()
-    } finally {
-      setRefreshing(false)
-    }
-  }
 
   // Knocking costs money, so it is its own deliberate act behind its own button
   // — never something an ordinary-looking send turns into.
@@ -106,43 +82,7 @@ export function Conversation({
         </div>
       </header>
 
-      <div className="relative flex-1 overflow-hidden">
-        <div
-          className="text-muted-foreground pointer-events-none absolute inset-x-0 top-0 z-[2] flex justify-center"
-          style={{
-            transform: `translateY(${(refreshing ? PULL_TRIGGER_PX : pull) - 30}px)`,
-            opacity: refreshing || pull > 0 ? 1 : 0,
-          }}
-        >
-          <span className="bg-background flex size-7 items-center justify-center rounded-full border shadow-sm">
-            <RefreshCw
-              className={cn("size-3.5", refreshing && "animate-spin")}
-              style={
-                refreshing ? undefined : { transform: `rotate(${(pull / PULL_TRIGGER_PX) * 270}deg)` }
-              }
-            />
-          </span>
-        </div>
-
-      <div
-        ref={scroller}
-        onTouchStart={(event) => {
-          pullFrom.current =
-            (scroller.current?.scrollTop ?? 0) <= 0 ? event.touches[0].clientY : null
-        }}
-        onTouchMove={(event) => {
-          if (pullFrom.current === null || refreshing) return
-          const dy = event.touches[0].clientY - pullFrom.current
-          // Resisted, so it feels like pulling against something.
-          setPull(dy > 0 ? Math.min(dy * 0.5, PULL_MAX_PX) : 0)
-        }}
-        onTouchEnd={() => {
-          if (pull >= PULL_TRIGGER_PX) void runRefresh()
-          setPull(0)
-          pullFrom.current = null
-        }}
-        className="scrollbar-none h-full overflow-y-auto overscroll-contain px-3.5 py-4"
-      >
+      <div className="scrollbar-none flex-1 overflow-y-auto overscroll-contain px-3.5 py-4">
         {groups.length === 0 ? (
           <ThreadIntro peer={peer} />
         ) : (
@@ -167,7 +107,6 @@ export function Conversation({
           ))
         )}
         <div ref={bottom} />
-        </div>
       </div>
 
       {shut && <KnockPrompt waiting={waiting} cost={cost} onKnock={onKnock} />}
