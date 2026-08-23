@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { compact, isValidAddress, normalizeInput, shortenAddress } from "@/lib/address"
+import { rememberOne, sanitize } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { cn } from "@/lib/utils"
@@ -72,7 +73,11 @@ export function KnockSheet({
     setChecking(true)
     setError("")
     onReach(value)
-      .then((r) => !cancelled && setReach(r))
+      .then((r) => {
+        if (cancelled) return
+        setReach(r)
+        rememberOne(value, r.name)
+      })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Couldn't check"))
       .finally(() => !cancelled && setChecking(false))
     return () => {
@@ -95,6 +100,15 @@ export function KnockSheet({
   }
 
   const cost = reach ? reach.policy.amount_luna : 0
+  /**
+   * What this address says it is called.
+   *
+   * Read from the relay's answer rather than the directory, because this is the
+   * one screen where the address might belong to someone never seen before —
+   * and it is deliberately never the only thing shown. Paying to reach a name is
+   * paying to reach whoever claimed it.
+   */
+  const claimed = reach?.name ? sanitize(reach.name) : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -112,9 +126,12 @@ export function KnockSheet({
           {peer ? (
             <div className="bg-muted flex items-center gap-3 rounded-2xl px-4 py-3">
               <AddressAvatar address={peer} size="sm" />
-              <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold tracking-tight">
-                {shortenAddress(peer)}
-              </p>
+              <div className="min-w-0 flex-1">
+                {claimed && <p className="truncate text-[15px] leading-tight font-semibold">{claimed}</p>}
+                <p className="text-muted-foreground truncate font-mono text-[12px] font-semibold tracking-tight">
+                  {shortenAddress(peer)}
+                </p>
+              </div>
               {checking && <Loader2 className="text-muted-foreground size-4 animate-spin" />}
             </div>
           ) : (
@@ -152,6 +169,13 @@ export function KnockSheet({
             </p>
           )}
           {isSelf && <p className="text-destructive px-1 text-[13px]">That's your own address.</p>}
+
+          {!peer && claimed && (
+            <p className="text-muted-foreground px-1 text-[13px]">
+              This address calls itself <span className="text-foreground font-semibold">{claimed}</span>.
+              Anyone can choose any name.
+            </p>
+          )}
 
           {reach?.channel_open && (
             <div className="bg-accent text-accent-foreground flex items-center gap-2.5 rounded-2xl p-3.5 text-[13px]">

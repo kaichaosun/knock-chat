@@ -5,11 +5,14 @@ import { AddressAvatar } from "@/components/address-avatar"
 import { Composer } from "@/components/composer"
 import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
+import { useNames } from "@/hooks/use-names"
 import { formatAddress, shortenAddress } from "@/lib/address"
 import type { Message } from "@/lib/messages"
+import { nameIn } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { dayLabel } from "@/lib/time"
+import { cn } from "@/lib/utils"
 
 export function Conversation({
   peer,
@@ -34,6 +37,7 @@ export function Conversation({
 }) {
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
+  const name = nameIn(useNames(), peer)
 
   // Knocking costs money, so it is its own deliberate act behind its own button
   // — never something an ordinary-looking send turns into.
@@ -78,10 +82,22 @@ export function Conversation({
 
           <AddressAvatar address={peer} size="sm" />
 
+          {/* Name over address, never name instead of it. This header is the
+              one place you are always looking at while reading what someone
+              wrote, so it is where the address has to stay visible. */}
           <div className="min-w-0 flex-1 px-1">
-            <p className="truncate font-mono text-[13px] font-semibold tracking-tight">
-              {shortenAddress(peer)}
-            </p>
+            {name ? (
+              <>
+                <p className="truncate text-[15px] leading-tight font-semibold">{name}</p>
+                <p className="text-muted-foreground truncate font-mono text-[11px] tracking-tight">
+                  {shortenAddress(peer)}
+                </p>
+              </>
+            ) : (
+              <p className="truncate font-mono text-[13px] font-semibold tracking-tight">
+                {shortenAddress(peer)}
+              </p>
+            )}
           </div>
 
           <Button
@@ -102,7 +118,7 @@ export function Conversation({
         className="scrollbar-none flex-1 overflow-y-auto overscroll-contain px-3.5 py-4"
       >
         {groups.length === 0 ? (
-          <ThreadIntro peer={peer} />
+          <ThreadIntro peer={peer} name={name} />
         ) : (
           groups.map((group) => (
             <section key={group.label} className="mb-1">
@@ -165,11 +181,14 @@ function KnockPrompt({
   )
 }
 
-function ThreadIntro({ peer }: { peer: string }) {
+function ThreadIntro({ peer, name }: { peer: string; name: string | null }) {
   return (
     <div className="flex flex-col items-center px-8 py-14 text-center">
       <AddressAvatar address={peer} size="lg" />
-      <p className="mt-4 font-mono text-[13px] font-semibold">{shortenAddress(peer)}</p>
+      {name && <p className="mt-4 text-base font-semibold">{name}</p>}
+      <p className={cn("font-mono text-[13px] font-semibold", name ? "mt-1 text-muted-foreground" : "mt-4")}>
+        {shortenAddress(peer)}
+      </p>
       <p className="text-muted-foreground mt-2 text-sm text-balance">
         This is the start of your conversation. Say hello.
       </p>

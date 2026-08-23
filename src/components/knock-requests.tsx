@@ -3,7 +3,9 @@ import { Check, Loader2, X } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Button } from "@/components/ui/button"
+import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
+import { nameIn } from "@/lib/names"
 import type { Knock } from "@/lib/relay"
 import { relativeTime } from "@/lib/time"
 
@@ -24,6 +26,7 @@ export function KnockRequests({
   onDecline: (id: string) => Promise<void>
 }) {
   const [busy, setBusy] = useState<string | null>(null)
+  const names = useNames()
 
   if (knocks.length === 0) return null
 
@@ -49,8 +52,17 @@ export function KnockRequests({
             className="bg-card flex items-center gap-3 rounded-2xl border p-3 shadow-sm"
           >
             <AddressAvatar address={knock.from} />
+            {/* A stranger's name is a stranger's claim. It goes above the
+                address rather than in place of it: this is the one screen where
+                the person shown is by definition someone you do not know, and
+                deciding about them on a name alone is deciding on nothing. */}
             <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-[13px] font-semibold">
+              {nameIn(names, knock.from) && (
+                <p className="truncate text-[15px] leading-tight font-semibold">
+                  {nameIn(names, knock.from)}
+                </p>
+              )}
+              <p className="text-muted-foreground truncate font-mono text-[12px]">
                 {shortenAddress(knock.from)}
               </p>
               <p className="text-muted-foreground text-[11px]">

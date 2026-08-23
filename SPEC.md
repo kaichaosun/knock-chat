@@ -303,6 +303,15 @@ using NIM rather than blind signatures as the toll.
 
 **The chain shows** every postage payment: sender, recipient, amount, timing.
 
+**Display names are public and unverified.** A name is stored in plain text on the relay
+and readable for any address by anyone with a session, so it is one more thing the relay
+knows and one more thing that can be scraped. It is also self-chosen and unchecked, which
+makes it an impersonation surface: anyone can call themselves anything. Two rules keep it
+a convenience rather than a claim — nothing resolves a name back to an address, and a name
+is never shown without the address it belongs to. Names are refused if they contain
+invisible or bidirectional-control characters, which are the ways one name is made to read
+as another.
+
 **Losing your device** loses your history and forces a re-key.
 
 **Knock stops bulk spam, not a determined individual.** Someone willing to spend half a

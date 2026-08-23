@@ -119,6 +119,8 @@ export type Reachability = {
   policy: Policy
   channel_open: boolean
   knock_pending: boolean
+  /** What they call themselves, if they have said. Unverified — see `lib/names`. */
+  name: string | null
 }
 
 export type Knock = {
@@ -140,6 +142,31 @@ export function setPolicy(amountLuna: number): Promise<Policy> {
   })
 }
 
+// -- display names ---------------------------------------------------------
+
+/**
+ * Display names for a list of addresses, keyed by the address in its grouped
+ * form. Only addresses that have chosen a name appear.
+ */
+export type Names = Record<string, string>
+
+export type Profile = { name: string | null }
+
+/**
+ * The longest name the relay will accept, in characters. Mirrored here so the
+ * field can stop you before a round trip, not so the client can be trusted —
+ * the relay checks the same thing again.
+ */
+export const MAX_NAME_LEN = 32
+
+/** Set your own display name. A blank name clears it. */
+export function setProfile(name: string): Promise<Profile> {
+  return request<Profile>("/v1/profile", {
+    method: "PUT",
+    body: JSON.stringify({ name }),
+  })
+}
+
 /** Knock on a door. `postage` is omitted only when the recipient waived it. */
 export function sendKnock(
   to: string,
@@ -152,8 +179,8 @@ export function sendKnock(
   })
 }
 
-export function listKnocks(): Promise<{ knocks: Knock[] }> {
-  return request<{ knocks: Knock[] }>("/v1/knocks")
+export function listKnocks(): Promise<{ knocks: Knock[]; names: Names }> {
+  return request<{ knocks: Knock[]; names: Names }>("/v1/knocks")
 }
 
 export function acceptKnock(id: string) {
@@ -166,8 +193,8 @@ export function declineKnock(id: string) {
 
 export type Contact = { address: string; opened_at: string }
 
-export function listContacts(): Promise<{ contacts: Contact[] }> {
-  return request<{ contacts: Contact[] }>("/v1/contacts")
+export function listContacts(): Promise<{ contacts: Contact[]; names: Names }> {
+  return request<{ contacts: Contact[]; names: Names }>("/v1/contacts")
 }
 
 /**

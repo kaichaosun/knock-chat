@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import type { RelayStatus } from "@/hooks/use-messages"
 import { formatAddress } from "@/lib/address"
-import { LUNA_PER_NIM, getReachability, setPolicy } from "@/lib/relay"
+import { rememberOne } from "@/lib/names"
+import { LUNA_PER_NIM, MAX_NAME_LEN, getReachability, setPolicy, setProfile } from "@/lib/relay"
 import { cn } from "@/lib/utils"
 import type { WalletMode } from "@/lib/wallet"
 
@@ -37,22 +38,51 @@ export function ProfileSheet({
   onCopy: (address: string) => void
 }) {
   const [nim, setNim] = useState("")
+  const [name, setName] = useState("")
+  /** What the relay last confirmed, so Save can tell a change from a re-tap. */
+  const [savedName, setSavedName] = useState("")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savingName, setSavingName] = useState(false)
 
-  // Read the current amount each time the sheet opens, so it never shows a
-  // stale value after being changed on another device.
+  // Read the current values each time the sheet opens, so it never shows a
+  // stale one after being changed on another device.
   useEffect(() => {
     if (!open) return
     setLoading(true)
     getReachability(address)
-      .then((r) => setNim(String(r.policy.amount_luna / LUNA_PER_NIM)))
+      .then((r) => {
+        setNim(String(r.policy.amount_luna / LUNA_PER_NIM))
+        setName(r.name ?? "")
+        setSavedName(r.name ?? "")
+      })
       .catch(() => setNim(""))
       .finally(() => setLoading(false))
   }, [open, address])
 
   const parsed = Number(nim)
   const valid = nim.trim() !== "" && Number.isFinite(parsed) && parsed >= 0
+
+  // Counted in characters rather than `length`, which counts UTF-16 units and
+  // would call a name of emoji twice as long as it looks.
+  const nameLength = [...name.trim()].length
+  const nameTooLong = nameLength > MAX_NAME_LEN
+  const nameChanged = name.trim() !== savedName
+
+  const saveName = async () => {
+    setSavingName(true)
+    try {
+      const saved = await setProfile(name.trim())
+      setName(saved.name ?? "")
+      setSavedName(saved.name ?? "")
+      rememberOne(address, saved.name)
+      toast.success(saved.name ? `You'll show up as ${saved.name}` : "Name cleared")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't save")
+    } finally {
+      setSavingName(false)
+    }
+  }
 
   const save = async (value: number) => {
     setSaving(true)
@@ -90,6 +120,54 @@ export function ProfileSheet({
               >
                 <Copy className="size-3.5" />
                 Copy
+              </Button>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-sm font-semibold">Your name</h3>
+            <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
+              Shown next to your address to anyone who looks you up. Anyone can pick any
+              name, so it is a label rather than proof — your address is what identifies
+              you.
+            </p>
+
+            <div className="mt-3 flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  value={loading ? "" : name}
+                  disabled={loading || savingName}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Unnamed"
+                  aria-label="Your name"
+                  aria-invalid={nameTooLong}
+                  className={cn(
+                    "bg-muted w-full rounded-2xl py-3 pr-14 pl-4 font-medium outline-none",
+                    "placeholder:text-muted-foreground/70 placeholder:font-normal",
+                    "focus-visible:ring-ring/60 focus-visible:ring-2",
+                    nameTooLong && "ring-destructive ring-2",
+                  )}
+                />
+                {/* Only once it is close to mattering: a counter sitting there
+                    from the first keystroke reads as a limit to aim for. */}
+                {nameLength > MAX_NAME_LEN - 8 && (
+                  <span
+                    className={cn(
+                      "pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs tabular-nums",
+                      nameTooLong ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {MAX_NAME_LEN - nameLength}
+                  </span>
+                )}
+              </div>
+              <Button
+                disabled={loading || savingName || nameTooLong || !nameChanged}
+                onClick={() => void saveName()}
+                className="h-12 rounded-2xl px-5"
+              >
+                {savingName ? <Loader2 className="animate-spin" /> : <Check />}
+                Save
               </Button>
             </div>
           </section>

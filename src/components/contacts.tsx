@@ -14,8 +14,32 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { shortenAddress } from "@/lib/address"
+import { useNames } from "@/hooks/use-names"
+import { forget, labelIn, nameIn, remember, type Directory } from "@/lib/names"
 import { listContacts, removeContact, type Contact } from "@/lib/relay"
 import { relativeTime } from "@/lib/time"
+
+/**
+ * A contact's name, or their address when they have not chosen one.
+ *
+ * The two are set in different type: a name is prose and an address is a code,
+ * and rendering an address in a proportional face makes it harder to compare
+ * against another one — which is the only thing an address is ever read for.
+ */
+function PeerName({ address, names }: { address: string; names: Directory }) {
+  const name = nameIn(names, address)
+  return (
+    <p
+      className={
+        name
+          ? "truncate text-[15px] font-semibold"
+          : "truncate font-mono text-[13px] font-semibold tracking-tight"
+      }
+    >
+      {name ?? shortenAddress(address)}
+    </p>
+  )
+}
 
 /**
  * Everyone you can write to freely.
@@ -34,6 +58,7 @@ export function Contacts({
   /** Called once the relay has confirmed, so the chat goes with the channel. */
   onRemoved: (peer: string) => void
 }) {
+  const names = useNames()
   const [contacts, setContacts] = useState<Contact[] | null>(null)
   const [error, setError] = useState("")
   const [revealed, setRevealed] = useState<string | null>(null)
@@ -45,7 +70,11 @@ export function Contacts({
     if (!signedIn) return
     let cancelled = false
     listContacts()
-      .then((r) => !cancelled && setContacts(r.contacts))
+      .then((r) => {
+        if (cancelled) return
+        remember(r.names)
+        setContacts(r.contacts)
+      })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Couldn't load"))
     return () => {
       cancelled = true
@@ -62,6 +91,7 @@ export function Contacts({
       await removeContact(contact.address)
       // Only now: the row can be put back if this fails, but messages cannot.
       onRemoved(contact.address)
+      forget(contact.address)
       toast.success("Removed. The chat is gone, and they'd have to knock again.")
     } catch (e) {
       setContacts((current) =>
@@ -104,7 +134,7 @@ export function Contacts({
         {contacts.map((contact) => (
           <SwipeRow
             key={contact.address}
-            actionLabel={`Remove ${shortenAddress(contact.address)}`}
+            actionLabel={`Remove ${labelIn(names, contact.address)}`}
             onAction={() => setConfirming(contact)}
             onClick={() => onOpen(contact.address)}
             revealed={revealed === contact.address}
@@ -112,12 +142,19 @@ export function Contacts({
           >
             <AddressAvatar address={contact.address} />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-[13px] font-semibold tracking-tight">
-                {shortenAddress(contact.address)}
-              </p>
+              <PeerName address={contact.address} names={names} />
+              {/* The address stays on the row even for someone with a name.
+                  This is the screen you would come to in order to check who
+                  someone is, and a name alone cannot answer that. */}
               <p className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[12px]">
-                <DoorOpen className="size-3.5" />
-                open since {relativeTime(contact.opened_at)}
+                {nameIn(names, contact.address) ? (
+                  <span className="truncate font-mono">{shortenAddress(contact.address)}</span>
+                ) : (
+                  <>
+                    <DoorOpen className="size-3.5 shrink-0" />
+                    open since {relativeTime(contact.opened_at)}
+                  </>
+                )}
               </p>
             </div>
           </SwipeRow>
@@ -129,6 +166,9 @@ export function Contacts({
           <DialogHeader className="items-center">
             {confirming && <AddressAvatar address={confirming.address} />}
             <DialogTitle className="mt-2">Remove this contact?</DialogTitle>
+            {confirming && nameIn(names, confirming.address) && (
+              <p className="text-[15px] font-semibold">{nameIn(names, confirming.address)}</p>
+            )}
             <p className="font-mono text-[13px] font-semibold tracking-tight">
               {confirming ? shortenAddress(confirming.address) : ""}
             </p>

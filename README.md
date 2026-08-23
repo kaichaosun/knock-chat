@@ -67,9 +67,14 @@ closing is tidying, not deleting, and not a mute.
 
 ## Your profile
 
-Tap your avatar in the header. It holds your address and **cost to knock** — both public,
-which is what makes it a profile rather than settings: anyone can read either from the
-relay.
+Tap your avatar in the header. It holds your address, your **name**, and your **cost to
+knock** — all three public, which is what makes it a profile rather than settings: anyone
+can read any of them from the relay.
+
+Your name is what people see instead of your address in their chat list, and next to it
+everywhere identity matters. Nothing reserves it and nothing verifies it: two people can
+pick the same name, so every screen that shows a stranger's name shows their address with
+it. Leave it blank and you are your address, as before.
 
 Cost to knock is what a stranger pays to reach you — default 10 NIM, and you keep it whether or not you answer. Presets go down to
 **Free** (0), which is the one to use while testing: it removes the payment step entirely

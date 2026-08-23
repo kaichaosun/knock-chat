@@ -4,7 +4,9 @@ import { MessageSquarePlus, PenLine } from "lucide-react"
 import { AddressAvatar } from "@/components/address-avatar"
 import { SwipeRow } from "@/components/swipe-row"
 import { Button } from "@/components/ui/button"
+import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
+import { labelIn, nameIn, type Directory } from "@/lib/names"
 import type { Conversation } from "@/lib/messages"
 import { relativeTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
@@ -23,6 +25,7 @@ export function Inbox({
   // Only one row open at a time, so a stray Delete is never left lurking under
   // a row the user has moved on from.
   const [revealed, setRevealed] = useState<string | null>(null)
+  const names = useNames()
   if (conversations.length === 0) {
     return <EmptyInbox onCompose={onCompose} />
   }
@@ -34,6 +37,7 @@ export function Inbox({
           <ConversationRow
             key={conversation.peer}
             conversation={conversation}
+            names={names}
             onOpen={onOpen}
             onDelete={onDelete}
             revealed={revealed === conversation.peer}
@@ -58,12 +62,14 @@ export function Inbox({
 
 function ConversationRow({
   conversation,
+  names,
   onOpen,
   onDelete,
   revealed,
   onReveal,
 }: {
   conversation: Conversation
+  names: Directory
   onOpen: (peer: string) => void
   onDelete: (peer: string) => void
   revealed: boolean
@@ -71,10 +77,11 @@ function ConversationRow({
 }) {
   const { peer, last, unread } = conversation
   const preview = last.direction === "out" ? `You: ${last.body}` : last.body
+  const name = nameIn(names, peer)
 
   return (
     <SwipeRow
-      actionLabel={`Delete chat with ${shortenAddress(peer)}`}
+      actionLabel={`Delete chat with ${labelIn(names, peer)}`}
       onAction={() => onDelete(peer)}
       onClick={() => onOpen(peer)}
       revealed={revealed}
@@ -84,13 +91,18 @@ function ConversationRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
+          {/* A named chat drops the address from the row. You chose these
+              people, the identicon tells them apart at a glance, and the
+              address is one tap away in the header — a list of codes is what
+              this screen looked like before anyone had a name. */}
           <span
             className={cn(
-              "truncate font-mono text-[13px] tracking-tight",
+              "truncate",
+              name ? "text-[15px]" : "font-mono text-[13px] tracking-tight",
               unread > 0 ? "font-bold" : "font-semibold",
             )}
           >
-            {shortenAddress(peer)}
+            {name ?? shortenAddress(peer)}
           </span>
           <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
             {relativeTime(last.at)}

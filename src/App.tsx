@@ -17,6 +17,7 @@ import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import type { Message } from "@/lib/messages"
+import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import { NoKeyError } from "@/lib/keys"
 import { deviceKeyPair } from "@/lib/keys"
 import { RelayError, type Reachability } from "@/lib/relay"
@@ -85,6 +86,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     return () => window.removeEventListener("popstate", onPop)
   }, [openPeer])
 
+  // Names are learnt per identity: switching to a development identity should
+  // not inherit what the previous one had been told.
+  useEffect(() => adoptNames(owner), [owner])
+
   const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
 
   // How the open thread stands with its peer. A channel can be closed from the
@@ -94,7 +99,12 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const refreshReach = useCallback(async () => {
     if (!openPeer) return
     try {
-      setOpenReach(await reach(openPeer))
+      const answer = await reach(openPeer)
+      setOpenReach(answer)
+      // This answer is about one address, so it can be believed about the
+      // absence of a name too — unlike a list, which only speaks for the names
+      // it happens to carry.
+      rememberOne(openPeer, answer.name)
     } catch {
       // Leave it null: the composer stays in its ordinary mode, and a send that
       // turns out to be impossible is caught below.

@@ -25,8 +25,9 @@ Two repos: this app, and the relay at `../knock-relay`.
 | Policy | Per-address price for strangers, `0` to waive. Default 10 NIM. |
 | Contacts | Channels as the durable record of who can reach whom, so a fresh device knows without local history. |
 | Remove contact | `DELETE /v1/contacts/{address}`. One normalised row, so closing is symmetric by construction. |
+| Display names | `PUT /v1/profile`, and the name served with reachability, contacts and knocks. Normalised and refused — not truncated, not stripped — if it carries invisible or text-reordering characters. Lists carry names in a map beside them rather than on each entry, so a name is looked up when read rather than frozen into a knock. |
 
-**Tests:** 78 offline, plus 4 Postgres-backed run separately
+**Tests:** 91 offline, plus 5 Postgres-backed run separately
 (`cargo test -- --ignored pg_ --test-threads=1`). The Postgres set exists
 because two postage bugs were Postgres-only and every test at the time ran
 in-memory.
@@ -40,12 +41,13 @@ in-memory.
 | Contacts | Read from relay channels. Swipe-left to remove, behind a confirmation, since removal costs the other side money to undo. Removing also deletes the local chat. |
 | Knocking | Address entry with live cost lookup, or from inside a closed chat with the address fixed. Same sheet either way. |
 | Closed chats | Banner with an explicit priced Knock button; composer disabled so no dead message is left behind. |
-| Profile | Address with copy, and your own postage price. |
+| Profile | Address with copy, your display name, and your own postage price. |
+| Names | A directory fed by whatever the app already asks for — contacts, knocks, a reachability check — held per identity and cached in storage so a name shows on a cold start. Sanitised again on the way in, since the relay is not the last word on what is safe to draw. Shown alone only in the chat list; everywhere identity matters it sits above the address, never in place of it. |
 | Avatars | Nimiq identicons (`identicons-esm`), generated from the address and cached per address. Costs ~31 kB gzip of shape table, which buys a contact the same face they have in the Nimiq Wallet and Nimiq Pay. |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
 | Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
-**Tests:** 51. Typecheck clean.
+**Tests:** 70. Typecheck clean.
 
 ---
 
@@ -81,6 +83,9 @@ in-memory.
 
 ### Product gaps
 
+- **Local nicknames.** A name is chosen by its owner, so two contacts can wear
+  the same one and a stranger can wear yours. Letting you rename someone in
+  your own copy is the unspoofable half of this feature, and is not built.
 - **Blocking.** Removing a contact is not blocking: they can pay again and
   return. Correct as a default, thin protection against someone determined.
   A real blocklist is its own feature.

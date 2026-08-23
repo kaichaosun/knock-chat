@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 
 import { encryptBody } from "@/lib/crypto"
 import { keyForPeer } from "@/lib/keys"
+import { remember } from "@/lib/names"
 import { commitment, newNonce } from "@/lib/postage"
 import { toHex } from "@/lib/crypto"
 import {
@@ -32,7 +33,9 @@ export function useKnocks(wallet: Wallet | null, owner: string | null) {
   const refresh = useCallback(async () => {
     if (!signedIn) return
     try {
-      setKnocks((await listKnocks()).knocks)
+      const { knocks, names } = await listKnocks()
+      remember(names)
+      setKnocks(knocks)
     } catch {
       // A failed poll is not worth surfacing; the next one will try again.
     }
