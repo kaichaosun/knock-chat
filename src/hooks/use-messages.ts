@@ -49,20 +49,22 @@ export function useMessages(
     setSnapshot(loaded)
   }, [owner])
 
-  // Poll while the document is visible; a hidden WebView should not keep asking.
-  useEffect(() => {
-    if (!owner) return
-    let cancelled = false
-
-    const poll = async () => {
-      if (document.hidden) return
+  /**
+   * Fetch whatever the relay is holding.
+   *
+   * Hoisted out of the polling effect so a pull-to-refresh can ask for the same
+   * thing on demand, rather than the user waiting out an interval.
+   */
+  const refresh = useCallback(
+    async ({ evenIfHidden = false } = {}) => {
+      if (!owner) return
+      if (document.hidden && !evenIfHidden) return
       try {
         // The cursor goes back exactly as it arrived. If it is stale — the
         // relay was rebuilt, or restored to an earlier point — the relay
         // notices and replays from the beginning, and the stable message ids
         // make the replay a no-op for anything already held.
         const result = await fetchMessages(owner, snapshotRef.current.cursor)
-        if (cancelled) return
         setRelayStatus("online")
 
         // Decrypt before merging, so local history stays plain and the store
@@ -70,30 +72,32 @@ export function useMessages(
         const opened = deviceSecretKey
           ? await openAll(result.messages, owner, deviceSecretKey)
           : result.messages
-        if (cancelled) return
 
         update((current) => history.mergeIncoming(current, opened, result.next))
       } catch (error) {
-        if (cancelled) return
         if (error instanceof RelayError && error.status === 401) {
           onUnauthorized?.()
           return
         }
         setRelayStatus(error instanceof RelayError && error.status === 0 ? "offline" : "online")
       }
-    }
+    },
+    [owner, update, onUnauthorized, deviceSecretKey],
+  )
 
-    void poll()
-    const timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS)
-    const onVisible = () => void poll()
+  // Poll while the document is visible; a hidden WebView should not keep asking.
+  useEffect(() => {
+    if (!owner) return
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), POLL_INTERVAL_MS)
+    const onVisible = () => void refresh()
     document.addEventListener("visibilitychange", onVisible)
 
     return () => {
-      cancelled = true
       window.clearInterval(timer)
       document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [owner, update, onUnauthorized, deviceSecretKey])
+  }, [owner, refresh])
 
   const send = useCallback(
     async (peer: string, body: string) => {
@@ -184,6 +188,7 @@ export function useMessages(
     markRead,
     deleteThread,
     recordOutgoing,
+    refresh,
     relayStatus,
   }
 }

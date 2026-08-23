@@ -131,8 +131,8 @@ export function KnockSheet({
               aria-invalid={(typed.length === 36 && !valid) || isSelf}
               onChange={(event) => setValue(normalizeInput(event.target.value))}
               className={cn(
-                "bg-muted w-full rounded-2xl px-4 py-3.5 font-mono tracking-tight outline-none",
-                "placeholder:text-muted-foreground/60 placeholder:font-sans",
+                "bg-muted w-full rounded-2xl py-3.5 pl-4 pr-11 font-mono text-[13px] tracking-tight outline-none",
+                "placeholder:text-muted-foreground/60 placeholder:font-sans placeholder:text-base",
                 "focus-visible:ring-ring/60 focus-visible:ring-2",
                 ((typed.length === 36 && !valid) || isSelf) && "ring-destructive ring-2",
               )}
@@ -187,6 +187,7 @@ export function KnockSheet({
                 aria-label="Your message"
                 className={cn(
                   "bg-muted w-full resize-none rounded-2xl px-4 py-3 leading-snug outline-none",
+                  "placeholder:text-muted-foreground/70",
                   "focus-visible:ring-ring/60 focus-visible:ring-2",
                 )}
               />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -25,6 +25,7 @@ import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
 import { useSession } from "@/hooks/use-session"
 import { ProbeScreen } from "@/probe/probe-screen"
 import { probeRequested, useSecretTap } from "@/probe/entry"
+
 
 export default function App() {
   // Diagnostics are never linked from the app. Reachable by `?probe`, `#probe`
@@ -59,6 +60,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     markRead,
     deleteThread,
     recordOutgoing,
+    refresh: refreshMessages,
     relayStatus,
   } = useMessages(owner, deviceSecretKey, session.invalidate)
 
@@ -103,6 +105,35 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   }, [openPeer, refreshReach])
 
   const openMessages = openPeer ? threadWith(openPeer) : []
+
+  // Accepting a knock delivers the message to the *recipient*, so the person who
+  // knocked is told nothing when their door is opened, and their composer would
+  // stay shut. Rather than poll the relay for a thing that changes once, take the
+  // two signals that already exist: anything arriving from them means the door
+  // must be open, and a pull on the thread asks outright.
+  //
+  // Only while the door is shut. Once it is open an arriving message says nothing
+  // new, so an open conversation costs no reachability calls at all however busy
+  // it gets — and the one call this does make is what closes the gate.
+  const doorShut = openReach !== null && !openReach.channel_open
+  const incoming = openMessages.filter((message) => message.direction === "in").length
+  const seenIncoming = useRef<{ peer: string | null; count: number }>({
+    peer: null,
+    count: 0,
+  })
+  useEffect(() => {
+    const previous = seenIncoming.current
+    // Recorded even when nothing is asked, so reopening a thread never counts
+    // messages that were already there as newly arrived.
+    seenIncoming.current = { peer: openPeer, count: incoming }
+    if (!doorShut) return
+    if (previous.peer === openPeer && incoming > previous.count) void refreshReach()
+  }, [openPeer, incoming, doorShut, refreshReach])
+
+  const refreshThread = useCallback(async () => {
+    await Promise.all([refreshMessages({ evenIfHidden: true }), refreshReach()])
+  }, [refreshMessages, refreshReach])
+
 
   // Keep the open thread marked read as messages arrive, not only when it is
   // opened — otherwise anything that lands while you are reading stays unread
@@ -228,6 +259,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onBack={closeThreadView}
           onSend={onSend}
           onKnock={knockOnOpenPeer}
+          onRefresh={refreshThread}
           onRetry={onRetrySend}
           onCopyAddress={copy}
         />

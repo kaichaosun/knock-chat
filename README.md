@@ -4,7 +4,8 @@ A Nimiq Pay Mini App for messaging between wallets, where spam is priced out
 instead of guessed at.
 
 > **Status.** Authenticated, end-to-end encrypted messages over
-> [knock-relay](../knock-relay). No postage yet — see [Roadmap](#roadmap).
+> [knock-relay](../knock-relay), with NIM postage on knocks. Not deployed —
+> see [ROADMAP.md](./ROADMAP.md).
 
 ## Run it
 
@@ -156,9 +157,5 @@ that constraint is a no-op.
 
 ## Roadmap
 
-1. **Encryption.** Bodies are plain text and readable by the relay. They become
-   ciphertext under a per-conversation key.
-3. **NIM postage.** Strangers attach a small refundable payment the relay
-   verifies on-chain before accepting; contacts and stakers are exempt. See
-   [SPAM-PROTECTION.md](./SPAM-PROTECTION.md) and
-   [ARCHITECTURE.md](./ARCHITECTURE.md).
+Encryption and NIM postage both ship today. See [ROADMAP.md](./ROADMAP.md) for
+what is built and what is left.
