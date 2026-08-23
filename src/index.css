@@ -119,15 +119,25 @@
   }
 
   html {
+    --safe-bottom: env(safe-area-inset-bottom);
     /* The WebView must not rubber-band the whole page; only lists scroll. */
     height: 100%;
     overscroll-behavior: none;
     -webkit-text-size-adjust: 100%;
   }
 
+  /* With a keyboard up there is no home indicator left to clear — see
+     lib/viewport.ts. Without this the composer floats above the keyboard. */
+  html[data-keyboard="open"] {
+    --safe-bottom: 0px;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
-    min-height: 100%;
+    /* Fixed height, not min-height: the document itself must never scroll, or
+       iOS will scroll it to reveal a focused field and take the header with it. */
+    height: 100%;
+    overflow: hidden;
     display: flex;
     justify-content: center;
     /* A tap should never select text or flash a highlight in a native shell. */
@@ -143,7 +153,10 @@
     position: relative;
     width: 100%;
     max-width: 30rem;
-    height: 100dvh;
+    /* Driven from visualViewport, which is the only thing that reports the real
+       visible area once a keyboard is up. See lib/viewport.ts; 100dvh is the
+       fallback before the first measurement and where there is no support. */
+    height: var(--app-height, 100dvh);
     overflow: hidden;
     background: var(--background);
   }
@@ -193,5 +206,5 @@
   padding-top: env(safe-area-inset-top);
 }
 @utility pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom));
 }

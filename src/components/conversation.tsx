@@ -40,10 +40,21 @@ export function Conversation({
   const waiting = shut && reach.knock_pending
   const cost = reach?.policy.amount_luna ?? 0
 
-  // Keep the newest message in view as the thread grows or the keyboard opens.
+  // Keep the newest message in view as the thread grows.
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" })
   }, [messages.length])
+
+  // And when the keyboard opens. The app shrinks to the visible area (see
+  // lib/viewport.ts), which would otherwise leave the thread scrolled to where
+  // the bottom used to be, hiding the messages you were just reading.
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+    const pin = () => bottom.current?.scrollIntoView({ block: "end" })
+    viewport.addEventListener("resize", pin)
+    return () => viewport.removeEventListener("resize", pin)
+  }, [])
 
   const groups = useMemo(() => groupByDay(messages), [messages])
 
