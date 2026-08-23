@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
 import { labelIn, nameIn, type Directory } from "@/lib/names"
+import { preview } from "@/lib/payload"
 import type { Conversation } from "@/lib/messages"
 import { relativeTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
@@ -76,7 +77,7 @@ function ConversationRow({
   onReveal: (open: boolean) => void
 }) {
   const { peer, last, unread } = conversation
-  const preview = last.direction === "out" ? `You: ${last.body}` : last.body
+  const summary = preview(last.body, last.direction)
   const name = nameIn(names, peer)
 
   return (
@@ -115,7 +116,7 @@ function ConversationRow({
               unread > 0 ? "text-foreground font-medium" : "text-muted-foreground",
             )}
           >
-            {preview}
+            {summary}
           </span>
           {unread > 0 && (
             <span className="bg-primary text-primary-foreground flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums">

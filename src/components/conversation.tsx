@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef } from "react"
-import { ChevronLeft, Clock, Copy, DoorClosed } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { ChevronLeft, Clock, Coins, Copy, DoorClosed } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { AttachMenu } from "@/components/attach-menu"
 import { Composer } from "@/components/composer"
+import { SendNimSheet } from "@/components/send-nim-sheet"
 import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
@@ -23,6 +25,7 @@ export function Conversation({
   onKnock,
   onRetry,
   onCopyAddress,
+  onPay,
 }: {
   peer: string
   messages: Message[]
@@ -34,10 +37,14 @@ export function Conversation({
   onKnock: () => void
   onRetry: (message: Message) => void
   onCopyAddress: (address: string) => void
+  /** Raises the wallet for a transfer, then posts the note into the thread. */
+  onPay: (peer: string, luna: number) => Promise<void>
 }) {
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const name = nameIn(useNames(), peer)
+  const [attaching, setAttaching] = useState(false)
+  const [paying, setPaying] = useState(false)
 
   // Knocking costs money, so it is its own deliberate act behind its own button
   // — never something an ordinary-looking send turns into.
@@ -145,7 +152,27 @@ export function Conversation({
 
       {shut && <KnockPrompt waiting={waiting} cost={cost} onKnock={onKnock} />}
 
-      <Composer onSend={onSend} disabled={shut} />
+      <Composer onSend={onSend} onAttach={() => setAttaching(true)} disabled={shut} />
+
+      <AttachMenu
+        open={attaching}
+        onOpenChange={setAttaching}
+        actions={[
+          {
+            icon: Coins,
+            label: "Send NIM",
+            description: "Straight from your wallet to theirs.",
+            onSelect: () => setPaying(true),
+          },
+        ]}
+      />
+
+      <SendNimSheet
+        open={paying}
+        onOpenChange={setPaying}
+        peer={peer}
+        onSend={(luna) => onPay(peer, luna)}
+      />
     </div>
   )
 }

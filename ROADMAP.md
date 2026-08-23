@@ -44,10 +44,12 @@ in-memory.
 | Profile | Address with copy, your display name, and your own postage price. |
 | Names | A directory fed by whatever the app already asks for — contacts, knocks, a reachability check — held per identity and cached in storage so a name shows on a cold start. Sanitised again on the way in, since the relay is not the last word on what is safe to draw. Shown alone only in the chat list; everywhere identity matters it sits above the address, never in place of it. |
 | Avatars | Nimiq identicons (`identicons-esm`), generated from the address and cached per address. Costs ~31 kB gzip of shape table, which buys a contact the same face they have in the Nimiq Wallet and Nimiq Pay. |
+| Send NIM in a chat | A plus button in the composer opens a menu of things a message can be other than text; the one action there now is a transfer to the person you are talking to. The wallet moves the money, then a card is posted into the thread. Message plaintext is framed (`\0knock1\n` + JSON) so text still travels as itself and an unrecognised frame degrades to "not supported in this version" rather than raw JSON. Confirmed working on Android and iOS. |
+| Payment cards | Not chat bubbles: bordered, tailless, laid out in rows and given a minimum width, so a payment is distinguishable from something someone said without reading either. Reports what the sender said they paid, and nothing more. |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
 | Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
-**Tests:** 70. Typecheck clean.
+**Tests:** 91. Typecheck clean.
 
 ---
 
@@ -83,6 +85,20 @@ in-memory.
 
 ### Product gaps
 
+- **A payment card is a claim, not a receipt.** Nothing checks it against the
+  chain, so anyone can send a card saying they paid you. The card is worded as
+  a note rather than a receipt, and the truth is the recipient's own balance.
+  A relay endpoint that looked the transaction up was built and then removed:
+  it never reached "confirmed" for a real payment, which leaves the underlying
+  question open — see below.
+- **What `sendBasicTransaction` actually returns is still unknown.** The SDK
+  documents it as "the serialized transaction"; the postage path has treated it
+  as a transaction hash since the beginning. Nothing has ever confirmed which,
+  and `getTransactionByHash` failing to find a real payment is a hint that it is
+  not a hash. If so, **postage verification has the same bug** and the paid
+  knock path cannot work. Worth settling before a public deploy.
+- **No explorer link on a payment card.** Linking out needs to know whether the
+  relay is on mainnet or testnet, which `/v1/info` does not report.
 - **Local nicknames.** A name is chosen by its owner, so two contacts can wear
   the same one and a stranger can wear yours. Letting you rename someone in
   your own copy is the unspoofable half of this feature, and is not built.

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react"
-import { ArrowUp } from "lucide-react"
+import { ArrowUp, Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -9,9 +9,12 @@ const MAX_BODY_BYTES = 4096
 
 export function Composer({
   onSend,
+  onAttach,
   disabled,
 }: {
   onSend: (body: string) => void
+  /** Opens the menu of things a message can be other than text. */
+  onAttach: () => void
   disabled?: boolean
 }) {
   const [value, setValue] = useState("")
@@ -38,6 +41,21 @@ export function Composer({
   return (
     <div className="bg-background/85 border-t backdrop-blur-xl">
       <div className="flex items-end gap-2 px-3 py-2.5">
+        {/* Disabled alongside the composer, not independently: a transfer would
+            still go through with the door shut, but the note about it would
+            not, leaving money moved and no record of it in the thread. */}
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          onClick={onAttach}
+          disabled={disabled}
+          aria-label="Send something else"
+          className="text-muted-foreground size-11 shrink-0 rounded-full"
+        >
+          <Plus className="size-5" />
+        </Button>
+
         <textarea
           ref={textarea}
           rows={1}

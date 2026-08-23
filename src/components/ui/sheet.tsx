@@ -65,8 +65,16 @@ function SheetContent({
             "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
           side === "top" &&
             "inset-x-0 top-0 h-auto border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
-          side === "bottom" &&
-            "inset-x-0 bottom-0 h-auto border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+          side === "bottom" && [
+            "inset-x-0 h-auto border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+            // Anchored to the bottom of what is visible, not the bottom of the
+            // layout viewport — otherwise a sheet that opens the keyboard opens
+            // behind it. See `--keyboard-inset` in lib/viewport.
+            "bottom-[var(--keyboard-inset,0px)]",
+            // And never taller than what is left to show it in, so a long sheet
+            // scrolls itself instead of running off the top of the screen.
+            "max-h-[var(--app-height,100dvh)] overflow-y-auto",
+          ],
           className
         )}
         {...props}

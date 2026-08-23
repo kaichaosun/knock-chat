@@ -1,6 +1,16 @@
-import { AlertCircle, Check, Clock, LockKeyhole } from "lucide-react"
+import {
+  AlertCircle,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Check,
+  Clock,
+  HelpCircle,
+  LockKeyhole,
+} from "lucide-react"
 
 import type { Message } from "@/lib/messages"
+import { decode, type Payment } from "@/lib/payload"
+import { formatNim } from "@/lib/postage"
 import { clockTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
 
@@ -30,21 +40,37 @@ export function MessageBubble({
     )
   }
 
+  const payload = decode(message.body)
+
   return (
     <div className={cn("flex w-full", outgoing ? "justify-end" : "justify-start")}>
       <div className={cn("max-w-[80%]", outgoing && "flex flex-col items-end")}>
-        <div
-          className={cn(
-            "rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug whitespace-pre-wrap",
-            "wrap-anywhere",
-            outgoing
-              ? "brand-gradient rounded-br-md text-white shadow-sm"
-              : "bg-muted text-foreground rounded-bl-md",
-            failed && "opacity-60",
-          )}
-        >
-          {message.body}
-        </div>
+        {payload.kind === "payment" ? (
+          <PaymentCard payment={payload.payment} outgoing={outgoing} faded={failed} />
+        ) : (
+          <div
+            className={cn(
+              "rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug whitespace-pre-wrap",
+              "wrap-anywhere",
+              outgoing
+                ? "brand-gradient rounded-br-md text-white shadow-sm"
+                : "bg-muted text-foreground rounded-bl-md",
+              failed && "opacity-60",
+            )}
+          >
+            {payload.kind === "text" ? (
+              payload.text
+            ) : (
+              // Something a newer build sent that this one has no way to draw.
+              // Shown as a gap on purpose: silently dropping it would leave the
+              // two sides disagreeing about what was said.
+              <span className="text-muted-foreground flex items-center gap-2 text-[13px] italic">
+                <HelpCircle className="size-3.5 shrink-0" />
+                Not supported in this version
+              </span>
+            )}
+          </div>
+        )}
 
         <div
           className={cn(
@@ -57,6 +83,62 @@ export function MessageBubble({
             <DeliveryState message={message} onRetry={onRetry} channelOpen={channelOpen} />
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A payment.
+ *
+ * Deliberately not a chat bubble. It carries no tail, it has a border, and it
+ * is laid out in rows rather than as a run of text — a payment is a different
+ * kind of thing from something someone said, and it should be possible to tell
+ * which is which from across the room without reading either.
+ *
+ * It reports what the sender said they paid and nothing more. Nothing here is
+ * checked against the chain, so this is a note about a payment rather than a
+ * receipt for one — what actually arrived is what the wallet says arrived.
+ * See `lib/payload`.
+ */
+function PaymentCard({
+  payment,
+  outgoing,
+  faded,
+}: {
+  payment: Payment
+  outgoing: boolean
+  faded: boolean
+}) {
+  const Icon = outgoing ? ArrowUpRight : ArrowDownLeft
+
+  return (
+    <div
+      className={cn(
+        "bg-card flex min-w-52 items-center gap-3 rounded-2xl border px-3.5 py-3 shadow-sm",
+        faded && "opacity-60",
+      )}
+    >
+      <span
+        className={cn(
+          "flex size-9 shrink-0 items-center justify-center rounded-full",
+          outgoing ? "bg-muted text-muted-foreground" : "bg-success/12 text-success",
+        )}
+      >
+        <Icon className="size-4.5" strokeWidth={2.25} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-muted-foreground text-[11px] font-semibold">
+          {outgoing ? "Sent" : "Received"}
+        </p>
+        <p
+          className={cn(
+            "text-xl leading-tight font-bold tabular-nums",
+            !outgoing && "text-success",
+          )}
+        >
+          {formatNim(payment.luna)} NIM
+        </p>
       </div>
     </div>
   )

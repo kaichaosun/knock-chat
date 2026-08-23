@@ -18,6 +18,9 @@ import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import type { Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
+import { encode as encodePayload, payment } from "@/lib/payload"
+import { sendNim } from "@/lib/payments"
+import { formatNim } from "@/lib/postage"
 import { NoKeyError } from "@/lib/keys"
 import { deviceKeyPair } from "@/lib/keys"
 import { RelayError, type Reachability } from "@/lib/relay"
@@ -197,6 +200,32 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [openPeer, send, refreshReach],
   )
 
+  /**
+   * Move NIM, then say so in the thread.
+   *
+   * Strictly in that order. The wallet either moved the money or it did not,
+   * and the note is a record of that — writing it first would leave a card in
+   * the thread for a payment the user went on to cancel. If the note fails to
+   * send the money has still moved, which is why the toast says so rather than
+   * reporting a failed payment.
+   */
+  const onPay = useCallback(
+    async (peer: string, luna: number) => {
+      if (!wallet?.provider) {
+        throw new Error("Sending NIM needs Nimiq Pay. Open the app there to continue.")
+      }
+      const reference = await sendNim(wallet.provider, peer, luna)
+      try {
+        await send(peer, encodePayload(payment(luna, reference)))
+      } catch {
+        toast.info(`Sent ${formatNim(luna)} NIM, but the note didn't reach this chat.`)
+        return
+      }
+      toast.success(`Sent ${formatNim(luna)} NIM`)
+    },
+    [wallet, send],
+  )
+
   /** Knock on a door we already know, reusing the sheet the compose flow uses. */
   const knockOnOpenPeer = useCallback(() => {
     setKnockPeer(openPeer)
@@ -273,6 +302,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onKnock={knockOnOpenPeer}
           onRetry={onRetrySend}
           onCopyAddress={copy}
+          onPay={onPay}
         />
         {knockSheet}
       </>

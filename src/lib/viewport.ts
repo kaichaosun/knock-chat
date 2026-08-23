@@ -36,6 +36,7 @@ export function trackVisibleViewport(): () => void {
   let uncovered = viewport.height
   let appliedHeight = ""
   let appliedKeyboard = ""
+  let appliedInset = ""
 
   const sync = () => {
     const height = viewport.height
@@ -45,6 +46,23 @@ export function trackVisibleViewport(): () => void {
     if (value !== appliedHeight) {
       root.style.setProperty("--app-height", value)
       appliedHeight = value
+    }
+
+    // How much of the layout viewport is hidden below what can be seen.
+    //
+    // A `position: fixed` element anchored to the bottom — every bottom sheet in
+    // the app — anchors to the *layout* viewport, which iOS does not shrink for
+    // the keyboard. Without lifting it by this much, a sheet opens into the
+    // strip behind the keyboard and is simply never seen.
+    //
+    // Measured rather than assumed, because hosts differ: a WebView that shrinks
+    // its layout viewport along with the keyboard leaves this at zero, which is
+    // exactly right for it. `documentElement.clientHeight` is the layout
+    // viewport height by definition, whatever CSS says about `html`.
+    const inset = `${Math.max(0, root.clientHeight - height)}px`
+    if (inset !== appliedInset) {
+      root.style.setProperty("--keyboard-inset", inset)
+      appliedInset = inset
     }
 
     // A keyboard covers the home indicator, so the bottom safe-area inset is
@@ -83,6 +101,7 @@ export function trackVisibleViewport(): () => void {
     window.removeEventListener("pageshow", sync)
     window.removeEventListener("orientationchange", onOrientation)
     root.style.removeProperty("--app-height")
+    root.style.removeProperty("--keyboard-inset")
     delete root.dataset.keyboard
   }
 }

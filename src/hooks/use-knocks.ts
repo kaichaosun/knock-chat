@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react"
 import { encryptBody } from "@/lib/crypto"
 import { keyForPeer } from "@/lib/keys"
 import { remember } from "@/lib/names"
+import { unwrapTransaction } from "@/lib/payments"
 import { commitment, newNonce } from "@/lib/postage"
 import { toHex } from "@/lib/crypto"
 import {
@@ -89,18 +90,17 @@ export function useKnocks(wallet: Wallet | null, owner: string | null) {
       }
 
       const nonce = newNonce()
-      const result = await wallet.provider.sendBasicTransactionWithData({
-        recipient: peer,
-        value: policyLuna,
-        data: commitment(owner, nonce),
-      })
-      if (typeof result === "object" && result !== null && "error" in result) {
-        throw new Error(result.error.message)
-      }
+      const result = unwrapTransaction(
+        await wallet.provider.sendBasicTransactionWithData({
+          recipient: peer,
+          value: policyLuna,
+          data: commitment(owner, nonce),
+        }),
+      )
 
       // The hash is the serialized transaction's identity; the relay looks it
       // up on chain before storing anything.
-      return sendKnock(peer, sealed, { tx_hash: String(result), nonce: toHex(nonce) })
+      return sendKnock(peer, sealed, { tx_hash: result, nonce: toHex(nonce) })
     },
     [wallet, owner],
   )

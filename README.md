@@ -65,6 +65,16 @@ findable again.
 open, the messages stay on the device, and anything new brings the thread straight back —
 closing is tidying, not deleting, and not a mute.
 
+## Sending NIM in a chat
+
+The **+** in the composer opens the things a message can be other than text.
+Today that is one thing: a transfer to the person you are talking to. Your
+wallet moves the money and a card goes into the thread saying so.
+
+The card is a note about a payment, not a receipt for one. Nothing verifies it
+against the chain, so an incoming card is the sender's claim in exactly the way
+their words are — what actually arrived is what your wallet says arrived.
+
 ## Your profile
 
 Tap your avatar in the header. It holds your address, your **name**, and your **cost to
