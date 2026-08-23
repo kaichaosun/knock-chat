@@ -151,13 +151,15 @@ export function useMessages(
     [update],
   )
 
-  const closeThread = useCallback(
-    (peer: string) => update((current) => history.closeThread(current, peer)),
+  const deleteThread = useCallback(
+    (peer: string) => update((current) => history.deleteThread(current, peer)),
     [update],
   )
 
-  const reopenThread = useCallback(
-    (peer: string) => update((current) => history.reopenThread(current, peer)),
+  /** Record a message this device sent outside the normal send path — a knock. */
+  const recordOutgoing = useCallback(
+    (peer: string, body: string, id: string) =>
+      update((current) => history.recordOutgoing(current, peer, body, id)),
     [update],
   )
 
@@ -167,7 +169,16 @@ export function useMessages(
     [snapshot],
   )
 
-  return { conversations, threadWith, send, retry, markRead, closeThread, reopenThread, relayStatus }
+  return {
+    conversations,
+    threadWith,
+    send,
+    retry,
+    markRead,
+    deleteThread,
+    recordOutgoing,
+    relayStatus,
+  }
 }
 
 /**

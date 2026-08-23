@@ -56,8 +56,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     send,
     retry: retrySend,
     markRead,
-    closeThread,
-    reopenThread,
+    deleteThread,
+    recordOutgoing,
     relayStatus,
   } = useMessages(owner, deviceSecretKey, session.invalidate)
 
@@ -77,15 +77,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     return () => window.removeEventListener("popstate", onPop)
   }, [openPeer])
 
-  const openThread = useCallback(
-    (peer: string) => {
-      // Opening from Contacts should bring a closed thread back rather than
-      // showing an empty chat that vanishes again on exit.
-      reopenThread(peer)
-      setOpenPeer(peer)
-    },
-    [reopenThread],
-  )
+  const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
 
   const openMessages = openPeer ? threadWith(openPeer) : []
 
@@ -171,11 +163,6 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onSend={onSend}
           onRetry={onRetrySend}
           onCopyAddress={copy}
-          onClose={() => {
-            closeThread(openPeer)
-            closeThreadView()
-            toast.success("Chat closed. They're still in Contacts.")
-          }}
         />
       </>
     )
@@ -223,6 +210,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               conversations={conversations}
               onOpen={openThread}
               onCompose={() => setKnocking(true)}
+              onDelete={(peer) => {
+                deleteThread(peer)
+                toast.success("Chat deleted. They're still in Contacts.")
+              }}
             />
           </>
         ) : (
@@ -243,7 +234,11 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onReach={reach}
         onKnock={async (peer, body, policyLuna) => {
           if (!deviceSecretKey) throw new Error("no device key")
-          await knock(peer, body, policyLuna, deviceSecretKey)
+          const sent = await knock(peer, body, policyLuna, deviceSecretKey)
+          // The relay holds the knock until it is accepted, so nothing comes
+          // back through the message poll — without this the sender has no
+          // record of what they wrote.
+          recordOutgoing(peer, body, `knock:${sent.id}`)
           toast.success("Knocked. They'll see it next time they open Knock.")
         }}
         onOpenThread={openThread}

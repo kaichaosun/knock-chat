@@ -65,17 +65,9 @@ type Snapshot = {
    * entirely, and works because local history only ever grows.
    */
   readCount: Record<string, number>
-  /**
-   * Threads hidden from the chat list.
-   *
-   * Closing a chat is tidying, not deleting: the channel stays open on the
-   * relay, the messages stay on the device, and a new message brings the thread
-   * straight back. Anything else would make "close" a trap.
-   */
-  closed?: string[]
 }
 
-const EMPTY: Snapshot = { cursor: null, messages: [], readCount: {}, closed: [] }
+const EMPTY: Snapshot = { cursor: null, messages: [], readCount: {} }
 
 function storageKey(owner: string): string {
   return `knock:history:${compact(owner)}`
@@ -149,17 +141,28 @@ export function mergeIncoming(
 
   if (added.length === 0 && snapshot.cursor === cursor) return snapshot
 
-  // Something arriving in a closed thread reopens it — a closed chat is not a
-  // mute, and silently swallowing new mail would lose messages.
-  const revived = new Set(added.map((m) => m.peer))
-  const closed = (snapshot.closed ?? []).filter((peer) => !revived.has(peer))
-
   return {
     ...snapshot,
     cursor,
-    closed,
     messages: added.length > 0 ? sorted([...snapshot.messages, ...added]) : snapshot.messages,
   }
+}
+
+/** Record something this device sent, so the sender sees their own words. */
+export function recordOutgoing(
+  snapshot: Snapshot,
+  peer: string,
+  body: string,
+  id: string,
+): Snapshot {
+  return appendOutgoing(snapshot, {
+    id,
+    peer: compact(peer),
+    direction: "out",
+    body,
+    at: new Date().toISOString(),
+    status: "sent",
+  })
 }
 
 export function appendOutgoing(snapshot: Snapshot, message: Message): Snapshot {
@@ -191,20 +194,23 @@ export function markRead(snapshot: Snapshot, peer: string): Snapshot {
   return { ...snapshot, readCount: { ...snapshot.readCount, [key]: seen } }
 }
 
-/** Hide a thread from the chat list. */
-export function closeThread(snapshot: Snapshot, peer: string): Snapshot {
+/**
+ * Delete a conversation from this device.
+ *
+ * The messages go; the channel does not. You stay connected and can write to
+ * them again — the thread simply starts empty. Deleting a relationship is a
+ * different act, and it lives in Contacts.
+ *
+ * The cursor is left alone deliberately: it is what stops the relay handing the
+ * same messages back on the next poll and resurrecting what was just deleted.
+ */
+export function deleteThread(snapshot: Snapshot, peer: string): Snapshot {
   const key = compact(peer)
-  const closed = snapshot.closed ?? []
-  if (closed.includes(key)) return snapshot
-  return { ...snapshot, closed: [...closed, key] }
-}
+  const messages = snapshot.messages.filter((m) => m.peer !== key)
+  if (messages.length === snapshot.messages.length) return snapshot
 
-/** Bring a closed thread back — explicitly, or because something arrived. */
-export function reopenThread(snapshot: Snapshot, peer: string): Snapshot {
-  const key = compact(peer)
-  const closed = snapshot.closed ?? []
-  if (!closed.includes(key)) return snapshot
-  return { ...snapshot, closed: closed.filter((c) => c !== key) }
+  const { [key]: _removed, ...readCount } = snapshot.readCount
+  return { ...snapshot, messages, readCount }
 }
 
 function incomingCount(messages: Message[], peer: string): number {
@@ -222,10 +228,8 @@ export function threadWith(snapshot: Snapshot, peer: string): Message[] {
 
 /** One entry per peer, most recently active first. */
 export function conversations(snapshot: Snapshot): Conversation[] {
-  const closed = new Set(snapshot.closed ?? [])
   const byPeer = new Map<string, Message[]>()
   for (const message of snapshot.messages) {
-    if (closed.has(message.peer)) continue
     const bucket = byPeer.get(message.peer)
     if (bucket) bucket.push(message)
     else byPeer.set(message.peer, [message])

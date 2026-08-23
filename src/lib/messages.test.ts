@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  closeThread,
   conversations,
+  deleteThread,
   emptySnapshot,
   markRead,
   mergeIncoming,
-  reopenThread,
+  recordOutgoing,
   threadWith,
 } from "./messages"
 import type { Snapshot } from "./messages"
@@ -171,43 +171,19 @@ describe("markRead", () => {
   })
 })
 
-describe("closing a chat", () => {
+describe("deleting a chat", () => {
   const listed = (snapshot: Snapshot) => conversations(snapshot).map((c) => c.peer)
 
-  it("hides the thread without touching its messages", () => {
+  it("removes the thread and its messages", () => {
     let snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1))
-    expect(listed(snapshot)).toHaveLength(1)
+    snapshot = deleteThread(snapshot, ALICE)
 
-    snapshot = closeThread(snapshot, ALICE)
     expect(listed(snapshot)).toHaveLength(0)
-    // The history is still there — closing is tidying, not deleting.
-    expect(threadWith(snapshot, ALICE)).toHaveLength(1)
+    expect(threadWith(snapshot, ALICE)).toHaveLength(0)
   })
 
-  it("reopens on request, with the messages intact", () => {
-    let snapshot = closeThread(
-      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
-      ALICE,
-    )
-    snapshot = reopenThread(snapshot, ALICE)
-    expect(listed(snapshot)).toHaveLength(1)
-    expect(threadWith(snapshot, ALICE)[0].body).toBe("hi")
-  })
-
-  /** A closed chat is not a mute — new mail must not vanish into it. */
-  it("reopens by itself when something new arrives", () => {
-    let snapshot = closeThread(
-      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
-      ALICE,
-    )
-    expect(listed(snapshot)).toHaveLength(0)
-
-    snapshot = mergeIncoming(snapshot, [envelope(2, "still there?", ALICE, "id-2b")], cursor(2))
-    expect(listed(snapshot)).toHaveLength(1)
-  })
-
-  it("closes only the thread asked for", () => {
-    const snapshot = closeThread(
+  it("leaves other conversations alone", () => {
+    const snapshot = deleteThread(
       mergeIncoming(
         emptySnapshot(),
         [envelope(1, "from alice", ALICE), envelope(2, "from bob", BOB)],
@@ -216,5 +192,36 @@ describe("closing a chat", () => {
       ALICE,
     )
     expect(listed(snapshot)).toEqual([BOB.replace(/\s+/g, "")])
+  })
+
+  /**
+   * The cursor must survive, or the next poll hands the same messages back and
+   * resurrects what was just deleted.
+   */
+  it("keeps the cursor so the relay does not replay what was deleted", () => {
+    const before = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1))
+    expect(deleteThread(before, ALICE).cursor).toBe(before.cursor)
+  })
+
+  it("does nothing when there is no such thread", () => {
+    const snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1))
+    expect(deleteThread(snapshot, BOB)).toBe(snapshot)
+  })
+})
+
+describe("recordOutgoing", () => {
+  /** A knock never comes back through the poll, so the sender must record it. */
+  it("puts the sender's own knock in their thread", () => {
+    const snapshot = recordOutgoing(emptySnapshot(), ALICE, "let me in", "knock:abc")
+    const thread = threadWith(snapshot, ALICE)
+
+    expect(thread).toHaveLength(1)
+    expect(thread[0].direction).toBe("out")
+    expect(thread[0].body).toBe("let me in")
+  })
+
+  it("does not count as unread for the sender", () => {
+    const snapshot = recordOutgoing(emptySnapshot(), ALICE, "let me in", "knock:abc")
+    expect(conversations(snapshot)[0].unread).toBe(0)
   })
 })

@@ -234,8 +234,14 @@ one account and pay from another — observed on a real device, where `sign()` u
 `NQ80 M6TC…` while the transaction came from `NQ86 MASJ…`. Requiring payer and sender to
 match would reject legitimate postage.
 
-**Anti-replay** is the `UNIQUE` constraint on the knock's transaction hash: one payment
-opens one door, with no separate spent-nonce table to keep in step.
+**Anti-replay** is a `spent_postage` table, keyed by transaction hash and never deleted.
+It sits apart from the knock it paid for on purpose: a payment being spent is a fact about
+the chain, not about a knock, and it has to outlive every knock. A waived knock records no
+payment at all rather than an empty one.
+
+**Being declined is not a ban.** The knock row is removed, so the pair is free to knock
+again — with a *new* payment. Paying more than asked is accepted, so a second attempt can
+carry more weight, though the interface does not yet offer that.
 
 **Why the relay enforces this rather than the client:** a rejected knock never reaches the
 recipient's device at all. A client-side filter still downloads the spam.
