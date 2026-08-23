@@ -149,8 +149,8 @@ Details that matter inside a WebView, and are easy to miss:
   the thread rather than the app.
 - `crypto.randomUUID` and `navigator.clipboard` need a secure context, which
   `http://<lan-ip>` is not — both have fallbacks.
-- Avatars are derived from the address, so nobody has to set a profile picture
-  and a screen full of them still looks like one product.
+- Avatars are Nimiq identicons, so nobody has to set a profile picture and a
+  contact wears the same face here as in the Nimiq Wallet and Nimiq Pay.
 
 On a desktop browser the app is held in a phone-width column; inside Nimiq Pay
 that constraint is a no-op.

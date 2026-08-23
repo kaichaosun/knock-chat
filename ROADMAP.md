@@ -41,10 +41,11 @@ in-memory.
 | Knocking | Address entry with live cost lookup, or from inside a closed chat with the address fixed. Same sheet either way. |
 | Closed chats | Banner with an explicit priced Knock button; composer disabled so no dead message is left behind. |
 | Profile | Address with copy, and your own postage price. |
+| Avatars | Nimiq identicons (`identicons-esm`), generated from the address and cached per address. Costs ~31 kB gzip of shape table, which buys a contact the same face they have in the Nimiq Wallet and Nimiq Pay. |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
 | Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
-**Tests:** 48. Typecheck clean.
+**Tests:** 51. Typecheck clean.
 
 ---
 

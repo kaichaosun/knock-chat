@@ -1,43 +1,32 @@
 /**
- * Deterministic avatars.
+ * Avatars.
  *
- * Every address gets a stable gradient and monogram, so a conversation is
- * recognizable at a glance without anyone having to set a profile picture.
- * Colors are drawn from Nimiq's brand palette rather than generated freely, so
- * a screen full of avatars still looks like one product.
+ * Every address gets its Nimiq identicon — the same face the Nimiq Wallet and
+ * Nimiq Pay draw for that address, so a contact here is recognizable as the same
+ * person there. Nobody uploads a picture and nobody can pick one: the icon is a
+ * function of the address, which is the only identity Knock has.
  */
 
-import { compact } from "./address"
+import { createIdenticonCache, createIdenticonCached } from "identicons-esm/cache"
 
-const GRADIENTS: Array<[string, string]> = [
-  ["#265DD7", "#0582CA"],
-  ["#41A38E", "#21BCA5"],
-  ["#FC8702", "#E9B213"],
-  ["#CC3047", "#FC8702"],
-  ["#4D4C96", "#5F4B8B"],
-  ["#0582CA", "#21BCA5"],
-  ["#D94432", "#E9B213"],
-  ["#5F4B8B", "#265DD7"],
-  ["#1F2348", "#0582CA"],
-  ["#21BCA5", "#E9B213"],
-]
+import { formatAddress } from "./address"
 
-/** FNV-1a — small, fast, and stable across runs. */
-function hash(value: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < value.length; i++) {
-    h ^= value.charCodeAt(i)
-    h = Math.imul(h, 0x01000193)
-  }
-  return h >>> 0
-}
+/**
+ * The same address is drawn repeatedly — a row in the inbox, the header of its
+ * conversation, the contact list — so an LRU makes all but the first free. Small
+ * on purpose: each entry is an ~8 KB data URI, and a phone holds few contacts.
+ */
+const cache = createIdenticonCache(32)
 
-export function avatarGradient(address: string): string {
-  const [from, to] = GRADIENTS[hash(compact(address)) % GRADIENTS.length]
-  return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`
-}
-
-/** Two characters from the address body — skips `NQ` and the check digits. */
-export function avatarMonogram(address: string): string {
-  return compact(address).slice(4, 6) || "??"
+/**
+ * A `data:` URI of the identicon for `address`.
+ *
+ * Falls back to Nimiq's placeholder if the string is not an address, which is
+ * the honest picture for one: an unknown face rather than a plausible one.
+ */
+export function avatarUri(address: string): string {
+  // The generator normalizes to the grouped uppercase form before hashing, so
+  // feeding it that form directly keeps one cache entry per address however the
+  // caller happened to be holding it.
+  return createIdenticonCached(formatAddress(address), { cache })
 }

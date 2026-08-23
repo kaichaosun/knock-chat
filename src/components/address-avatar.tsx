@@ -1,13 +1,20 @@
-import { avatarGradient, avatarMonogram } from "@/lib/avatar"
+import { avatarUri } from "@/lib/avatar"
 import { cn } from "@/lib/utils"
 
 const SIZES = {
-  sm: "size-8 text-[11px]",
-  md: "size-11 text-[13px]",
-  lg: "size-16 text-lg",
+  sm: "size-8",
+  md: "size-11",
+  lg: "size-16",
 } as const
 
-/** A stable, address-derived avatar: brand gradient plus a two-character monogram. */
+/**
+ * The Nimiq identicon for an address.
+ *
+ * Deliberately not cropped to a circle: the hexagon is how Nimiq draws
+ * identicons everywhere else, and rounding it off would cut away the silhouette
+ * that makes one recognizable before you have read a single character of the
+ * address.
+ */
 export function AddressAvatar({
   address,
   size = "md",
@@ -18,17 +25,12 @@ export function AddressAvatar({
   className?: string
 }) {
   return (
-    <div
-      aria-hidden
-      style={{ backgroundImage: avatarGradient(address) }}
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-bold tracking-wide text-white",
-        "shadow-sm ring-1 ring-black/5 select-none",
-        SIZES[size],
-        className,
-      )}
-    >
-      {avatarMonogram(address)}
-    </div>
+    <img
+      // Decorative: every avatar sits next to the address it was made from.
+      alt=""
+      src={avatarUri(address)}
+      draggable={false}
+      className={cn("shrink-0 select-none", SIZES[size], className)}
+    />
   )
 }
