@@ -33,6 +33,7 @@ export function Conversation({
   onCopyAddress: (address: string) => void
 }) {
   const bottom = useRef<HTMLDivElement>(null)
+  const scroller = useRef<HTMLDivElement>(null)
 
   // Knocking costs money, so it is its own deliberate act behind its own button
   // — never something an ordinary-looking send turns into.
@@ -45,15 +46,18 @@ export function Conversation({
     bottom.current?.scrollIntoView({ block: "end" })
   }, [messages.length])
 
-  // And when the keyboard opens. The app shrinks to the visible area (see
-  // lib/viewport.ts), which would otherwise leave the thread scrolled to where
-  // the bottom used to be, hiding the messages you were just reading.
+  // And whenever the thread area itself changes size — the keyboard opening is
+  // the case that matters, which otherwise leaves the thread scrolled to where
+  // the bottom used to be, showing its middle. Watched on the element rather
+  // than on viewport events, because the resize does not always arrive as one.
   useEffect(() => {
-    const viewport = window.visualViewport
-    if (!viewport) return
-    const pin = () => bottom.current?.scrollIntoView({ block: "end" })
-    viewport.addEventListener("resize", pin)
-    return () => viewport.removeEventListener("resize", pin)
+    const element = scroller.current
+    if (!element || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(() => {
+      bottom.current?.scrollIntoView({ block: "end" })
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
   }, [])
 
   const groups = useMemo(() => groupByDay(messages), [messages])
@@ -93,7 +97,10 @@ export function Conversation({
         </div>
       </header>
 
-      <div className="scrollbar-none flex-1 overflow-y-auto overscroll-contain px-3.5 py-4">
+      <div
+        ref={scroller}
+        className="scrollbar-none flex-1 overflow-y-auto overscroll-contain px-3.5 py-4"
+      >
         {groups.length === 0 ? (
           <ThreadIntro peer={peer} />
         ) : (

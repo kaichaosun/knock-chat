@@ -17,6 +17,7 @@ import {
   clipboardProbe,
   deeplinkProbe,
   environmentProbe,
+  viewportProbe,
   minimumAmountProbe,
   signatureProbe,
   walletProbe,
@@ -120,6 +121,13 @@ export function ProbeScreen() {
           report={reports.Clipboard}
           note="Tests each copy mechanism separately. Paste afterwards to confirm."
           action={{ label: "Run", onClick: () => run("Clipboard", clipboardProbe) }}
+        />
+
+        <Card
+          name="Viewport"
+          report={reports.Viewport}
+          note="Run this while the app is drawn at the wrong size — it says whether the WebView itself is short."
+          action={{ label: "Run", onClick: () => set("Viewport", viewportProbe()) }}
         />
 
         <Card name="Deeplink" report={reports.Deeplink} note="Open the links below from Nimiq Pay and watch for probe=42." />

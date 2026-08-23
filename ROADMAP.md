@@ -42,7 +42,7 @@ in-memory.
 | Closed chats | Banner with an explicit priced Knock button; composer disabled so no dead message is left behind. |
 | Profile | Address with copy, and your own postage price. |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
-| Refresh | Messages poll while visible. Reachability is asked on open, when a message arrives **while the door is shut**, and on pull-to-refresh — never on a timer. An open conversation costs zero reachability calls. |
+| Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
 **Tests:** 48. Typecheck clean.
 
@@ -66,6 +66,17 @@ in-memory.
   provider and throw before any transaction.
 - **Mainnet.** All testing has been local against
   `rpc.nimiqwatch.com` / `rpc.testnet.nimiqwatch.com`.
+
+### Known limits
+
+- **The Mini App WebView shrinks after a screen lock.** Measured on iPhone
+  (iOS 18.1.1): a fresh launch fills the screen, but after locking and
+  unlocking, Nimiq Pay hands the page a WebView 462px tall on an 844px screen
+  and the rest of the screen is the host's own UI. `innerHeight`,
+  `documentElement.clientHeight` and `visualViewport.height` all agree on 462,
+  so the page is filling exactly what it is given — a page cannot resize its own
+  WebView, and the SDK exposes nothing for height or presentation. Upstream.
+  The Viewport probe on the probe screen reports the numbers.
 
 ### Product gaps
 

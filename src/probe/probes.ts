@@ -54,6 +54,47 @@ export function environmentProbe(): ProbeReport {
   }
 }
 
+/**
+ * Every number that describes how big the app thinks it is.
+ *
+ * Settles whose problem a wrong-sized app is. If the WebView itself is short —
+ * `innerHeight` well under `screen.height` — then the host is presenting the
+ * Mini App in a partial-height sheet and no CSS here can undo that. If instead
+ * the WebView is full height and only `--app-height` is small, the fault is
+ * ours. Run it while the app is misdrawn, not before.
+ */
+export function viewportProbe(): ProbeReport {
+  const viewport = window.visualViewport
+  const root = document.getElementById("root")
+  const style = document.documentElement.style
+  const px = (value: number | undefined) =>
+    value === undefined ? "(none)" : String(Math.round(value))
+
+  const shortfall = Math.round(window.screen.height - window.innerHeight)
+
+  return {
+    outcome: "info",
+    // Stated, not judged: on a phone in portrait a large shortfall means the host
+    // is giving us a partial-height WebView, but a desktop window is short too.
+    headline: `WebView is ${Math.round(window.innerHeight)}px tall of a ${Math.round(window.screen.height)}px screen (${shortfall}px short)`,
+    detail: {
+      "screen.height": px(window.screen.height),
+      "screen.availHeight": px(window.screen.availHeight),
+      "window.innerHeight": px(window.innerHeight),
+      "documentElement.clientHeight": px(document.documentElement.clientHeight),
+      "visualViewport.height": px(viewport?.height),
+      "visualViewport.offsetTop": px(viewport?.offsetTop),
+      "visualViewport.scale": String(viewport?.scale ?? "(none)"),
+      "--app-height": style.getPropertyValue("--app-height") || "(unset)",
+      "data-keyboard": document.documentElement.dataset.keyboard ?? "(unset)",
+      "#root height": px(root?.getBoundingClientRect().height),
+      "body height": px(document.body.getBoundingClientRect().height),
+      "window.scrollY": px(window.scrollY),
+      devicePixelRatio: String(window.devicePixelRatio),
+    },
+  }
+}
+
 /** Basic provider reachability, and the address the wallet says is ours. */
 export async function walletProbe(provider: NimiqProvider): Promise<ProbeReport> {
   const [accounts, consensus, height] = await Promise.all([

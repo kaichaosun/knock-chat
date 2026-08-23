@@ -1,5 +1,6 @@
 /**
- * How much of the screen has to disappear before it counts as a keyboard.
+ * How much shorter than its tallest the visible area has to get before it counts
+ * as a keyboard.
  *
  * Comfortably above a collapsing URL bar or an accessory strip, and well below
  * any real software keyboard.
@@ -26,30 +27,62 @@ export function trackVisibleViewport(): () => void {
   const viewport = window.visualViewport
   if (!viewport) return () => {}
 
+  const root = document.documentElement
+
+  // The tallest the visible area has been, which is what it is with no keyboard.
+  // `window.innerHeight` cannot serve as that reference: some WebViews shrink it
+  // along with the keyboard and others leave it alone, and getting this wrong
+  // means the app is never resized and the composer sits under the keyboard.
+  let uncovered = viewport.height
+  let appliedHeight = ""
+  let appliedKeyboard = ""
+
   const sync = () => {
-    document.documentElement.style.setProperty("--app-height", `${viewport.height}px`)
+    const height = viewport.height
+    if (height > uncovered) uncovered = height
+
+    const value = `${height}px`
+    if (value !== appliedHeight) {
+      root.style.setProperty("--app-height", value)
+      appliedHeight = value
+    }
 
     // A keyboard covers the home indicator, so the bottom safe-area inset is
     // padding against something no longer there — it shows up as a gap between
     // the composer and the keyboard. iOS keeps reporting the inset regardless,
-    // so infer it from how much of the screen went missing.
-    const covered = window.innerHeight - viewport.height
-    document.documentElement.dataset.keyboard =
-      covered > KEYBOARD_THRESHOLD_PX ? "open" : "closed"
+    // so infer the keyboard from how much of the screen went missing.
+    const keyboard = uncovered - height > KEYBOARD_THRESHOLD_PX ? "open" : "closed"
+    if (keyboard !== appliedKeyboard) {
+      root.dataset.keyboard = keyboard
+      appliedKeyboard = keyboard
+    }
 
     // The app now fits the visible area, so any scroll iOS applied to reveal the
     // field is pure offset — it only hides the top of the app.
     if (window.scrollY !== 0) window.scrollTo(0, 0)
   }
 
+  // Rotating changes what "no keyboard" means, so the reference starts over.
+  const onOrientation = () => {
+    uncovered = viewport.height
+    sync()
+  }
+
   sync()
   viewport.addEventListener("resize", sync)
   viewport.addEventListener("scroll", sync)
+  // Re-measure when the app comes back to the front or the window changes shape.
+  document.addEventListener("visibilitychange", sync)
+  window.addEventListener("pageshow", sync)
+  window.addEventListener("orientationchange", onOrientation)
 
   return () => {
     viewport.removeEventListener("resize", sync)
     viewport.removeEventListener("scroll", sync)
-    document.documentElement.style.removeProperty("--app-height")
-    delete document.documentElement.dataset.keyboard
+    document.removeEventListener("visibilitychange", sync)
+    window.removeEventListener("pageshow", sync)
+    window.removeEventListener("orientationchange", onOrientation)
+    root.style.removeProperty("--app-height")
+    delete root.dataset.keyboard
   }
 }
