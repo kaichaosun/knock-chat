@@ -19,7 +19,12 @@ export type OpenedEnvelope = Omit<Envelope, "body"> & {
   undecryptable?: boolean
 }
 
-export type MessageStatus = "sending" | "sent" | "failed"
+/**
+ * `blocked` is a failure that retrying cannot fix: the channel is shut, so the
+ * only way through is a fresh knock. Kept apart from `failed` so the UI never
+ * offers a retry that is guaranteed to fail again.
+ */
+export type MessageStatus = "sending" | "sent" | "failed" | "blocked"
 
 export type Message = {
   id: string

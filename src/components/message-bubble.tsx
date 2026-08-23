@@ -12,7 +12,7 @@ export function MessageBubble({
   onRetry: (message: Message) => void
 }) {
   const outgoing = message.direction === "out"
-  const failed = message.status === "failed"
+  const failed = message.status === "failed" || message.status === "blocked"
 
   // Kept and shown rather than hidden: a message this device cannot read is
   // still evidence someone wrote, and dropping it would leave a silent gap.
@@ -66,6 +66,16 @@ function DeliveryState({
 }) {
   if (message.status === "sending") {
     return <Clock className="size-3 animate-pulse" aria-label="Sending" />
+  }
+  if (message.status === "blocked") {
+    // Deliberately not a button: there is nothing to tap that would help. The
+    // way through is the knock prompt above the composer.
+    return (
+      <span className="text-destructive flex items-center gap-1 font-medium">
+        <AlertCircle className="size-3" />
+        Not delivered
+      </span>
+    )
   }
   if (message.status === "failed") {
     return (

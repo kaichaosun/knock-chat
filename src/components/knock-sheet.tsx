@@ -25,6 +25,7 @@ export function KnockSheet({
   open,
   onOpenChange,
   myAddress,
+  peer,
   suggestions,
   onReach,
   onKnock,
@@ -33,6 +34,9 @@ export function KnockSheet({
   open: boolean
   onOpenChange: (open: boolean) => void
   myAddress: string
+  /** Set when knocking on a door you already know — from inside a closed chat.
+   *  The address is then fixed rather than typed. */
+  peer?: string
   suggestions: Array<{ label: string; address: string }>
   onReach: (peer: string) => Promise<Reachability>
   onKnock: (peer: string, body: string, policyLuna: number) => Promise<void>
@@ -47,12 +51,12 @@ export function KnockSheet({
 
   useEffect(() => {
     if (open) {
-      setValue("")
+      setValue(peer ? normalizeInput(peer) : "")
       setBody("")
       setReach(null)
       setError("")
     }
-  }, [open])
+  }, [open, peer])
 
   const typed = compact(value)
   const valid = isValidAddress(value)
@@ -96,14 +100,24 @@ export function KnockSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Knock on a door</SheetTitle>
+          <SheetTitle>{peer ? "Knock to reopen" : "Knock on a door"}</SheetTitle>
           <SheetDescription>
-            Reaching someone new costs once. After they let you in, messages are free
-            both ways, forever.
+            {peer
+              ? "This chat is closed. Knocking asks them to open it again — after that, messages are free both ways."
+              : "Reaching someone new costs once. After they let you in, messages are free both ways, forever."}
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-3 pb-6">
+          {peer ? (
+            <div className="bg-muted flex items-center gap-3 rounded-2xl px-4 py-3">
+              <AddressAvatar address={peer} size="sm" />
+              <p className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold tracking-tight">
+                {shortenAddress(peer)}
+              </p>
+              {checking && <Loader2 className="text-muted-foreground size-4 animate-spin" />}
+            </div>
+          ) : (
           <div className="relative">
             <input
               autoFocus
@@ -130,6 +144,7 @@ export function KnockSheet({
               <CheckCircle2 className="text-success absolute top-1/2 right-4 size-5 -translate-y-1/2" />
             )}
           </div>
+          )}
 
           {typed.length === 36 && !valid && (
             <p className="text-destructive px-1 text-[13px]">
@@ -196,7 +211,7 @@ export function KnockSheet({
 
           {error && <p className="text-destructive px-1 text-[13px] text-balance">{error}</p>}
 
-          {suggestions.length > 0 && !reach && (
+          {suggestions.length > 0 && !reach && !peer && (
             <div className="pt-2">
               <p className="text-muted-foreground mb-2 px-1 text-xs font-medium">
                 Test identities

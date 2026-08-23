@@ -119,7 +119,11 @@ export function useMessages(
         update((current) => history.setStatus(current, message.id, "sent"))
         setRelayStatus("online")
       } catch (error) {
-        update((current) => history.setStatus(current, message.id, "failed"))
+        // 402 means the door is shut, not that the network hiccuped.
+        const shut = error instanceof RelayError && error.status === 402
+        update((current) =>
+          history.setStatus(current, message.id, shut ? "blocked" : "failed"),
+        )
         if (error instanceof RelayError) {
           if (error.status === 0) setRelayStatus("offline")
           if (error.status === 401) onUnauthorized?.()

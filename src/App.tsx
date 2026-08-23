@@ -19,6 +19,7 @@ import { copyText } from "@/lib/clipboard"
 import type { Message } from "@/lib/messages"
 import { NoKeyError } from "@/lib/keys"
 import { deviceKeyPair } from "@/lib/keys"
+import { RelayError, type Reachability } from "@/lib/relay"
 import { devIdentities } from "@/lib/wallet"
 import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
 import { useSession } from "@/hooks/use-session"
@@ -65,6 +66,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [knocking, setKnocking] = useState(false)
+  // Set when knocking on a door we already know, so the sheet fixes the address
+  // instead of asking for it. Null for the ordinary compose flow.
+  const [knockPeer, setKnockPeer] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>("chats")
   const [profileOpen, setProfileOpen] = useState(false)
 
@@ -78,6 +82,25 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   }, [openPeer])
 
   const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
+
+  // How the open thread stands with its peer. A channel can be closed from the
+  // other side at any time, so this is asked on open rather than assumed from
+  // the fact that a thread exists.
+  const [openReach, setOpenReach] = useState<Reachability | null>(null)
+  const refreshReach = useCallback(async () => {
+    if (!openPeer) return
+    try {
+      setOpenReach(await reach(openPeer))
+    } catch {
+      // Leave it null: the composer stays in its ordinary mode, and a send that
+      // turns out to be impossible is caught below.
+    }
+  }, [openPeer, reach])
+
+  useEffect(() => {
+    setOpenReach(null)
+    void refreshReach()
+  }, [openPeer, refreshReach])
 
   const openMessages = openPeer ? threadWith(openPeer) : []
 
@@ -109,6 +132,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       try {
         await send(openPeer, body)
       } catch (error) {
+        // The channel can be closed while this thread is open, which is exactly
+        // how a send arrives at a shut door. Re-ask, so the composer switches to
+        // knocking instead of offering a retry that cannot work.
+        if (error instanceof RelayError && error.status === 402) {
+          await refreshReach()
+          toast.error("They closed this chat. Send again to knock and reopen it.")
+          return
+        }
         // Someone who has never opened Knock has published no key, so there is
         // nothing to encrypt to. Say that plainly instead of "failed to send".
         toast.error(
@@ -120,8 +151,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         )
       }
     },
-    [openPeer, send],
+    [openPeer, send, refreshReach],
   )
+
+  /** Knock on a door we already know, reusing the sheet the compose flow uses. */
+  const knockOnOpenPeer = useCallback(() => {
+    setKnockPeer(openPeer)
+    setKnocking(true)
+  }, [openPeer])
 
   const onRetrySend = useCallback(
     async (message: Message) => {
@@ -153,17 +190,48 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
   const address = session.state.session.address
 
+  const knockSheet = (
+    <KnockSheet
+      open={knocking}
+      onOpenChange={setKnocking}
+      myAddress={address}
+      peer={knockPeer ?? undefined}
+      onReach={reach}
+      onKnock={async (peer, body, policyLuna) => {
+        if (!deviceSecretKey) throw new Error("no device key")
+        const sent = await knock(peer, body, policyLuna, deviceSecretKey)
+        // The relay holds the knock until it is accepted, so nothing comes
+        // back through the message poll — without this the sender has no
+        // record of what they wrote.
+        recordOutgoing(peer, body, `knock:${sent.id}`)
+        // The open thread's banner is driven by this, so it has to be re-asked
+        // or the composer stays shut with no sign the knock went out.
+        await refreshReach()
+        toast.success("Knocked. They'll see it next time they open Knock.")
+      }}
+      onOpenThread={openThread}
+      suggestions={
+        wallet?.mode === "dev"
+          ? devIdentities.filter((identity) => compact(identity.address) !== compact(address))
+          : []
+      }
+    />
+  )
+
   if (openPeer) {
     return (
       <>
         <Conversation
           peer={openPeer}
           messages={openMessages}
+          reach={openReach}
           onBack={closeThreadView}
           onSend={onSend}
+          onKnock={knockOnOpenPeer}
           onRetry={onRetrySend}
           onCopyAddress={copy}
         />
+        {knockSheet}
       </>
     )
   }
@@ -209,7 +277,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             <Inbox
               conversations={conversations}
               onOpen={openThread}
-              onCompose={() => setKnocking(true)}
+              onCompose={() => {
+                setKnockPeer(null)
+                setKnocking(true)
+              }}
               onDelete={(peer) => {
                 deleteThread(peer)
                 toast.success("Chat deleted. They're still in Contacts.")
@@ -227,27 +298,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         unread={conversations.reduce((total, c) => total + c.unread, 0) + knocks.length}
       />
 
-      <KnockSheet
-        open={knocking}
-        onOpenChange={setKnocking}
-        myAddress={address}
-        onReach={reach}
-        onKnock={async (peer, body, policyLuna) => {
-          if (!deviceSecretKey) throw new Error("no device key")
-          const sent = await knock(peer, body, policyLuna, deviceSecretKey)
-          // The relay holds the knock until it is accepted, so nothing comes
-          // back through the message poll — without this the sender has no
-          // record of what they wrote.
-          recordOutgoing(peer, body, `knock:${sent.id}`)
-          toast.success("Knocked. They'll see it next time they open Knock.")
-        }}
-        onOpenThread={openThread}
-        suggestions={
-          wallet?.mode === "dev"
-            ? devIdentities.filter((identity) => compact(identity.address) !== compact(address))
-            : []
-        }
-      />
+      {knockSheet}
 
       <ProfileSheet
         open={profileOpen}

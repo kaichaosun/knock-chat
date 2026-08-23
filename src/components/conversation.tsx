@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
-import { ChevronLeft, Copy } from "lucide-react"
+import { ChevronLeft, Clock, Copy, DoorClosed } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Composer } from "@/components/composer"
@@ -7,24 +7,38 @@ import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { formatAddress, shortenAddress } from "@/lib/address"
 import type { Message } from "@/lib/messages"
+import { formatNim } from "@/lib/postage"
+import type { Reachability } from "@/lib/relay"
 import { dayLabel } from "@/lib/time"
 
 export function Conversation({
   peer,
   messages,
+  reach,
   onBack,
   onSend,
+  onKnock,
   onRetry,
   onCopyAddress,
 }: {
   peer: string
   messages: Message[]
+  /** Null while it is still being fetched; assume the channel is open until told otherwise. */
+  reach: Reachability | null
   onBack: () => void
   onSend: (body: string) => void
+  /** Open the knock sheet for this peer. */
+  onKnock: () => void
   onRetry: (message: Message) => void
   onCopyAddress: (address: string) => void
 }) {
   const bottom = useRef<HTMLDivElement>(null)
+
+  // Knocking costs money, so it is its own deliberate act behind its own button
+  // — never something an ordinary-looking send turns into.
+  const shut = reach !== null && !reach.channel_open
+  const waiting = shut && reach.knock_pending
+  const cost = reach?.policy.amount_luna ?? 0
 
   // Keep the newest message in view as the thread grows or the keyboard opens.
   useEffect(() => {
@@ -90,7 +104,40 @@ export function Conversation({
         <div ref={bottom} />
       </div>
 
-      <Composer onSend={onSend} />
+      {shut && <KnockPrompt waiting={waiting} cost={cost} onKnock={onKnock} />}
+
+      <Composer onSend={onSend} disabled={shut} />
+    </div>
+  )
+}
+
+/** Why the composer is shut, and the one way back through it. */
+function KnockPrompt({
+  waiting,
+  cost,
+  onKnock,
+}: {
+  waiting: boolean
+  cost: number
+  onKnock: () => void
+}) {
+  return (
+    <div className="bg-muted/60 text-muted-foreground flex items-center gap-3 border-t px-4 py-3 text-[12px] leading-snug">
+      {waiting ? (
+        <Clock className="size-3.5 shrink-0" />
+      ) : (
+        <DoorClosed className="size-3.5 shrink-0" />
+      )}
+      <p className="flex-1 text-balance">
+        {waiting
+          ? "Knock sent. You can write again once they answer."
+          : "This chat is closed. Knock to ask them to reopen it."}
+      </p>
+      {!waiting && (
+        <Button size="sm" onClick={onKnock} className="h-8 shrink-0 rounded-lg">
+          {cost === 0 ? "Knock" : `Knock — ${formatNim(cost)} NIM`}
+        </Button>
+      )}
     </div>
   )
 }
