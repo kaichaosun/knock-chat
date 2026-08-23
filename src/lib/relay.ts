@@ -169,3 +169,15 @@ export type Contact = { address: string; opened_at: string }
 export function listContacts(): Promise<{ contacts: Contact[] }> {
   return request<{ contacts: Contact[] }>("/v1/contacts")
 }
+
+/**
+ * Shut the channel with someone you had let in.
+ *
+ * There is one channel, not one per side, so this closes it for both: their
+ * next message costs postage again, exactly as if you had never answered.
+ */
+export function removeContact(address: string): Promise<{ address: string }> {
+  return request<{ address: string }>(`/v1/contacts/${encodeURIComponent(address)}`, {
+    method: "DELETE",
+  })
+}

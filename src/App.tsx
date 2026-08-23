@@ -217,7 +217,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             />
           </>
         ) : (
-          <Contacts signedIn onOpen={openThread} />
+          <Contacts signedIn onOpen={openThread} onRemoved={deleteThread} />
         )}
       </div>
 
