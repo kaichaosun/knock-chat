@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { decode, encode, invite, payment, preview, text } from "./payload"
+import { decode, encode, giftNote, invite, payment, preview, text } from "./payload"
 
 /** The frame marker, spelled out here so a test can forge one by hand. */
 const FRAME = "\u0000knock1\n"
@@ -129,5 +129,42 @@ describe("invite", () => {
 
   it("says something sensible when the name is missing", () => {
     expect(preview(encode(invite(ID, "")), "in")).toBe("Invited you to a group")
+  })
+})
+
+describe("gift", () => {
+  const ID = "9d23068a-287d-407d-ac4c-53f20451c5e2"
+
+  it("survives a round trip", () => {
+    expect(decode(encode(giftNote(ID, 1_000_000, 5, "have some")))).toEqual({
+      kind: "gift",
+      giftNote: { gift: ID, total_luna: 1_000_000, shares: 5, note: "have some" },
+    })
+  })
+
+  it("carries no count of what is left", () => {
+    // The one number guaranteed to change. Freezing it into the message would
+    // make every card wrong the moment somebody claimed.
+    const encoded = encode(giftNote(ID, 1_000_000, 5, ""))
+    expect(encoded).not.toContain("claimed")
+  })
+
+  it("refuses a pot that could not exist", () => {
+    for (const bad of [
+      { gift: "nope", total_luna: 100, shares: 2 },
+      { gift: ID, total_luna: 0, shares: 2 },
+      { gift: ID, total_luna: -5, shares: 2 },
+      { gift: ID, total_luna: 100, shares: 0 },
+      { gift: ID, total_luna: 1.5, shares: 2 },
+    ]) {
+      const forged = FRAME + JSON.stringify({ kind: "gift", ...bad })
+      expect(decode(forged), JSON.stringify(bad)).toEqual({ kind: "unknown" })
+    }
+  })
+
+  it("reads differently from each end in a chat list", () => {
+    const left = encode(giftNote(ID, 1_000_000, 5, "have some"))
+    expect(preview(left, "out")).toBe("You left 10 NIM")
+    expect(preview(left, "in")).toBe("Left 10 NIM for the room")
   })
 })

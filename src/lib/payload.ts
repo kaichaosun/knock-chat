@@ -58,10 +58,28 @@ export type Invite = {
   name: string
 }
 
+/**
+ * A pot somebody dropped in the room.
+ *
+ * Only the id and the shape travel: how much is left, and whether you already
+ * took a share, are asked of the relay when the card is drawn. Putting the
+ * count in the message would freeze it at the moment it was sent, which is the
+ * one number that is guaranteed to change.
+ */
+export type GiftNote = {
+  /** The gift's id. Everything about its state is looked up. */
+  gift: string
+  total_luna: number
+  shares: number
+  /** A word from the sender, so the card reads as something before it loads. */
+  note: string
+}
+
 export type Payload =
   | { kind: "text"; text: string }
   | { kind: "payment"; payment: Payment }
   | { kind: "invite"; invite: Invite }
+  | { kind: "gift"; giftNote: GiftNote }
   /** A frame this build does not understand — a newer client, or damage. */
   | { kind: "unknown" }
 
@@ -77,6 +95,10 @@ export function invite(group: string, name: string): Payload {
   return { kind: "invite", invite: { group, name } }
 }
 
+export function giftNote(gift: string, total_luna: number, shares: number, note: string): Payload {
+  return { kind: "gift", giftNote: { gift, total_luna, shares, note } }
+}
+
 /** Turn a payload into the plaintext that gets encrypted. */
 export function encode(payload: Payload): string {
   if (payload.kind === "text") return payload.text
@@ -85,6 +107,9 @@ export function encode(payload: Payload): string {
   }
   if (payload.kind === "invite") {
     return FRAME + JSON.stringify({ kind: "invite", ...payload.invite })
+  }
+  if (payload.kind === "gift") {
+    return FRAME + JSON.stringify({ kind: "gift", ...payload.giftNote })
   }
   // `unknown` is something this build received and could not read. Re-encoding
   // it would mean claiming to have understood it.
@@ -109,6 +134,26 @@ export function decode(plain: string): Payload {
       }
       const reference = typeof value.reference === "string" ? value.reference : null
       return { kind: "payment", payment: { luna, reference } }
+    }
+
+    if (value.kind === "gift") {
+      const gift = typeof value.gift === "string" ? groupIdFrom(value.gift) : null
+      const total = value.total_luna
+      const shares = value.shares
+      // A card for a pot that cannot exist is a button that cannot work.
+      if (
+        !gift ||
+        typeof total !== "number" ||
+        !Number.isSafeInteger(total) ||
+        total <= 0 ||
+        typeof shares !== "number" ||
+        !Number.isSafeInteger(shares) ||
+        shares <= 0
+      ) {
+        return { kind: "unknown" }
+      }
+      const note = typeof value.note === "string" ? value.note.trim() : ""
+      return { kind: "gift", giftNote: { gift, total_luna: total, shares, note } }
     }
 
     if (value.kind === "invite") {
@@ -148,6 +193,10 @@ export function preview(plain: string, direction: "in" | "out"): string {
     case "invite": {
       const room = payload.invite.name || "a group"
       return direction === "out" ? `You shared ${room}` : `Invited you to ${room}`
+    }
+    case "gift": {
+      const amount = `${formatNim(payload.giftNote.total_luna)} NIM`
+      return direction === "out" ? `You left ${amount}` : `Left ${amount} for the room`
     }
     case "unknown":
       return "Unsupported message"

@@ -26,10 +26,11 @@ Two repos: this app, and the relay at `../knock-relay`.
 | Contacts | Channels as the durable record of who can reach whom, so a fresh device knows without local history. |
 | Remove contact | `DELETE /v1/contacts/{address}`. One normalised row, so closing is symmetric by construction. |
 | Groups | `chat_group` / `group_member` / `group_request`, plus a `group_id` on delivered messages. A room is a lobby, not a shortcut: membership opens no channel, so reaching a member privately still costs their postage. The door mirrors a knock — pay the owner, get in forever — with the price defaulting to 0 and an optional approval queue. Owner-only moderation, link-only distribution, no ban list. **Bodies are plain text**; the relay can read them. |
+| Gifts | A pot dropped in a room, taken first-come-first-served — even or random shares, whatever is unclaimed returned after 24 hours. **The one place the relay holds money**: a pot must be funded before anyone knows who will claim it. Funding is verified on chain and spent once, the same rule postage runs under. Shares are decided at creation, so claiming is only ever "take the next unclaimed row" — `FOR UPDATE … SKIP LOCKED` plus a partial unique index, so simultaneous taps get different shares and nobody gets two. Payout is signed locally with `core-rs-albatross` crates (git, `tag = v2.0.0`) and broadcast through the same public nodes the relay already reads from, so no node of our own is needed. A relay without `KNOCK_RELAY_WALLET` answers 501 and is otherwise unchanged. |
 | Chain reads | A node that cannot answer is told apart from a transaction that is not there: the first a 502 that says nothing about the payment, the second a 402. Pinned to the exact bodies real nodes send — including the prose `rpc.nimiqwatch.com` returned while it was down, which read as "not found" tells someone who has just paid that their payment does not exist. Configuration moved into `.env` / `.env.example`, since `KNOCK_NIMIQ_RPC` was previously discoverable only by reading `main.rs`. |
 | Display names | `PUT /v1/profile`, and the name served with reachability, contacts and knocks. Normalised and refused — not truncated, not stripped — if it carries invisible or text-reordering characters. Lists carry names in a map beside them rather than on each entry, so a name is looked up when read rather than frozen into a knock. |
 
-**Tests:** 119 offline, plus 6 Postgres-backed run separately
+**Tests:** 141 offline, plus 8 Postgres-backed run separately
 (`cargo test -- --ignored pg_ --test-threads=1`). The Postgres set exists
 because two postage bugs were Postgres-only and every test at the time ran
 in-memory.
@@ -53,13 +54,14 @@ in-memory.
 | Editing a room | The owner can change its name, its cost to join and whether they approve arrivals, from the same sheet everyone sees. The relay took `PATCH /v1/groups/{id}` from the start; only the approval switch had been wired, so a price or a typo'd name was set for good at creation. |
 | Being removed from a room | The thread stays and stays readable — the relay describes a room to anyone, just without its members — and the composer is replaced by a line saying you are not in it. Opening it no longer mistakes the room's id for an address, which is what produced "address has the wrong length" from a reachability check on a uuid. |
 | Adding somebody to a room | **Add someone** in the group's info picks from your contacts and posts an invite card into your chat with them. A third payload kind (`invite`), so it rides inside the **encrypted** body — the relay never learns which room was shared — and because it is an ordinary message it can only reach someone who has already let you in. A group therefore cannot become a way around postage. The card carries the sender's copy of the name so it draws at once; tapping it opens the join sheet, which fetches what the room really is and what it costs before anything is paid. Anyone in the room can invite; the door still decides who gets through. |
+| Gifts in a room | `+` in a room leaves a pot: an amount, how many can take a share, even or random, and a word. Funded from the wallet to the relay, then announced as a card. The card carries only what cannot change — id, total, share count — and asks the relay for how many are left and whether you already took one, since both move after the message was sent. A share that is yours but not yet transferred says **sending** rather than claiming the money has arrived. `+` appears only on a relay that holds gifts. |
 | Groups tab | A third tab after Contacts, listing the rooms you are in. Swipe to **Leave** — the durable act, behind a confirmation that says what getting back in would cost. Deleting a room's chat in Chats stays what it always was: tidying this device. Same shape as Chats / Contacts, where the thread is a view and the tab beside it is the thing itself. |
 | Payment cards | Not chat bubbles: bordered, tailless, laid out in rows and given a minimum width, so a payment is distinguishable from something someone said without reading either. Reports what the sender said they paid, and nothing more. |
 | Paid postage survives a failure | A knock is a payment then a request, and the wallet returns before the transaction is in a block — so the relay used to refuse the knock for being early, after the money had gone. The proof is now written to storage *before* the relay is told anything, the request retries on a 1/2/4/8s backoff, and a payment already made is always reused. Paying twice would strand the first payment forever: its commitment binds a nonce only that device ever had. A sweep on every foreground finishes anything still owed, so the guarantee is "once you have paid, the knock is sent" rather than "…if you come back and tap again". |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
 | Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
-**Tests:** 134. Typecheck clean.
+**Tests:** 138. Typecheck clean.
 
 ---
 
@@ -135,6 +137,16 @@ in-memory.
   plaintext. A long message therefore fails to send with a generic error.
 
 ### Product gaps
+
+- **A gift makes the relay custodial.** It holds a private key with real funds
+  between a gift being made and its shares being claimed or returned. Whoever
+  obtains that key drains every open gift — the only secret here whose loss
+  costs money rather than privacy. Everything else in the relay is built so it
+  cannot touch money at all, and this is the deliberate exception. Not yet
+  written into SPEC §8, and it should be before anyone else runs one.
+- **Gift payouts are unverified end to end.** Signing, serialization and the
+  claim race are tested, and the transaction format was checked against a live
+  mainnet node — but no gift has been funded, claimed and paid on a real chain.
 
 - **Groups are not encrypted.** Direct messages are end-to-end encrypted;
   group bodies are plain text and the relay can read them. A deliberate cut for

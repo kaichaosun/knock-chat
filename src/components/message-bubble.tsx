@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react"
 
+import { GiftCard } from "@/components/gift-card"
 import type { Message } from "@/lib/messages"
 import { decode, type Invite, type Payment } from "@/lib/payload"
 import { formatNim } from "@/lib/postage"
@@ -52,6 +53,8 @@ export function MessageBubble({
       <div className={cn("max-w-[80%]", outgoing && "flex flex-col items-end")}>
         {payload.kind === "payment" ? (
           <PaymentCard payment={payload.payment} outgoing={outgoing} faded={failed} />
+        ) : payload.kind === "gift" ? (
+          <GiftCard note={payload.giftNote} outgoing={outgoing} faded={failed} />
         ) : payload.kind === "invite" ? (
           <InviteCard
             invite={payload.invite}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, DoorClosed, Info } from "lucide-react"
+import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info } from "lucide-react"
 
+import { AttachMenu } from "@/components/attach-menu"
 import { Composer } from "@/components/composer"
 import { GroupAvatar } from "@/components/group-avatar"
 import { GroupSheet } from "@/components/group-sheet"
@@ -31,6 +32,7 @@ export function GroupRoom({
   onOpenChat,
   onOpenInvite,
   onInvite,
+  onGift,
 }: {
   group: Group
   /** Members and settings; null until the first read lands. */
@@ -48,11 +50,14 @@ export function GroupRoom({
   onOpenInvite: (group: string) => void
   /** Send this room's invite into your chat with somebody. */
   onInvite: (address: string) => void
+  /** Leave a pot in the room. Absent on a relay that doesn't hold gifts. */
+  onGift?: () => void
 }) {
   const names = useNames()
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const [details, setDetails] = useState(false)
+  const [attaching, setAttaching] = useState(false)
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" })
@@ -152,10 +157,10 @@ export function GroupRoom({
       </div>
 
       {member ? (
-        /* No `+`: there is nothing a room message can be but text yet. Group
-           details are the header's job, and were only wired here as a
-           placeholder. */
-        <Composer onSend={onSay} />
+        /* `+` appears only when there is something behind it — a relay
+           without a wallet holds no gifts, and an empty menu is worse than
+           no button. */
+        <Composer onSend={onSay} onAttach={onGift && (() => setAttaching(true))} />
       ) : (
         /* Read-only rather than gone: what was said is still yours to read, and
            a composer that cannot send is worse than none. */
@@ -166,6 +171,21 @@ export function GroupRoom({
           </p>
           <div className="pb-safe" />
         </div>
+      )}
+
+      {onGift && (
+        <AttachMenu
+          open={attaching}
+          onOpenChange={setAttaching}
+          actions={[
+            {
+              icon: GiftIcon,
+              label: "Leave a gift",
+              description: "A pot for the room, first come first served.",
+              onSelect: onGift,
+            },
+          ]}
+        />
       )}
 
       <GroupSheet

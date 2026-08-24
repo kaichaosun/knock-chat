@@ -18,21 +18,31 @@ import { CreateGroupSheet } from "@/components/create-group-sheet"
 import { GroupRoom } from "@/components/group-room"
 import { JoinByLinkSheet } from "@/components/join-by-link-sheet"
 import { JoinGroupSheet } from "@/components/join-group-sheet"
+import { SendGiftSheet } from "@/components/send-gift-sheet"
 import { useGroups } from "@/hooks/use-groups"
 import { useKnocks } from "@/hooks/use-knocks"
 import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
+import { toHex } from "@/lib/crypto"
 import { messageId, withRooms, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import type { Receipt } from "@/lib/receipts"
-import { encode as encodePayload, invite, payment } from "@/lib/payload"
-import { sendNim } from "@/lib/payments"
-import { formatNim } from "@/lib/postage"
+import { encode as encodePayload, giftNote, invite, payment } from "@/lib/payload"
+import { sendNim, unwrapTransaction } from "@/lib/payments"
+import { commitment, formatNim, newNonce } from "@/lib/postage"
 import { NoKeyError } from "@/lib/keys"
 import { deviceKeyPair } from "@/lib/keys"
-import { RelayError, type Group, type GroupDetail, type Reachability } from "@/lib/relay"
+import {
+  RelayError,
+  createGift,
+  getGiftTerms,
+  type GiftTerms,
+  type Group,
+  type GroupDetail,
+  type Reachability,
+} from "@/lib/relay"
 import { devIdentities } from "@/lib/wallet"
 import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
 import { useSession } from "@/hooks/use-session"
@@ -129,6 +139,21 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [pasting, setPasting] = useState(false)
+  const [gifting, setGifting] = useState(false)
+  /**
+   * The relay's terms for holding a gift, or null on a relay that holds none.
+   *
+   * Asked once: the funding address cannot be guessed, and a relay without a
+   * wallet should show no gift controls at all rather than ones that fail.
+   */
+  const [giftTerms, setGiftTerms] = useState<GiftTerms | null>(null)
+
+  useEffect(() => {
+    if (!owner) return
+    getGiftTerms()
+      .then(setGiftTerms)
+      .catch(() => setGiftTerms(null))
+  }, [owner])
 
   /**
    * Whichever thread is open, if either is.
@@ -406,6 +431,55 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [groups, openGroup, send],
   )
 
+  /**
+   * Leave a pot in the open room.
+   *
+   * Funded first and announced second. The relay verifies the transfer on chain
+   * before it will hold anything, so the payment has to exist before the gift
+   * does — and the card that appears in the room is only a pointer to it, which
+   * is why it goes out afterwards rather than optimistically.
+   */
+  const onGift = useCallback(
+    async (input: {
+      total_luna: number
+      shares: number
+      split: "even" | "random"
+      note: string
+    }) => {
+      if (!owner || !openGroup || !giftTerms) throw new Error("gifts aren't available here")
+      if (!wallet?.provider) {
+        throw new Error("Leaving a gift needs Nimiq Pay. Open the app there to continue.")
+      }
+
+      const nonce = newNonce()
+      const paid = unwrapTransaction(
+        await wallet.provider.sendBasicTransactionWithData({
+          recipient: giftTerms.fund_to,
+          value: input.total_luna,
+          data: commitment(owner, nonce),
+        }),
+      )
+
+      const gift = await createGift(openGroup, {
+        ...input,
+        postage: { tx_hash: paid, nonce: toHex(nonce) },
+      })
+
+      // The card is a pointer at the pot, carrying only what cannot change.
+      await say(
+        openGroup,
+        encodePayload(giftNote(gift.id, gift.total_luna, gift.shares, gift.note)),
+      )
+      recordOutgoing(
+        owner,
+        encodePayload(giftNote(gift.id, gift.total_luna, gift.shares, gift.note)),
+        `local:${messageId()}`,
+        openGroup,
+      )
+    },
+    [owner, openGroup, giftTerms, wallet, say, recordOutgoing],
+  )
+
   /** Knock on a door we already know, reusing the sheet the compose flow uses. */
   const knockOnOpenPeer = useCallback(() => {
     setKnockPeer(openPeer)
@@ -575,7 +649,17 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           }}
           onOpenInvite={openInvite}
           onInvite={onInviteToRoom}
+          onGift={giftTerms ? () => setGifting(true) : undefined}
         />
+        {giftTerms && (
+          <SendGiftSheet
+            open={gifting}
+            onOpenChange={setGifting}
+            expiresInHours={giftTerms.expires_in_hours}
+            maxShares={giftTerms.max_shares}
+            onSend={onGift}
+          />
+        )}
         {groupSheets}
       </>
     )

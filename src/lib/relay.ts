@@ -307,6 +307,81 @@ export function removeGroupMember(id: string, address: string): Promise<{ addres
   )
 }
 
+// -- gifts -----------------------------------------------------------------
+
+/**
+ * A pot in a room, taken first come first served.
+ *
+ * The one thing the relay holds itself: a gift has to be funded before anyone
+ * knows who will claim it. Whatever is unclaimed goes back to the sender when
+ * it expires.
+ */
+export type Gift = {
+  id: string
+  group_id: string
+  sender: string
+  total_luna: number
+  split: "even" | "random"
+  note: string
+  created_at: string
+  expires_at: string
+  shares: number
+  /** How many have been taken. */
+  claimed: number
+  refunded: boolean
+}
+
+export type GiftClaim = {
+  address: string
+  amount_luna: number
+  claimed_at: string
+  /** Null while the share is yours but the transfer has not gone out yet. */
+  payout_tx: string | null
+}
+
+export type GiftDetail = {
+  gift: Gift
+  claims: GiftClaim[]
+  names: Names
+  /** What you got, if you were quick enough. */
+  yours: number | null
+}
+
+/** Where to send a gift's money, and the terms the relay holds it on. */
+export type GiftTerms = {
+  fund_to: string
+  expires_in_hours: number
+  max_shares: number
+}
+
+export function getGiftTerms(): Promise<GiftTerms> {
+  return request<GiftTerms>("/v1/gifts/terms")
+}
+
+export function createGift(
+  groupId: string,
+  input: {
+    total_luna: number
+    shares: number
+    split: "even" | "random"
+    note: string
+    postage: { tx_hash: string; nonce: string }
+  },
+): Promise<Gift> {
+  return request<Gift>(`/v1/groups/${encodeURIComponent(groupId)}/gifts`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export function getGift(id: string): Promise<GiftDetail> {
+  return request<GiftDetail>(`/v1/gifts/${encodeURIComponent(id)}`)
+}
+
+export function claimGift(id: string): Promise<GiftClaim> {
+  return request<GiftClaim>(`/v1/gifts/${encodeURIComponent(id)}/claim`, { method: "POST" })
+}
+
 /**
  * Shut the channel with someone you had let in.
  *
