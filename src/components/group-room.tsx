@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, Info, ShieldOff } from "lucide-react"
+import { ChevronLeft, Info } from "lucide-react"
 
 import { Composer } from "@/components/composer"
 import { GroupAvatar } from "@/components/group-avatar"
@@ -17,10 +17,7 @@ import { dayLabel } from "@/lib/time"
  *
  * Close to a conversation and deliberately not identical: every incoming
  * message is labelled with who said it, because in a room that is not implied
- * by the thread, and the header carries a standing notice that what is said
- * here is not encrypted. The app tells people elsewhere that messages are
- * encrypted to their device; leaving a room looking exactly like a chat would
- * make that a promise it is quietly breaking.
+ * by the thread.
  */
 export function GroupRoom({
   group,
@@ -104,12 +101,6 @@ export function GroupRoom({
             <Info className="size-4" />
           </Button>
         </div>
-
-        {/* Standing, not dismissible. It is true of every message in here. */}
-        <p className="text-muted-foreground flex items-center gap-1.5 px-4 pb-1.5 text-[11px]">
-          <ShieldOff className="size-3 shrink-0" />
-          Group messages aren't encrypted — the relay can read them.
-        </p>
       </header>
 
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">

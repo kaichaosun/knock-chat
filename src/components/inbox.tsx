@@ -86,8 +86,9 @@ function ConversationRow({
   revealed: boolean
   onReveal: (open: boolean) => void
 }) {
-  const { key, peer, group, last, unread } = conversation
-  const summary = preview(last.body, last.direction)
+  const { key, peer, group, last, at, unread } = conversation
+  // A room you are in but nobody has spoken in yet. It is still a place.
+  const summary = last ? preview(last.body, last.direction) : "No messages yet"
 
   // A room is titled by its name; a chat by whoever it is with. A room whose
   // details have not arrived yet is still a room, so it says so rather than
@@ -121,7 +122,7 @@ function ConversationRow({
             {title ?? (peer ? shortenAddress(peer) : "")}
           </span>
           <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
-            {relativeTime(last.at)}
+            {relativeTime(at)}
           </span>
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-3">
@@ -129,11 +130,12 @@ function ConversationRow({
             className={cn(
               "truncate text-sm",
               unread > 0 ? "text-foreground font-medium" : "text-muted-foreground",
+              !last && "italic",
             )}
           >
             {/* In a room the speaker matters as much as what was said. */}
-            {group && last.direction === "in" && (
-              <span className="font-medium">{labelIn(names, last.peer)}: </span>
+            {group && last?.direction === "in" && (
+              <span className="font-medium not-italic">{labelIn(names, last.peer)}: </span>
             )}
             {summary}
           </span>

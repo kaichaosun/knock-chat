@@ -7,6 +7,7 @@ import { AddressAvatar } from "@/components/address-avatar"
 import { Conversation } from "@/components/conversation"
 import { Inbox } from "@/components/inbox"
 import { Contacts } from "@/components/contacts"
+import { Groups } from "@/components/groups"
 import { KnockRequests } from "@/components/knock-requests"
 import { KnockSheet } from "@/components/knock-sheet"
 import { ProfileSheet } from "@/components/profile-sheet"
@@ -22,7 +23,7 @@ import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
-import { messageId, type Message } from "@/lib/messages"
+import { messageId, withRooms, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import type { Receipt } from "@/lib/receipts"
 import { encode as encodePayload, payment } from "@/lib/payload"
@@ -74,6 +75,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     markRead,
     deleteThread,
     recordOutgoing,
+    dismissed,
     relayStatus,
   } = useMessages(owner, deviceSecretKey, session.invalidate)
 
@@ -97,7 +99,15 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     owner,
     onKnockRedeemed,
   )
-  const { groups, refresh: refreshGroups, inspect, create, join, say } = useGroups(wallet, owner)
+  const {
+    groups,
+    loading: groupsLoading,
+    refresh: refreshGroups,
+    inspect,
+    create,
+    join,
+    say,
+  } = useGroups(wallet, owner)
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [knocking, setKnocking] = useState(false)
@@ -132,6 +142,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   useEffect(() => adoptNames(owner), [owner])
 
   const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
+
+  /**
+   * The chat list: threads that have messages, plus rooms that do not yet.
+   *
+   * A direct chat has nothing to show before somebody writes, but a room is a
+   * place whether or not anyone has spoken — leaving it out until the first
+   * message means creating one and watching it disappear.
+   */
+  const threads = useMemo(
+    () => withRooms(conversations, groups, dismissed),
+    [conversations, groups, dismissed],
+  )
 
   /** Open whichever kind of thread this key names. */
   const openAnyThread = useCallback(
@@ -506,7 +528,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               onClick={revealProbes}
               className="text-xl font-extrabold tracking-tight select-none"
             >
-              {tab === "chats" ? "Messages" : "Contacts"}
+              {tab === "chats" ? "Messages" : tab === "contacts" ? "Contacts" : "Groups"}
             </h1>
             {relayStatus === "offline" && (
               <span className="text-destructive text-[11px] font-semibold">offline</span>
@@ -536,25 +558,44 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               onDecline={decline}
             />
             <Inbox
-              conversations={conversations}
+              conversations={threads}
               groups={groups}
               onOpen={openAnyThread}
               onCompose={() => setComposing(true)}
-              onDelete={(peer) => {
-                deleteThread(peer)
-                toast.success("Chat deleted. They're still in Contacts.")
+              onDelete={(thread) => {
+                deleteThread(thread)
+                // Deleting a thread is tidying this device, never leaving
+                // anything — which is why the durable thing has its own tab.
+                toast.success(
+                  groups.some((group) => group.id === thread)
+                    ? "Chat deleted. You're still in the group."
+                    : "Chat deleted. They're still in Contacts.",
+                )
               }}
             />
           </>
-        ) : (
+        ) : tab === "contacts" ? (
           <Contacts signedIn onOpen={openThread} onRemoved={deleteThread} />
+        ) : (
+          <Groups
+            groups={groups}
+            owner={address}
+            loading={groupsLoading}
+            onOpen={setOpenGroup}
+            onLeft={(id) => {
+              // The room goes, and its chat with it — the same shape as
+              // removing a contact, which also takes the conversation.
+              deleteThread(id)
+              void refreshGroups()
+            }}
+          />
         )}
       </div>
 
       <TabBar
         active={tab}
         onChange={setTab}
-        unread={conversations.reduce((total, c) => total + c.unread, 0) + knocks.length}
+        unread={threads.reduce((total, c) => total + c.unread, 0) + knocks.length}
       />
 
       {knockSheet}

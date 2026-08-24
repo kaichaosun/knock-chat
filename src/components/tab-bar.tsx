@@ -1,8 +1,8 @@
-import { MessageSquare, Users } from "lucide-react"
+import { MessageSquare, UserRound, UsersRound } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-export type Tab = "chats" | "contacts"
+export type Tab = "chats" | "contacts" | "groups"
 
 /** Bottom tabs, where a thumb can reach them. */
 export function TabBar({
@@ -16,7 +16,10 @@ export function TabBar({
 }) {
   const tabs = [
     { id: "chats" as const, label: "Chats", icon: MessageSquare, badge: unread },
-    { id: "contacts" as const, label: "Contacts", icon: Users, badge: 0 },
+    { id: "contacts" as const, label: "Contacts", icon: UserRound, badge: 0 },
+    // Rooms, not people — a different glyph so the two are told apart at the
+    // size a tab bar gives them.
+    { id: "groups" as const, label: "Groups", icon: UsersRound, badge: 0 },
   ]
 
   return (

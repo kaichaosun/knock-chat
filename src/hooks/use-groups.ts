@@ -28,6 +28,9 @@ const POLL_INTERVAL_MS = 30_000
 export function useGroups(wallet: Wallet | null, owner: string | null) {
   const signedIn = owner !== null
   const [groups, setGroups] = useState<Group[]>([])
+  // True until the first read lands, so an empty list can be told apart from
+  // one that has not arrived — otherwise a slow start reads as "no groups".
+  const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
     if (!signedIn) return
@@ -35,12 +38,15 @@ export function useGroups(wallet: Wallet | null, owner: string | null) {
       setGroups((await listGroups()).groups)
     } catch {
       // A failed poll is not worth surfacing; the next one will try again.
+    } finally {
+      setLoading(false)
     }
   }, [signedIn])
 
   useEffect(() => {
     if (!signedIn) {
       setGroups([])
+      setLoading(true)
       return
     }
     void refresh()
@@ -113,5 +119,5 @@ export function useGroups(wallet: Wallet | null, owner: string | null) {
 
   const say = useCallback((id: string, body: string) => sayInGroup(id, body), [])
 
-  return { groups, refresh, inspect, create, join, say }
+  return { groups, loading, refresh, inspect, create, join, say }
 }

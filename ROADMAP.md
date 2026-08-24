@@ -29,7 +29,7 @@ Two repos: this app, and the relay at `../knock-relay`.
 | Chain reads | A node that cannot answer is told apart from a transaction that is not there: the first a 502 that says nothing about the payment, the second a 402. Pinned to the exact bodies real nodes send — including the prose `rpc.nimiqwatch.com` returned while it was down, which read as "not found" tells someone who has just paid that their payment does not exist. Configuration moved into `.env` / `.env.example`, since `KNOCK_NIMIQ_RPC` was previously discoverable only by reading `main.rs`. |
 | Display names | `PUT /v1/profile`, and the name served with reachability, contacts and knocks. Normalised and refused — not truncated, not stripped — if it carries invisible or text-reordering characters. Lists carry names in a map beside them rather than on each entry, so a name is looked up when read rather than frozen into a knock. |
 
-**Tests:** 109 offline, plus 6 Postgres-backed run separately
+**Tests:** 118 offline, plus 6 Postgres-backed run separately
 (`cargo test -- --ignored pg_ --test-threads=1`). The Postgres set exists
 because two postage bugs were Postgres-only and every test at the time ran
 in-memory.
@@ -48,12 +48,14 @@ in-memory.
 | Avatars | Nimiq identicons (`identicons-esm`), generated from the address and cached per address. Costs ~31 kB gzip of shape table, which buys a contact the same face they have in the Nimiq Wallet and Nimiq Pay. |
 | Send NIM in a chat | A plus button in the composer opens a menu of things a message can be other than text; the one action there now is a transfer to the person you are talking to. The wallet moves the money, then a card is posted into the thread. Message plaintext is framed (`\0knock1\n` + JSON) so text still travels as itself and an unrecognised frame degrades to "not supported in this version" rather than raw JSON. Confirmed working on Android and iOS. |
 | Groups | Rooms in the chat list beside direct chats, told apart by a plain glyph rather than an identicon. A room view labels every incoming message with who said it and carries a standing "not encrypted" notice. Create with a name, a price and an approval switch; share by link (`?group=<id>`); the owner's controls live in the same sheet everyone else sees. Local history keys threads on `group ?? peer`, so a room and a direct chat with the same person stay apart. |
+| Deleting a room's chat | Hides it until something is said in it, the way closing a direct chat already worked. A room is not made of its messages — you are in it either way — so emptying the thread alone left the row sitting there looking untouched. Leaving is the other act, and it lives in Groups. |
+| Groups tab | A third tab after Contacts, listing the rooms you are in. Swipe to **Leave** — the durable act, behind a confirmation that says what getting back in would cost. Deleting a room's chat in Chats stays what it always was: tidying this device. Same shape as Chats / Contacts, where the thread is a view and the tab beside it is the thing itself. |
 | Payment cards | Not chat bubbles: bordered, tailless, laid out in rows and given a minimum width, so a payment is distinguishable from something someone said without reading either. Reports what the sender said they paid, and nothing more. |
 | Paid postage survives a failure | A knock is a payment then a request, and the wallet returns before the transaction is in a block — so the relay used to refuse the knock for being early, after the money had gone. The proof is now written to storage *before* the relay is told anything, the request retries on a 1/2/4/8s backoff, and a payment already made is always reused. Paying twice would strand the first payment forever: its commitment binds a nonce only that device ever had. A sweep on every foreground finishes anything still owed, so the guarantee is "once you have paid, the knock is sent" rather than "…if you come back and tap again". |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
 | Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
-**Tests:** 113. Typecheck clean.
+**Tests:** 122. Typecheck clean.
 
 ---
 
@@ -135,6 +137,9 @@ in-memory.
   this version, not an oversight — but it has to be visible in the app, or
   someone told "messages are encrypted to their device" will reasonably assume
   a group is too. The client work is not done yet.
+- **A group's owner cannot leave it.** Nothing hands ownership on, so leaving
+  would strand a room nobody can change. Refused outright rather than
+  half-answered; transferring ownership, or deleting a group, is not built.
 - **Removing someone from a free group does not hold.** They walk back in
   through the open door. The remedy is in-product — turn on approval — rather
   than a ban list, which this version does not have.

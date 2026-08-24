@@ -10,6 +10,7 @@ import {
   resend,
   setStatus,
   threadWith,
+  withRooms,
 } from "./messages"
 import type { Snapshot } from "./messages"
 import type { Envelope } from "./relay"
@@ -113,7 +114,7 @@ describe("conversations", () => {
     )
     const list = conversations(snapshot)
     expect(list).toHaveLength(2)
-    expect(list[0].last.body).toBe("from bob")
+    expect(list[0].last?.body).toBe("from bob")
     expect(list[0].unread).toBe(1)
   })
 
@@ -212,9 +213,54 @@ describe("deleting a chat", () => {
     expect(deleteThread(before, ALICE).cursor).toBe(before.cursor)
   })
 
-  it("does nothing when there is no such thread", () => {
+  it("leaves other threads alone, and notes the one dismissed", () => {
+    // "No messages" stopped meaning "no row" when rooms joined the list: a room
+    // you are in is a place whether or not anyone has spoken. So deleting is
+    // recorded even when there was nothing to delete.
     const snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1))
+    const after = deleteThread(snapshot, BOB)
+    expect(after.messages).toEqual(snapshot.messages)
+    expect(after.dismissed[BOB.replace(/\s+/g, "")]).toBe(true)
+  })
+
+  it("stays put when the same thread is deleted twice", () => {
+    const snapshot = deleteThread(
+      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
+      BOB,
+    )
     expect(deleteThread(snapshot, BOB)).toBe(snapshot)
+  })
+})
+
+describe("a room whose chat was deleted", () => {
+  const room = { id: ROOM, created_at: new Date(2026, 0, 1, 9, 0).toISOString() }
+  const dismissedRoom = () =>
+    deleteThread(mergeIncoming(emptySnapshot(), [roomEnvelope(1, "hello")], cursor(1)), ROOM)
+
+  it("goes from the list instead of coming straight back empty", () => {
+    // The bug: with the messages gone the room was rebuilt from membership and
+    // reappeared, so deleting the chat looked like it had done nothing.
+    const snapshot = dismissedRoom()
+    expect(threadWith(snapshot, ROOM)).toHaveLength(0)
+    expect(withRooms(conversations(snapshot), [room], snapshot.dismissed)).toHaveLength(0)
+  })
+
+  it("comes back when somebody says something", () => {
+    const snapshot = mergeIncoming(dismissedRoom(), [roomEnvelope(2, "still here")], cursor(2))
+    const list = withRooms(conversations(snapshot), [room], snapshot.dismissed)
+    expect(list).toHaveLength(1)
+    expect(list[0].last?.body).toBe("still here")
+  })
+
+  it("comes back when you say something in it yourself", () => {
+    const snapshot = recordOutgoing(dismissedRoom(), ALICE, "hello again", "local:1", ROOM)
+    expect(withRooms(conversations(snapshot), [room], snapshot.dismissed)).toHaveLength(1)
+  })
+
+  it("is hidden even when nothing was ever said in it", () => {
+    // A room made and then deleted from Chats without a word in it.
+    const snapshot = deleteThread(emptySnapshot(), ROOM)
+    expect(withRooms(conversations(snapshot), [room], snapshot.dismissed)).toHaveLength(0)
   })
 })
 
@@ -378,5 +424,36 @@ describe("rooms are threads of their own", () => {
     snapshot = deleteThread(snapshot, ROOM)
     expect(threadWith(snapshot, ROOM)).toHaveLength(0)
     expect(threadWith(snapshot, ALICE)).toHaveLength(1)
+  })
+})
+
+describe("a room with nothing said in it", () => {
+  const room = { id: ROOM, created_at: new Date(2026, 0, 1, 9, 0).toISOString() }
+
+  it("still shows up, because you made it or paid to be in it", () => {
+    // The bug this fixes: a thread existed only because a message existed, so
+    // creating a group and going back made it vanish.
+    const list = withRooms(conversations(emptySnapshot()), [room])
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({ key: ROOM, group: ROOM, peer: null, last: null, unread: 0 })
+  })
+
+  it("is not added twice once somebody speaks", () => {
+    const snapshot = mergeIncoming(emptySnapshot(), [roomEnvelope(1, "hello")], cursor(1))
+    const list = withRooms(conversations(snapshot), [room])
+    expect(list).toHaveLength(1)
+    expect(list[0].last?.body).toBe("hello")
+  })
+
+  it("sorts by when it was made, among threads sorted by when they last stirred", () => {
+    // Older than the message below, so it belongs underneath it.
+    const snapshot = mergeIncoming(emptySnapshot(), [envelope(5, "later")], cursor(5))
+    const list = withRooms(conversations(snapshot), [room])
+    expect(list.map((c) => c.key)).toEqual([ALICE.replace(/\s+/g, ""), ROOM])
+  })
+
+  it("leaves the list alone when there is nothing to add", () => {
+    const existing = conversations(mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1)))
+    expect(withRooms(existing, [])).toBe(existing)
   })
 })

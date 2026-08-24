@@ -68,7 +68,10 @@ export type Conversation = {
   peer: string | null
   /** The room's id, for a room. Null for a direct chat. */
   group: string | null
-  last: Message
+  /** Null for a room nobody has said anything in yet. */
+  last: Message | null
+  /** When this thread last stirred: a message, or the room being made. */
+  at: string
   unread: number
 }
 
@@ -94,9 +97,19 @@ type Snapshot = {
    * entirely, and works because local history only ever grows.
    */
   readCount: Record<string, number>
+  /**
+   * Threads hidden from the list until something new arrives.
+   *
+   * Deleting a chat used to be enough on its own: with the messages gone there
+   * was no thread, so the row went with them. A room is not made of its
+   * messages — you are in it whether or not anyone has spoken — so it would
+   * reappear empty the moment the list was rebuilt. This is what makes deleting
+   * a room's chat mean something without meaning *leave*, which lives in Groups.
+   */
+  dismissed: Record<string, true>
 }
 
-const EMPTY: Snapshot = { cursor: null, messages: [], readCount: {} }
+const EMPTY: Snapshot = { cursor: null, messages: [], readCount: {}, dismissed: {} }
 
 function storageKey(owner: string): string {
   return `knock:history:${compact(owner)}`
@@ -175,6 +188,9 @@ export function mergeIncoming(
     ...snapshot,
     cursor,
     messages: added.length > 0 ? sorted([...snapshot.messages, ...added]) : snapshot.messages,
+    // Something new in a hidden thread brings it back, which is the whole
+    // meaning of hidden rather than gone.
+    dismissed: without(snapshot.dismissed, added.map(threadKey)),
   }
 }
 
@@ -199,7 +215,23 @@ export function recordOutgoing(
 }
 
 export function appendOutgoing(snapshot: Snapshot, message: Message): Snapshot {
-  return { ...snapshot, messages: sorted([...snapshot.messages, message]) }
+  return {
+    ...snapshot,
+    messages: sorted([...snapshot.messages, message]),
+    // Writing in a thread you hid brings it back too — you are plainly using it.
+    dismissed: without(snapshot.dismissed, [threadKey(message)]),
+  }
+}
+
+/** Drop keys from a dismissal set, keeping the same object when nothing changed. */
+function without(
+  dismissed: Record<string, true>,
+  keys: string[],
+): Record<string, true> {
+  if (!keys.some((key) => dismissed[key])) return dismissed
+  const rest = { ...dismissed }
+  for (const key of keys) delete rest[key]
+  return rest
 }
 
 /**
@@ -259,10 +291,12 @@ export function markRead(snapshot: Snapshot, thread: string): Snapshot {
 export function deleteThread(snapshot: Snapshot, thread: string): Snapshot {
   const key = normalizeKey(thread)
   const messages = snapshot.messages.filter((m) => threadKey(m) !== key)
-  if (messages.length === snapshot.messages.length) return snapshot
+  if (messages.length === snapshot.messages.length && snapshot.dismissed[key]) {
+    return snapshot
+  }
 
   const { [key]: _removed, ...readCount } = snapshot.readCount
-  return { ...snapshot, messages, readCount }
+  return { ...snapshot, messages, readCount, dismissed: { ...snapshot.dismissed, [key]: true } }
 }
 
 function incomingCount(messages: Message[], thread: string): number {
@@ -308,11 +342,50 @@ export function conversations(snapshot: Snapshot): Conversation[] {
       peer: last.group ? null : last.peer,
       group: last.group ?? null,
       last,
+      at: last.at,
       // Clamped: a thread read and then trimmed should show zero, not negative.
       unread: Math.max(0, incoming - (snapshot.readCount[key] ?? 0)),
     })
   }
-  return result.sort((a, b) => b.last.at.localeCompare(a.last.at))
+  return sortByRecency(result)
+}
+
+/** Newest first. */
+function sortByRecency(conversations: Conversation[]): Conversation[] {
+  return conversations.sort((a, b) => b.at.localeCompare(a.at))
+}
+
+/**
+ * Add the rooms you are in that nobody has spoken in yet.
+ *
+ * A thread otherwise exists only because a message exists, which is right for a
+ * direct chat — there is nothing to show before somebody writes. A room is not
+ * like that: you made it, or you paid to get into it, and it is a place whether
+ * or not anyone has said anything. Leaving it out of the list until the first
+ * message means creating a room and watching it vanish.
+ *
+ * Takes the least it can about a room so local history stays independent of the
+ * relay's types.
+ */
+export function withRooms(
+  conversations: Conversation[],
+  rooms: Array<{ id: string; created_at: string }>,
+  /** Rooms whose chat was deleted. Hidden until something is said in them. */
+  dismissed: Record<string, true> = {},
+): Conversation[] {
+  const known = new Set(conversations.map((conversation) => conversation.key))
+  const quiet = rooms
+    .filter((room) => !known.has(room.id) && !dismissed[room.id])
+    .map((room) => ({
+      key: room.id,
+      peer: null,
+      group: room.id,
+      last: null,
+      at: room.created_at,
+      unread: 0,
+    }))
+
+  return quiet.length === 0 ? conversations : sortByRecency([...conversations, ...quiet])
 }
 
 export type { Snapshot }

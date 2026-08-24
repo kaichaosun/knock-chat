@@ -171,6 +171,9 @@ export function useMessages(
   )
 
   const conversations = useMemo(() => history.conversations(snapshot), [snapshot])
+  // Exposed so the caller can fold in rooms without resurrecting the ones whose
+  // chat was deleted — this hook knows nothing about rooms.
+  const dismissed = snapshot.dismissed
   const threadWith = useCallback(
     (peer: string) => history.threadWith(snapshot, peer),
     [snapshot],
@@ -183,6 +186,7 @@ export function useMessages(
     retry,
     markRead,
     deleteThread,
+    dismissed,
     recordOutgoing,
     relayStatus,
   }

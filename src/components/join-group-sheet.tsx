@@ -93,8 +93,7 @@ export function JoinGroupSheet({
 
               <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-[12px] leading-snug">
                 <ShieldOff className="mt-0.5 size-3 shrink-0" />
-                Group messages aren't encrypted, and joining doesn't open a private chat
-                with anyone in here.
+                Group messages aren't encrypted.
               </p>
 
               {error && <p className="text-destructive px-1 text-[13px]">{error}</p>}
