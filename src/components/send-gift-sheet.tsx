@@ -9,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { AlreadyPaidError } from "@/lib/gift-funding"
 import { parseNim } from "@/lib/payments"
 import { reason } from "@/lib/reason"
 import { formatNim } from "@/lib/postage"
@@ -52,6 +53,9 @@ export function SendGiftSheet({
   const [note, setNote] = useState("")
   const [sending, setSending] = useState(false)
   const [error, setError] = useState("")
+  // Set once the wallet has paid. From here there is nothing to try again —
+  // only something to wait for.
+  const [paid, setPaid] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -60,6 +64,7 @@ export function SendGiftSheet({
       setSplit("random")
       setNote("")
       setError("")
+      setPaid(false)
     }
   }, [open])
 
@@ -82,6 +87,7 @@ export function SendGiftSheet({
       await onSend({ total_luna: luna, shares, split, note: note.trim() })
       onOpenChange(false)
     } catch (e) {
+      if (e instanceof AlreadyPaidError) setPaid(true)
       setError(reason(e, "Couldn't leave the gift"))
     } finally {
       setSending(false)
@@ -105,7 +111,7 @@ export function SendGiftSheet({
               autoFocus
               value={amount}
               inputMode="decimal"
-              disabled={sending}
+              disabled={sending || paid}
               placeholder="0"
               aria-label="Total, in NIM"
               aria-invalid={typed && !enough}
@@ -131,7 +137,7 @@ export function SendGiftSheet({
               <input
                 value={shareText}
                 inputMode="numeric"
-                disabled={sending}
+                disabled={sending || paid}
                 aria-label="How many shares"
                 aria-invalid={!sharesValid}
                 onChange={(event) => setShareText(event.target.value.replace(/[^\d]/g, ""))}
@@ -151,7 +157,7 @@ export function SendGiftSheet({
                 <button
                   key={preset}
                   type="button"
-                  disabled={sending}
+                  disabled={sending || paid}
                   onClick={() => setShareText(String(preset))}
                   className={cn(
                     "rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
@@ -178,7 +184,7 @@ export function SendGiftSheet({
                 <button
                   key={mode}
                   type="button"
-                  disabled={sending}
+                  disabled={sending || paid}
                   onClick={() => setSplit(mode)}
                   className={cn(
                     "flex-1 rounded-2xl border px-3 py-2.5 text-left text-[13px] transition-colors",
@@ -202,7 +208,7 @@ export function SendGiftSheet({
 
           <input
             value={note}
-            disabled={sending}
+            disabled={sending || paid}
             onChange={(event) => setNote(event.target.value)}
             placeholder="Say something (optional)"
             aria-label="A word with the gift"
@@ -223,21 +229,39 @@ export function SendGiftSheet({
 
           {error && <p className="text-destructive px-1 text-[13px]">{error}</p>}
 
-          <Button
-            disabled={!enough || sending}
-            onClick={() => void submit()}
-            className="brand-gradient h-13 w-full rounded-2xl text-base"
-          >
-            {sending && <Loader2 className="animate-spin" />}
-            {enough && luna !== null
-              ? `Leave ${formatNim(luna)} NIM`
-              : "Leave a gift"}
-          </Button>
+          {paid ? (
+            // Paid, not placed. The one thing that must not be offered here is
+            // the button that pays again.
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => onOpenChange(false)}
+                className="h-13 w-full rounded-2xl text-base"
+              >
+                Close
+              </Button>
+              <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
+                Your {formatNim(luna ?? 0)} NIM is safe. Knock will finish placing the gift
+                on its own — don't send it again.
+              </p>
+            </>
+          ) : (
+            <>
+              <Button
+                disabled={!enough || sending}
+                onClick={() => void submit()}
+                className="brand-gradient h-13 w-full rounded-2xl text-base"
+              >
+                {sending && <Loader2 className="animate-spin" />}
+                {enough && luna !== null ? `Leave ${formatNim(luna)} NIM` : "Leave a gift"}
+              </Button>
 
-          <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-            Your wallet will ask you to confirm. The relay holds the money until it's
-            taken or returned.
-          </p>
+              <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
+                Your wallet will ask you to confirm. The relay holds the money until it's
+                taken or returned.
+              </p>
+            </>
+          )}
         </div>
       </SheetContent>
     </Sheet>

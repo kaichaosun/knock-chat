@@ -27,8 +27,10 @@ import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import { haveStoredSession } from "@/lib/auth"
 import { toHex } from "@/lib/crypto"
+import { reason } from "@/lib/reason"
 import { cn } from "@/lib/utils"
-import { fundGift } from "@/lib/gift-funding"
+import { AlreadyPaidError, fundGift } from "@/lib/gift-funding"
+import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftReceipt } from "@/lib/gift-receipts"
 import { messageId, withRooms, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import type { Receipt } from "@/lib/receipts"
@@ -453,6 +455,86 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   )
 
   /**
+   * Turn funding that has been paid for into a gift, and announce it.
+   *
+   * Everything after the payment lives here so the sweep can walk exactly the
+   * same path as the sheet — there is one way to redeem funding, not two that
+   * drift apart. The receipt is dropped at the precise point the money stops
+   * being at risk: once the relay holds the gift, nothing below can lose it.
+   */
+  const placeGift = useCallback(
+    async (
+      mine: string,
+      group: string,
+      funding: {
+        total_luna: number
+        shares: number
+        split: "even" | "random"
+        note: string
+        txHash: string
+        nonce: string
+      },
+    ) => {
+      const gift = await fundGift(group, {
+        total_luna: funding.total_luna,
+        shares: funding.shares,
+        split: funding.split,
+        note: funding.note,
+        postage: { tx_hash: funding.txHash, nonce: funding.nonce },
+      })
+      dropGiftReceipt(mine, funding.txHash)
+
+      // The card is a pointer at the pot, carrying only what cannot change.
+      const card = encodePayload(giftNote(gift.id, gift.total_luna, gift.shares, gift.note))
+      recordOutgoing(mine, card, `local:${messageId()}`, group)
+
+      // The gift exists whether or not this lands. Saying it failed would be a
+      // lie about where the money is, and would invite a second payment for a
+      // pot that is already sitting there.
+      try {
+        await say(group, card)
+      } catch {
+        toast.error("Gift made, but the card didn't reach the room. Nobody can take a share yet.")
+      }
+    },
+    [say, recordOutgoing],
+  )
+
+  // Funding that outlived the attempt meant to redeem it. Tried whenever the
+  // app comes to the front, on the same principle as a knock's: the promise is
+  // "once you have paid, the gift is placed" — not "…if you remember to come
+  // back and tap again". Quiet on failure; the receipt is kept and the next
+  // launch tries once more.
+  const sweeping = useRef(false)
+  useEffect(() => {
+    if (!owner) return
+
+    const sweep = async () => {
+      if (!owner || sweeping.current) return
+      sweeping.current = true
+      try {
+        for (const receipt of outstandingGifts(owner)) {
+          try {
+            await placeGift(owner, receipt.group, receipt)
+            toast.success("Your gift went through — it's in the room now.")
+          } catch {
+            // Still not redeemable. Kept for next time.
+          }
+        }
+      } finally {
+        sweeping.current = false
+      }
+    }
+
+    void sweep()
+    const onVisible = () => {
+      if (!document.hidden) void sweep()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => document.removeEventListener("visibilitychange", onVisible)
+  }, [owner, placeGift])
+
+  /**
    * Leave a pot in the open room.
    *
    * Funded first and announced second. The relay verifies the transfer on chain
@@ -481,27 +563,34 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         }),
       )
 
-      // Through the retry, not straight at the relay: the money is already
-      // gone by this line, so a payment the chain has not caught up with yet
-      // must be asked about again rather than abandoned.
-      const gift = await fundGift(openGroup, {
+      // Written down before the relay hears anything. From here the money has
+      // left, and everything below can fail — so the nonce that redeems it has
+      // to outlive this function. Paying again would mint a new one and strand
+      // this payment for good.
+      keepGiftReceipt(owner, {
+        group: openGroup,
         ...input,
-        postage: { tx_hash: paid, nonce: toHex(nonce) },
+        txHash: paid,
+        nonce: toHex(nonce),
       })
 
-      // The card is a pointer at the pot, carrying only what cannot change.
-      await say(
-        openGroup,
-        encodePayload(giftNote(gift.id, gift.total_luna, gift.shares, gift.note)),
-      )
-      recordOutgoing(
-        owner,
-        encodePayload(giftNote(gift.id, gift.total_luna, gift.shares, gift.note)),
-        `local:${messageId()}`,
-        openGroup,
-      )
+      try {
+        await placeGift(owner, openGroup, {
+          ...input,
+          txHash: paid,
+          nonce: toHex(nonce),
+        })
+      } catch (error) {
+        // Past the payment. Whatever went wrong, offering to send it again
+        // would take the money twice for one gift — the receipt above is what
+        // finishes this one instead.
+        throw new AlreadyPaidError(
+          reason(error, "The relay didn't take it, but your NIM is safe."),
+        )
+      }
+
     },
-    [owner, openGroup, giftTerms, wallet, say, recordOutgoing],
+    [owner, openGroup, giftTerms, wallet, placeGift],
   )
 
   /** Knock on a door we already know, reusing the sheet the compose flow uses. */

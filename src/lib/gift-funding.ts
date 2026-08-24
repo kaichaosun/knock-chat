@@ -7,6 +7,21 @@ import { RelayError, createGift, type Gift } from "@/lib/relay"
  */
 const BACKOFF_MS = [0, 1_000, 2_000, 4_000, 8_000]
 
+/**
+ * Raised when something failed *after* the wallet paid.
+ *
+ * The distinction the interface has to make: before the payment, trying again
+ * is free and obviously right; after it, trying again means paying twice for
+ * one gift. The receipt is already written, so the honest answer is that the
+ * money is safe and will be finished without another transaction.
+ */
+export class AlreadyPaidError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "AlreadyPaidError"
+  }
+}
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
