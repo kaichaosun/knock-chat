@@ -25,6 +25,7 @@ import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
+import { haveStoredSession } from "@/lib/auth"
 import { toHex } from "@/lib/crypto"
 import { cn } from "@/lib/utils"
 import { fundGift } from "@/lib/gift-funding"
@@ -835,7 +836,14 @@ function welcomeStatus(
   session: "restoring" | "needed" | "signing" | "error",
 ): WelcomeStatus {
   if (wallet === "unavailable") return "no-host"
-  if (wallet === "connecting" || session === "restoring") return "detecting"
+  if (wallet === "connecting" || session === "restoring") {
+    // Finding the wallet runs to a 2.5s timeout when there is no provider to
+    // answer, and the session cannot be restored until it finishes. Read
+    // straight from storage instead of waiting: it says whether this is a
+    // first visit or a returning one, which is the difference between an
+    // invitation to sign in and a splash.
+    return haveStoredSession() ? "resuming" : "detecting"
+  }
   if (session === "signing") return "signing"
   if (session === "error") return "error"
   return "ready"

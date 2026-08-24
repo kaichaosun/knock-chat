@@ -14,6 +14,8 @@ import { nimiqPayDeeplink } from "@/lib/wallet"
  */
 export type WelcomeStatus =
   | "detecting"
+  /** Finding the wallet for somebody who is already signed in. */
+  | "resuming"
   /** Provider ready, waiting for the user to start. */
   | "ready"
   | "signing"
@@ -45,6 +47,18 @@ export function WelcomeScreen({
   onSignIn: () => void
   onRetry: () => void
 }) {
+  // Somebody with a session is not being asked to do anything — they are
+  // waiting. Showing them the pitch and a "sign in" control for the seconds it
+  // takes to find the wallet says they are signed out, which they are not.
+  if (status === "resuming") {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-6 px-6 pt-safe pb-safe">
+        <BrandMark className="size-20" />
+        {/*<Loader2 className="text-muted-foreground size-5 animate-spin" />*/}
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full flex-col justify-between px-6 pt-safe pb-safe">
       <div className="flex flex-1 flex-col items-center justify-center text-center">
@@ -127,6 +141,7 @@ export function WelcomeScreen({
 function label(status: WelcomeStatus): string {
   switch (status) {
     case "detecting":
+    case "resuming":
       return "Looking for your wallet"
     case "signing":
       return "Waiting for your wallet"

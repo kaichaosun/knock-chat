@@ -29,6 +29,30 @@ function storageKey(scope: string): string {
   return `knock:session:${scope}`
 }
 
+/**
+ * Whether a usable session is already stored, for any scope.
+ *
+ * Answerable before the wallet has been found, which is the point: finding the
+ * wallet can take seconds, and for those seconds the app would otherwise show
+ * a sign-in screen to somebody who is already signed in. The scope is not
+ * known until the wallet resolves — hence the scan rather than a lookup.
+ *
+ * Only ever used to decide what to show while waiting. Restoring a session
+ * still goes through `loadSession` with the real scope.
+ */
+export function haveStoredSession(): boolean {
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (!key?.startsWith("knock:session:")) continue
+      if (loadSession(key.slice("knock:session:".length))) return true
+    }
+  } catch {
+    // No storage to read: treat it as signed out, which is what it is.
+  }
+  return false
+}
+
 /** A cached session for `scope`, if one is stored and still comfortably valid. */
 export function loadSession(scope: string): Session | null {
   try {
