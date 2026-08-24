@@ -28,6 +28,13 @@ function envelope(seq: number, body: string, from = ALICE, id = `id-${seq}`): En
   }
 }
 
+const ROOM = "3f1c0b7a-0000-4000-8000-000000000001"
+
+/** An envelope that came from a room rather than from a person. */
+function roomEnvelope(seq: number, body: string, from = ALICE): Envelope {
+  return { ...envelope(seq, body, from), group_id: ROOM }
+}
+
 function cursor(seq: number, instance = "relay-one"): string {
   return `${instance}.${seq}`
 }
@@ -122,7 +129,7 @@ describe("conversations", () => {
 
 describe("markRead", () => {
   const unreadFor = (snapshot: Snapshot, peer: string) =>
-    conversations(snapshot).find((c) => c.peer.replace(/\s+/g, "") === peer.replace(/\s+/g, ""))
+    conversations(snapshot).find((c) => c.key.replace(/\s+/g, "") === peer.replace(/\s+/g, ""))
       ?.unread ?? 0
 
   it("clears the badge for that thread only", () => {
@@ -300,5 +307,76 @@ describe("resend", () => {
     expect(threadWith(resend(snapshot, "local:missing"), ALICE)).toEqual(
       threadWith(snapshot, ALICE),
     )
+  })
+})
+
+describe("rooms are threads of their own", () => {
+  it("files a room message under the room, not under whoever spoke", () => {
+    const snapshot = mergeIncoming(
+      emptySnapshot(),
+      [roomEnvelope(1, "hello room")],
+      cursor(1),
+    )
+    expect(threadWith(snapshot, ROOM)).toHaveLength(1)
+    // Speaking in a room is not the same as writing to somebody.
+    expect(threadWith(snapshot, ALICE)).toHaveLength(0)
+  })
+
+  it("gathers everyone who spoke into one thread", () => {
+    const snapshot = mergeIncoming(
+      emptySnapshot(),
+      [roomEnvelope(1, "from alice", ALICE), roomEnvelope(2, "from bob", BOB)],
+      cursor(2),
+    )
+    expect(threadWith(snapshot, ROOM)).toHaveLength(2)
+    expect(conversations(snapshot)).toHaveLength(1)
+  })
+
+  it("keeps a room and a direct chat with the same person apart", () => {
+    const snapshot = mergeIncoming(
+      emptySnapshot(),
+      [envelope(1, "just you"), roomEnvelope(2, "everyone")],
+      cursor(2),
+    )
+    const threads = conversations(snapshot)
+    expect(threads).toHaveLength(2)
+
+    const room = threads.find((c) => c.group === ROOM)
+    expect(room?.peer).toBeNull()
+    const direct = threads.find((c) => c.group === null)
+    expect(direct?.peer).toBe(ALICE.replace(/\s+/g, ""))
+  })
+
+  it("counts and clears a room's unread on its own", () => {
+    let snapshot = mergeIncoming(
+      emptySnapshot(),
+      [envelope(1, "just you"), roomEnvelope(2, "everyone")],
+      cursor(2),
+    )
+    const unread = (key: string) =>
+      conversations(snapshot).find((c) => c.key === key)?.unread ?? 0
+
+    expect(unread(ROOM)).toBe(1)
+    snapshot = markRead(snapshot, ROOM)
+    expect(unread(ROOM)).toBe(0)
+    // Reading the room says nothing about the direct chat.
+    expect(unread(ALICE.replace(/\s+/g, ""))).toBe(1)
+  })
+
+  it("keeps your own words in the room you said them in", () => {
+    const snapshot = recordOutgoing(emptySnapshot(), BOB, "mine", "local:1", ROOM)
+    expect(threadWith(snapshot, ROOM)).toHaveLength(1)
+    expect(threadWith(snapshot, BOB)).toHaveLength(0)
+  })
+
+  it("deletes a room thread without touching a direct one", () => {
+    let snapshot = mergeIncoming(
+      emptySnapshot(),
+      [envelope(1, "just you"), roomEnvelope(2, "everyone")],
+      cursor(2),
+    )
+    snapshot = deleteThread(snapshot, ROOM)
+    expect(threadWith(snapshot, ROOM)).toHaveLength(0)
+    expect(threadWith(snapshot, ALICE)).toHaveLength(1)
   })
 })

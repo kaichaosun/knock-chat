@@ -165,8 +165,8 @@ export function useMessages(
 
   /** Record a message this device sent outside the normal send path — a knock. */
   const recordOutgoing = useCallback(
-    (peer: string, body: string, id: string) =>
-      update((current) => history.recordOutgoing(current, peer, body, id)),
+    (peer: string, body: string, id: string, group?: string) =>
+      update((current) => history.recordOutgoing(current, peer, body, id, group)),
     [update],
   )
 
@@ -194,6 +194,9 @@ export function useMessages(
  * Anything that will not open is kept and flagged rather than dropped: a
  * message this device cannot read is still evidence that someone wrote, and
  * silently discarding it would leave an unexplained gap.
+ *
+ * Room messages are passed through untouched, because they are not encrypted
+ * at all.
  */
 async function openAll(
   envelopes: Envelope[],
@@ -204,6 +207,15 @@ async function openAll(
   const opened: OpenedEnvelope[] = []
 
   for (const envelope of envelopes) {
+    // A room's messages are plain text and were never sealed. Handing one to
+    // the decrypter would fail and file it as unreadable, hiding what it
+    // plainly says — see `group.rs` on the relay for why they are not
+    // encrypted in this version.
+    if (envelope.group_id) {
+      opened.push({ ...envelope })
+      continue
+    }
+
     const peer = compact(envelope.from)
     if (!keys.has(peer)) {
       keys.set(

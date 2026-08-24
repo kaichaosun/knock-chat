@@ -25,9 +25,10 @@ Two repos: this app, and the relay at `../knock-relay`.
 | Policy | Per-address price for strangers, `0` to waive. Default 10 NIM. |
 | Contacts | Channels as the durable record of who can reach whom, so a fresh device knows without local history. |
 | Remove contact | `DELETE /v1/contacts/{address}`. One normalised row, so closing is symmetric by construction. |
+| Groups | `chat_group` / `group_member` / `group_request`, plus a `group_id` on delivered messages. A room is a lobby, not a shortcut: membership opens no channel, so reaching a member privately still costs their postage. The door mirrors a knock — pay the owner, get in forever — with the price defaulting to 0 and an optional approval queue. Owner-only moderation, link-only distribution, no ban list. **Bodies are plain text**; the relay can read them. |
 | Display names | `PUT /v1/profile`, and the name served with reachability, contacts and knocks. Normalised and refused — not truncated, not stripped — if it carries invisible or text-reordering characters. Lists carry names in a map beside them rather than on each entry, so a name is looked up when read rather than frozen into a knock. |
 
-**Tests:** 91 offline, plus 5 Postgres-backed run separately
+**Tests:** 103 offline, plus 6 Postgres-backed run separately
 (`cargo test -- --ignored pg_ --test-threads=1`). The Postgres set exists
 because two postage bugs were Postgres-only and every test at the time ran
 in-memory.
@@ -45,11 +46,12 @@ in-memory.
 | Names | A directory fed by whatever the app already asks for — contacts, knocks, a reachability check — held per identity and cached in storage so a name shows on a cold start. Sanitised again on the way in, since the relay is not the last word on what is safe to draw. Shown alone only in the chat list; everywhere identity matters it sits above the address, never in place of it. |
 | Avatars | Nimiq identicons (`identicons-esm`), generated from the address and cached per address. Costs ~31 kB gzip of shape table, which buys a contact the same face they have in the Nimiq Wallet and Nimiq Pay. |
 | Send NIM in a chat | A plus button in the composer opens a menu of things a message can be other than text; the one action there now is a transfer to the person you are talking to. The wallet moves the money, then a card is posted into the thread. Message plaintext is framed (`\0knock1\n` + JSON) so text still travels as itself and an unrecognised frame degrades to "not supported in this version" rather than raw JSON. Confirmed working on Android and iOS. |
+| Groups | Rooms in the chat list beside direct chats, told apart by a plain glyph rather than an identicon. A room view labels every incoming message with who said it and carries a standing "not encrypted" notice. Create with a name, a price and an approval switch; share by link (`?group=<id>`); the owner's controls live in the same sheet everyone else sees. Local history keys threads on `group ?? peer`, so a room and a direct chat with the same person stay apart. |
 | Payment cards | Not chat bubbles: bordered, tailless, laid out in rows and given a minimum width, so a payment is distinguishable from something someone said without reading either. Reports what the sender said they paid, and nothing more. |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
 | Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
-**Tests:** 91. Typecheck clean.
+**Tests:** 97. Typecheck clean.
 
 ---
 
@@ -83,7 +85,33 @@ in-memory.
   WebView, and the SDK exposes nothing for height or presentation. Upstream.
   The Viewport probe on the probe screen reports the numbers.
 
+### Known bugs
+
+- **The composer's length limit is wrong.** `composer.tsx` caps a message at
+  4096 bytes, commented as matching the relay's `max_body_len` "so the UI stops
+  before the server does". It does not: the relay measures the **ciphertext**,
+  and encryption inflates. The wire form is base64 of
+  `1 version + 24 nonce + plaintext + 16 tag`, so a 4096-byte message arrives as
+  ~5516 bytes and is rejected. The real ceiling is about **3030 bytes** of
+  plaintext. A long message therefore fails to send with a generic error.
+
 ### Product gaps
+
+- **Groups are not encrypted.** Direct messages are end-to-end encrypted;
+  group bodies are plain text and the relay can read them. A deliberate cut for
+  this version, not an oversight — but it has to be visible in the app, or
+  someone told "messages are encrypted to their device" will reasonably assume
+  a group is too. The client work is not done yet.
+- **Removing someone from a free group does not hold.** They walk back in
+  through the open door. The remedy is in-product — turn on approval — rather
+  than a ban list, which this version does not have.
+- **A new member sees no history.** Fan-out happens when a message is sent, so
+  somebody who joins later starts from an empty room. Fixing it means either
+  keeping room messages server-side and serving a backlog, or fanning out on
+  read — both change what the relay stores and for how long.
+- **No group discovery.** Groups travel by link only. A public directory is
+  what would make them serve finding people rather than only talking to people
+  already found, and it brings public content and moderation with it.
 
 - **A payment card is a claim, not a receipt.** Nothing checks it against the
   chain, so anyone can send a card saying they paid you. The card is worded as

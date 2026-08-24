@@ -23,6 +23,8 @@ export type Envelope = {
   seq: number
   from: string
   to: string
+  /** Set when this came from a room, and then it is the room's thread. */
+  group_id?: string | null
   body: string
   created_at: string
 }
@@ -195,6 +197,114 @@ export type Contact = { address: string; opened_at: string }
 
 export function listContacts(): Promise<{ contacts: Contact[]; names: Names }> {
   return request<{ contacts: Contact[]; names: Names }>("/v1/contacts")
+}
+
+// -- groups ----------------------------------------------------------------
+
+/**
+ * A room, and what it costs to get in.
+ *
+ * Membership opens no channel: reaching a member privately still costs their
+ * postage, exactly as if you had met them anywhere else. A room is a lobby.
+ *
+ * Bodies here are **not encrypted**. Direct messages are; group messages in
+ * this version are plain text and the relay can read them.
+ */
+export type Group = {
+  id: string
+  owner: string
+  name: string
+  /** What a stranger pays the owner to get in. Zero means anyone may walk in. */
+  join_price_luna: number
+  /** Whether the owner still has to say yes after they have paid. */
+  requires_approval: boolean
+  created_at: string
+}
+
+/** A room and who is in it. `members` is empty unless you are one. */
+export type GroupDetail = {
+  group: Group
+  members: string[]
+  names: Names
+}
+
+export type JoinRequest = {
+  id: string
+  group_id: string
+  address: string
+  created_at: string
+}
+
+export type JoinResult = {
+  /** `pending` when the owner still has to answer. */
+  status: "joined" | "pending"
+  group: Group
+}
+
+export function createGroup(input: {
+  name: string
+  join_price_luna?: number
+  requires_approval?: boolean
+}): Promise<Group> {
+  return request<Group>("/v1/groups", { method: "POST", body: JSON.stringify(input) })
+}
+
+export function listGroups(): Promise<{ groups: Group[] }> {
+  return request<{ groups: Group[] }>("/v1/groups")
+}
+
+export function getGroup(id: string): Promise<GroupDetail> {
+  return request<GroupDetail>(`/v1/groups/${encodeURIComponent(id)}`)
+}
+
+export function updateGroup(
+  id: string,
+  changes: { name?: string; join_price_luna?: number; requires_approval?: boolean },
+): Promise<Group> {
+  return request<Group>(`/v1/groups/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  })
+}
+
+/** Walk in, or ask to. `postage` is omitted only when the door is free. */
+export function joinGroup(
+  id: string,
+  postage: { tx_hash: string; nonce: string } | null,
+): Promise<JoinResult> {
+  return request<JoinResult>(`/v1/groups/${encodeURIComponent(id)}/join`, {
+    method: "POST",
+    body: JSON.stringify({ postage }),
+  })
+}
+
+export function sayInGroup(id: string, body: string) {
+  return request<{ seq: number; created_at: string }>(
+    `/v1/groups/${encodeURIComponent(id)}/messages`,
+    { method: "POST", body: JSON.stringify({ body }) },
+  )
+}
+
+export function listJoinRequests(id: string): Promise<{ requests: JoinRequest[]; names: Names }> {
+  return request<{ requests: JoinRequest[]; names: Names }>(
+    `/v1/groups/${encodeURIComponent(id)}/requests`,
+  )
+}
+
+export function answerJoinRequest(id: string, request_id: string, admit: boolean) {
+  return request<unknown>(
+    `/v1/groups/${encodeURIComponent(id)}/requests/${encodeURIComponent(request_id)}/${
+      admit ? "approve" : "decline"
+    }`,
+    { method: "POST" },
+  )
+}
+
+export function removeGroupMember(id: string, address: string): Promise<{ address: string }> {
+  return request<{ address: string }>(
+    `/v1/groups/${encodeURIComponent(id)}/members/${encodeURIComponent(address)}`,
+    { method: "DELETE" },
+  )
 }
 
 /**

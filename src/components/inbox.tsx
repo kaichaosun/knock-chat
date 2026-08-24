@@ -2,6 +2,7 @@ import { useState } from "react"
 import { MessageSquarePlus, PenLine } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { GroupAvatar } from "@/components/group-avatar"
 import { SwipeRow } from "@/components/swipe-row"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
@@ -9,24 +10,29 @@ import { shortenAddress } from "@/lib/address"
 import { labelIn, nameIn, type Directory } from "@/lib/names"
 import { preview } from "@/lib/payload"
 import type { Conversation } from "@/lib/messages"
+import type { Group } from "@/lib/relay"
 import { relativeTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
 
 export function Inbox({
   conversations,
+  groups,
   onOpen,
   onCompose,
   onDelete,
 }: {
   conversations: Conversation[]
-  onOpen: (peer: string) => void
+  /** The rooms you are in, so a room's thread can be labelled with its name. */
+  groups: Group[]
+  onOpen: (thread: string) => void
   onCompose: () => void
-  onDelete: (peer: string) => void
+  onDelete: (thread: string) => void
 }) {
   // Only one row open at a time, so a stray Delete is never left lurking under
   // a row the user has moved on from.
   const [revealed, setRevealed] = useState<string | null>(null)
   const names = useNames()
+  const rooms = new Map(groups.map((group) => [group.id, group]))
   if (conversations.length === 0) {
     return <EmptyInbox onCompose={onCompose} />
   }
@@ -36,13 +42,14 @@ export function Inbox({
       <ul className="divide-border/60 divide-y px-2 pb-28">
         {conversations.map((conversation) => (
           <ConversationRow
-            key={conversation.peer}
+            key={conversation.key}
             conversation={conversation}
+            room={conversation.group ? rooms.get(conversation.group) : undefined}
             names={names}
             onOpen={onOpen}
             onDelete={onDelete}
-            revealed={revealed === conversation.peer}
-            onReveal={(open) => setRevealed(open ? conversation.peer : null)}
+            revealed={revealed === conversation.key}
+            onReveal={(open) => setRevealed(open ? conversation.key : null)}
           />
         ))}
       </ul>
@@ -63,6 +70,7 @@ export function Inbox({
 
 function ConversationRow({
   conversation,
+  room,
   names,
   onOpen,
   onDelete,
@@ -70,40 +78,47 @@ function ConversationRow({
   onReveal,
 }: {
   conversation: Conversation
+  /** Set when this thread is a room, and absent while its details load. */
+  room: Group | undefined
   names: Directory
-  onOpen: (peer: string) => void
-  onDelete: (peer: string) => void
+  onOpen: (thread: string) => void
+  onDelete: (thread: string) => void
   revealed: boolean
   onReveal: (open: boolean) => void
 }) {
-  const { peer, last, unread } = conversation
+  const { key, peer, group, last, unread } = conversation
   const summary = preview(last.body, last.direction)
-  const name = nameIn(names, peer)
+
+  // A room is titled by its name; a chat by whoever it is with. A room whose
+  // details have not arrived yet is still a room, so it says so rather than
+  // showing a bare id nobody can read.
+  const title = group ? (room?.name ?? "Group") : (peer && nameIn(names, peer))
+  const mono = !group && !title
 
   return (
     <SwipeRow
-      actionLabel={`Delete chat with ${labelIn(names, peer)}`}
-      onAction={() => onDelete(peer)}
-      onClick={() => onOpen(peer)}
+      actionLabel={
+        group
+          ? `Delete ${room?.name ?? "group"} chat`
+          : `Delete chat with ${peer ? labelIn(names, peer) : "this chat"}`
+      }
+      onAction={() => onDelete(key)}
+      onClick={() => onOpen(key)}
       revealed={revealed}
       onReveal={onReveal}
     >
-      <AddressAvatar address={peer} />
+      {group ? <GroupAvatar /> : peer && <AddressAvatar address={peer} />}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          {/* A named chat drops the address from the row. You chose these
-              people, the identicon tells them apart at a glance, and the
-              address is one tap away in the header — a list of codes is what
-              this screen looked like before anyone had a name. */}
           <span
             className={cn(
               "truncate",
-              name ? "text-[15px]" : "font-mono text-[13px] tracking-tight",
+              mono ? "font-mono text-[13px] tracking-tight" : "text-[15px]",
               unread > 0 ? "font-bold" : "font-semibold",
             )}
           >
-            {name ?? shortenAddress(peer)}
+            {title ?? (peer ? shortenAddress(peer) : "")}
           </span>
           <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
             {relativeTime(last.at)}
@@ -116,6 +131,10 @@ function ConversationRow({
               unread > 0 ? "text-foreground font-medium" : "text-muted-foreground",
             )}
           >
+            {/* In a room the speaker matters as much as what was said. */}
+            {group && last.direction === "in" && (
+              <span className="font-medium">{labelIn(names, last.peer)}: </span>
+            )}
             {summary}
           </span>
           {unread > 0 && (

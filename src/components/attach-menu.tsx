@@ -23,17 +23,20 @@ export type AttachAction = {
 export function AttachMenu({
   open,
   onOpenChange,
+  title = "Send something else",
   actions,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** What this particular menu is offering. */
+  title?: string
   actions: AttachAction[]
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Send something else</SheetTitle>
+          <SheetTitle>{title}</SheetTitle>
         </SheetHeader>
 
         <ul className="space-y-2 pb-8">

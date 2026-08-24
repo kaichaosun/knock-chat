@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
+import { PenLine, Users } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 
@@ -9,21 +10,26 @@ import { Contacts } from "@/components/contacts"
 import { KnockRequests } from "@/components/knock-requests"
 import { KnockSheet } from "@/components/knock-sheet"
 import { ProfileSheet } from "@/components/profile-sheet"
+import { AttachMenu } from "@/components/attach-menu"
 import { TabBar, type Tab } from "@/components/tab-bar"
 import { Button } from "@/components/ui/button"
+import { CreateGroupSheet } from "@/components/create-group-sheet"
+import { GroupRoom } from "@/components/group-room"
+import { JoinGroupSheet } from "@/components/join-group-sheet"
+import { useGroups } from "@/hooks/use-groups"
 import { useKnocks } from "@/hooks/use-knocks"
 import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
-import type { Message } from "@/lib/messages"
+import { messageId, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import { encode as encodePayload, payment } from "@/lib/payload"
 import { sendNim } from "@/lib/payments"
 import { formatNim } from "@/lib/postage"
 import { NoKeyError } from "@/lib/keys"
 import { deviceKeyPair } from "@/lib/keys"
-import { RelayError, type Reachability } from "@/lib/relay"
+import { RelayError, type Group, type GroupDetail, type Reachability } from "@/lib/relay"
 import { devIdentities } from "@/lib/wallet"
 import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
 import { useSession } from "@/hooks/use-session"
@@ -71,6 +77,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   } = useMessages(owner, deviceSecretKey, session.invalidate)
 
   const { knocks, reach, knock, accept, decline } = useKnocks(wallet, owner)
+  const { groups, refresh: refreshGroups, inspect, create, join, say } = useGroups(wallet, owner)
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [knocking, setKnocking] = useState(false)
@@ -79,6 +86,17 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [knockPeer, setKnockPeer] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>("chats")
   const [profileOpen, setProfileOpen] = useState(false)
+  // A room is a thread like any other, but nothing a direct chat does applies
+  // to it — no reachability, no knocking — so it is opened separately rather
+  // than threaded through logic that would have to keep asking which it is.
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [groupDetail, setGroupDetail] = useState<GroupDetail | null>(null)
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [composing, setComposing] = useState(false)
+  /** A room a link pointed at, waiting to be joined. */
+  const [invited, setInvited] = useState<Group | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteLoading, setInviteLoading] = useState(false)
 
   // Let the hardware/gesture back control leave a thread instead of the app.
   useEffect(() => {
@@ -94,6 +112,51 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   useEffect(() => adoptNames(owner), [owner])
 
   const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
+
+  /** Open whichever kind of thread this key names. */
+  const openAnyThread = useCallback(
+    (thread: string) => {
+      if (groups.some((group) => group.id === thread)) setOpenGroup(thread)
+      else setOpenPeer(thread)
+    },
+    [groups],
+  )
+
+  const refreshGroupDetail = useCallback(async () => {
+    if (!openGroup) return
+    try {
+      setGroupDetail(await inspect(openGroup))
+    } catch {
+      // The room still opens; only its member list is missing.
+    }
+  }, [openGroup, inspect])
+
+  useEffect(() => {
+    setGroupDetail(null)
+    void refreshGroupDetail()
+  }, [openGroup, refreshGroupDetail])
+
+  // A link carries a room id. Looked up rather than joined on sight: what it
+  // costs has to be visible before anyone pays it.
+  useEffect(() => {
+    if (!owner) return
+    const id = new URLSearchParams(window.location.search).get("group")
+    if (!id) return
+    // Cleared straight away so a reload does not reopen the same door.
+    const url = new URL(window.location.href)
+    url.searchParams.delete("group")
+    window.history.replaceState({}, "", url)
+
+    setInviteOpen(true)
+    setInviteLoading(true)
+    inspect(id)
+      .then((detail) => setInvited(detail.group))
+      .catch(() => {
+        setInviteOpen(false)
+        toast.error("That group link doesn't lead anywhere.")
+      })
+      .finally(() => setInviteLoading(false))
+  }, [owner, inspect])
 
   // How the open thread stands with its peer. A channel can be closed from the
   // other side at any time, so this is asked on open rather than assumed from
@@ -243,6 +306,27 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [retrySend],
   )
 
+  /**
+   * Say something in a room.
+   *
+   * The relay fans a room message out to the other members and holds none for
+   * the speaker, so — exactly as with a knock — this device has to keep its own
+   * copy or the sender sees nothing of what they wrote.
+   */
+  const onSay = useCallback(
+    async (body: string) => {
+      if (!openGroup || !owner) return
+      const id = `local:${messageId()}`
+      recordOutgoing(owner, body, id, openGroup)
+      try {
+        await say(openGroup, body)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Couldn't send that")
+      }
+    },
+    [openGroup, owner, say, recordOutgoing],
+  )
+
   if (session.state.status !== "active") {
     return (
       <WelcomeScreen
@@ -290,6 +374,87 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     />
   )
 
+  /** What the compose button offers: a message, or a room. */
+  const composeMenu = (
+    <AttachMenu
+      open={composing}
+      onOpenChange={setComposing}
+      title="Start something"
+      actions={[
+        {
+          icon: PenLine,
+          label: "New message",
+          description: "Knock on someone's door with their address.",
+          onSelect: () => {
+            setKnockPeer(null)
+            setKnocking(true)
+          },
+        },
+        {
+          icon: Users,
+          label: "New group",
+          description: "A room you share by link. Not encrypted.",
+          onSelect: () => setCreatingGroup(true),
+        },
+      ]}
+    />
+  )
+
+  const groupSheets = (
+    <>
+      <CreateGroupSheet
+        open={creatingGroup}
+        onOpenChange={setCreatingGroup}
+        onCreate={async (input) => {
+          const group = await create(input)
+          setOpenGroup(group.id)
+          toast.success("Group created. Share the link to let people in.")
+          return group
+        }}
+      />
+      <JoinGroupSheet
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        group={invited}
+        loading={inviteLoading}
+        onJoin={async (group) => {
+          const result = await join(group)
+          if (result.status === "joined") {
+            setOpenGroup(group.id)
+            toast.success(`You're in ${group.name}`)
+          } else {
+            toast.success("Asked to join. The owner will answer.")
+          }
+        }}
+      />
+    </>
+  )
+
+  const room = groups.find((group) => group.id === openGroup)
+  if (openGroup && room) {
+    return (
+      <>
+        <GroupRoom
+          group={room}
+          detail={groupDetail}
+          owner={address}
+          messages={threadWith(openGroup)}
+          onBack={() => setOpenGroup(null)}
+          onSay={onSay}
+          onRefreshDetail={() => {
+            void refreshGroupDetail()
+            void refreshGroups()
+          }}
+          onOpenChat={(peer) => {
+            setOpenGroup(null)
+            openThread(peer)
+          }}
+        />
+        {groupSheets}
+      </>
+    )
+  }
+
   if (openPeer) {
     return (
       <>
@@ -305,6 +470,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onPay={onPay}
         />
         {knockSheet}
+        {composeMenu}
+        {groupSheets}
       </>
     )
   }
@@ -349,11 +516,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             />
             <Inbox
               conversations={conversations}
-              onOpen={openThread}
-              onCompose={() => {
-                setKnockPeer(null)
-                setKnocking(true)
-              }}
+              groups={groups}
+              onOpen={openAnyThread}
+              onCompose={() => setComposing(true)}
               onDelete={(peer) => {
                 deleteThread(peer)
                 toast.success("Chat deleted. They're still in Contacts.")
@@ -372,6 +537,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       />
 
       {knockSheet}
+      {composeMenu}
+      {groupSheets}
 
       <ProfileSheet
         open={profileOpen}

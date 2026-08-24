@@ -34,16 +34,40 @@ export type Message = {
    * hidden, so history has no silent gaps.
    */
   undecryptable?: boolean
-  /** The other party, whichever direction the message went. */
+  /** The other party, whichever direction the message went. In a room this is
+   *  whoever spoke, which is not the same as who the thread is with. */
   peer: string
+  /**
+   * The room this belongs to, when it came from one.
+   *
+   * A room is a thread in its own right, so it — not the speaker — is what
+   * files the message. [`threadKey`] is the one place that decides which.
+   */
+  group?: string
   direction: "in" | "out"
   body: string
   at: string
   status: MessageStatus
 }
 
+/**
+ * Which thread a message belongs to.
+ *
+ * A direct message is filed under the other party; a room message under the
+ * room, whoever happened to speak. Every keyed operation below goes through
+ * this, so the two kinds of thread cannot drift apart.
+ */
+export function threadKey(message: Message): string {
+  return message.group ?? message.peer
+}
+
 export type Conversation = {
-  peer: string
+  /** Thread identity: a peer's address, or a room's id. */
+  key: string
+  /** The other party, for a direct chat. Null for a room. */
+  peer: string | null
+  /** The room's id, for a room. Null for a direct chat. */
+  group: string | null
   last: Message
   unread: number
 }
@@ -136,6 +160,7 @@ export function mergeIncoming(
     added.push({
       id,
       peer: compact(envelope.from),
+      ...(envelope.group_id ? { group: envelope.group_id } : {}),
       direction: "in",
       body: envelope.body,
       at: envelope.created_at,
@@ -159,10 +184,13 @@ export function recordOutgoing(
   peer: string,
   body: string,
   id: string,
+  /** Files it under a room instead of under the recipient. */
+  group?: string,
 ): Snapshot {
   return appendOutgoing(snapshot, {
     id,
     peer: compact(peer),
+    ...(group ? { group } : {}),
     direction: "out",
     body,
     at: new Date().toISOString(),
@@ -210,8 +238,8 @@ export function setStatus(
  * Returns the same snapshot when nothing changed, so callers can run this on
  * every render of an open thread without causing writes or re-renders.
  */
-export function markRead(snapshot: Snapshot, peer: string): Snapshot {
-  const key = compact(peer)
+export function markRead(snapshot: Snapshot, thread: string): Snapshot {
+  const key = normalizeKey(thread)
   const seen = incomingCount(snapshot.messages, key)
   if (snapshot.readCount[key] === seen) return snapshot
 
@@ -228,45 +256,60 @@ export function markRead(snapshot: Snapshot, peer: string): Snapshot {
  * The cursor is left alone deliberately: it is what stops the relay handing the
  * same messages back on the next poll and resurrecting what was just deleted.
  */
-export function deleteThread(snapshot: Snapshot, peer: string): Snapshot {
-  const key = compact(peer)
-  const messages = snapshot.messages.filter((m) => m.peer !== key)
+export function deleteThread(snapshot: Snapshot, thread: string): Snapshot {
+  const key = normalizeKey(thread)
+  const messages = snapshot.messages.filter((m) => threadKey(m) !== key)
   if (messages.length === snapshot.messages.length) return snapshot
 
   const { [key]: _removed, ...readCount } = snapshot.readCount
   return { ...snapshot, messages, readCount }
 }
 
-function incomingCount(messages: Message[], peer: string): number {
-  return messages.filter((m) => m.peer === peer && m.direction === "in").length
+function incomingCount(messages: Message[], thread: string): number {
+  return messages.filter((m) => threadKey(m) === thread && m.direction === "in").length
+}
+
+/**
+ * A thread key as stored.
+ *
+ * Addresses arrive grouped or compact and have to agree; a room id is a uuid
+ * and is already itself. Compacting a uuid leaves it alone, so one rule covers
+ * both without having to know which it was given.
+ */
+function normalizeKey(thread: string): string {
+  return compact(thread)
 }
 
 function sorted(messages: Message[]): Message[] {
   return [...messages].sort((a, b) => a.at.localeCompare(b.at))
 }
 
-export function threadWith(snapshot: Snapshot, peer: string): Message[] {
-  const key = compact(peer)
-  return snapshot.messages.filter((m) => m.peer === key)
+export function threadWith(snapshot: Snapshot, thread: string): Message[] {
+  const key = normalizeKey(thread)
+  return snapshot.messages.filter((m) => threadKey(m) === key)
 }
 
 /** One entry per peer, most recently active first. */
 export function conversations(snapshot: Snapshot): Conversation[] {
-  const byPeer = new Map<string, Message[]>()
+  const byThread = new Map<string, Message[]>()
   for (const message of snapshot.messages) {
-    const bucket = byPeer.get(message.peer)
+    const key = threadKey(message)
+    const bucket = byThread.get(key)
     if (bucket) bucket.push(message)
-    else byPeer.set(message.peer, [message])
+    else byThread.set(key, [message])
   }
 
   const result: Conversation[] = []
-  for (const [peer, messages] of byPeer) {
+  for (const [key, messages] of byThread) {
     const incoming = messages.filter((m) => m.direction === "in").length
+    const last = messages[messages.length - 1]
     result.push({
-      peer,
-      last: messages[messages.length - 1],
+      key,
+      peer: last.group ? null : last.peer,
+      group: last.group ?? null,
+      last,
       // Clamped: a thread read and then trimmed should show zero, not negative.
-      unread: Math.max(0, incoming - (snapshot.readCount[peer] ?? 0)),
+      unread: Math.max(0, incoming - (snapshot.readCount[key] ?? 0)),
     })
   }
   return result.sort((a, b) => b.last.at.localeCompare(a.last.at))
