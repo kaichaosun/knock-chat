@@ -34,7 +34,7 @@ import type { Receipt } from "@/lib/receipts"
 import { encode as encodePayload, giftNote, invite, payment } from "@/lib/payload"
 import { sendNim, unwrapTransaction } from "@/lib/payments"
 import { commitment, formatNim, newNonce } from "@/lib/postage"
-import { NoKeyError } from "@/lib/keys"
+import { forgetPeerKey, NoKeyError } from "@/lib/keys"
 import { deviceKeyPair } from "@/lib/keys"
 import {
   RelayError,
@@ -192,6 +192,17 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   useEffect(() => adoptNames(owner), [owner])
 
   const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
+
+  // Opening a chat is the moment worth re-checking who you are writing to.
+  // A cached key stays right until the peer signs in on another device, and
+  // nothing announces when they do — so the next message would be sealed to a
+  // key they no longer hold, and they would see it as unreadable with no way
+  // to tell you. Keyed on `openPeer` rather than done at the call sites, so
+  // every way into a thread is covered. Costs one fetch, and only if you then
+  // write something.
+  useEffect(() => {
+    if (openPeer) forgetPeerKey(openPeer)
+  }, [openPeer])
 
   /**
    * The chat list: threads that have messages, plus rooms that do not yet.

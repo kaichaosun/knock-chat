@@ -121,6 +121,59 @@ export function clearPeerKeys(): void {
 }
 
 /**
+ * Forget one peer's key, so the next use fetches a fresh certificate.
+ *
+ * A cached key is right until the peer signs in on another device, and there
+ * is no notification when they do — this is how the cache is told it might be
+ * out of date. Cheap: the next send re-fetches once and caches again.
+ */
+export function forgetPeerKey(peer: string): void {
+  peerKeys.delete(compact(peer))
+}
+
+/** Whether the key the relay hands out for you is the one this device holds. */
+export type KeyStanding =
+  /** The relay is vouching for this device. */
+  | "matches"
+  /** The relay is vouching for some other key — nobody can write to you. */
+  | "stale"
+  /** Could not be established; the relay is unreachable or refused. */
+  | "unknown"
+
+/**
+ * Check that the key others will encrypt to is the one this device can open.
+ *
+ * These come apart more easily than they look. The key is published only as
+ * part of signing in, and a cached session is reused for weeks without
+ * republishing — so a device that mints a fresh key (storage cleared, a corrupt
+ * value, a different origin) while its token is still valid will never
+ * announce it. Everything sent to you then arrives sealed to a key you do not
+ * have, and nothing in the app notices.
+ *
+ * "unknown" is deliberately distinct from "stale": a relay that cannot be
+ * reached must not cost somebody their session.
+ */
+export async function checkRegisteredKey(
+  address: string,
+  publicKey: Uint8Array,
+): Promise<KeyStanding> {
+  let certificate: KeyCertificate
+  try {
+    certificate = await request<KeyCertificate>(
+      `/v1/keys/${encodeURIComponent(formatAddress(address))}`,
+    )
+  } catch (error) {
+    // Nothing registered at all — signing in is what publishes it.
+    if (error instanceof Error && "status" in error && error.status === 404) return "stale"
+    return "unknown"
+  }
+
+  const registered = verifyCertificate(certificate)
+  if (!registered) return "stale"
+  return registered.toLowerCase() === toHex(publicKey).toLowerCase() ? "matches" : "stale"
+}
+
+/**
  * The conversation key for talking to `peer`, fetching and verifying their
  * certificate if this device has not seen it yet.
  *

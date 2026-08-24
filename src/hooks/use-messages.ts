@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { compact } from "@/lib/address"
 import { decryptBody, encryptBody } from "@/lib/crypto"
-import { keyForPeer } from "@/lib/keys"
+import { forgetPeerKey, keyForPeer } from "@/lib/keys"
 import * as history from "@/lib/messages"
 import type { Message, OpenedEnvelope, Snapshot } from "@/lib/messages"
 import { RelayError, fetchMessages, sendMessage } from "@/lib/relay"
@@ -208,6 +208,10 @@ async function openAll(
   deviceSecretKey: Uint8Array,
 ): Promise<OpenedEnvelope[]> {
   const keys = new Map<string, Uint8Array | null>()
+  // Peers whose certificate has already been re-fetched in this pass, so a
+  // thread full of genuinely unreadable messages asks once rather than once
+  // per message.
+  const refreshed = new Set<string>()
   const opened: OpenedEnvelope[] = []
 
   for (const envelope of envelopes) {
@@ -229,7 +233,22 @@ async function openAll(
     }
 
     const key = keys.get(peer) ?? null
-    const plaintext = key ? decryptBody(envelope.body, key, envelope.from, owner) : null
+    let plaintext = key ? decryptBody(envelope.body, key, envelope.from, owner) : null
+
+    // Failing to open it does not mean it cannot be opened. The sender may
+    // have signed in on another device since this key was cached, in which
+    // case the message is perfectly readable with their new certificate and
+    // only the cache makes it look broken. Worth one fetch to find out —
+    // marking it unreadable is permanent, and this is the last chance to be
+    // sure before that.
+    if (plaintext === null && !refreshed.has(peer)) {
+      refreshed.add(peer)
+      forgetPeerKey(envelope.from)
+      const fresh = await keyForPeer(envelope.from, deviceSecretKey).catch(() => null)
+      keys.set(peer, fresh)
+      plaintext = fresh ? decryptBody(envelope.body, fresh, envelope.from, owner) : null
+    }
+
     opened.push(
       plaintext === null
         ? { ...envelope, body: "", undecryptable: true }

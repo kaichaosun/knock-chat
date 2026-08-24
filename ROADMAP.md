@@ -161,6 +161,16 @@ in-memory.
   a `knock:` commitment; an empty one is somebody sending NIM by hand. Worth
   knowing before reading an unmatched transaction as a lost gift.
 
+- **A sender is not told when their message could not be read.** The
+  receiver is the only party that knows decryption failed, and there is no way
+  to say so. Two of the three causes are now handled without a protocol: a
+  stale cached key is re-fetched and retried on the receiving side, and the
+  sender re-reads a peer's certificate whenever a chat is opened. What remains
+  is a message already sealed to a key the receiver no longer holds — only the
+  sender can fix that, by re-sealing and sending again, and only if told. Doing
+  it well wants a key fingerprint in the envelope first, so the report can name
+  which key was used instead of saying only that something failed.
+
 - **Groups are not encrypted.** Direct messages are end-to-end encrypted;
   group bodies are plain text and the relay can read them. A deliberate cut for
   this version, not an oversight — but it has to be visible in the app, or

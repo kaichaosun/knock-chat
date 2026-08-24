@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 
 import { clearSession, loadSession, signIn, type Session } from "@/lib/auth"
+import { checkRegisteredKey, deviceKeyPair } from "@/lib/keys"
 import { setAuthToken } from "@/lib/relay"
 import type { Wallet } from "@/lib/wallet"
 
@@ -30,12 +31,35 @@ export function useSession(wallet: Wallet | null) {
     }
 
     const cached = loadSession(wallet.scope)
-    if (cached) {
-      setAuthToken(cached.token)
-      setState({ status: "active", session: cached })
-    } else {
+    if (!cached) {
       setAuthToken(null)
       setState({ status: "needed" })
+      return
+    }
+
+    setAuthToken(cached.token)
+    setState({ status: "active", session: cached })
+
+    // A valid token is not proof that the relay still vouches for this
+    // device's key. The two are published together and then drift apart in
+    // silence — see `checkRegisteredKey`. Asking costs one request per start,
+    // and the alternative is unreadable mail with nothing to explain it.
+    let dropped = false
+    void (async () => {
+      const standing = await checkRegisteredKey(
+        cached.address,
+        deviceKeyPair(wallet.scope).publicKey,
+      )
+      // Only a definite mismatch acts. An unreachable relay says nothing, and
+      // signing somebody out over a flaky network would be worse than the bug.
+      if (dropped || standing !== "stale") return
+      clearSession(wallet.scope)
+      setAuthToken(null)
+      setState({ status: "needed" })
+    })()
+
+    return () => {
+      dropped = true
     }
   }, [wallet])
 
