@@ -26,9 +26,10 @@ Two repos: this app, and the relay at `../knock-relay`.
 | Contacts | Channels as the durable record of who can reach whom, so a fresh device knows without local history. |
 | Remove contact | `DELETE /v1/contacts/{address}`. One normalised row, so closing is symmetric by construction. |
 | Groups | `chat_group` / `group_member` / `group_request`, plus a `group_id` on delivered messages. A room is a lobby, not a shortcut: membership opens no channel, so reaching a member privately still costs their postage. The door mirrors a knock — pay the owner, get in forever — with the price defaulting to 0 and an optional approval queue. Owner-only moderation, link-only distribution, no ban list. **Bodies are plain text**; the relay can read them. |
+| Chain reads | A node that cannot answer is told apart from a transaction that is not there: the first a 502 that says nothing about the payment, the second a 402. Pinned to the exact bodies real nodes send — including the prose `rpc.nimiqwatch.com` returned while it was down, which read as "not found" tells someone who has just paid that their payment does not exist. Configuration moved into `.env` / `.env.example`, since `KNOCK_NIMIQ_RPC` was previously discoverable only by reading `main.rs`. |
 | Display names | `PUT /v1/profile`, and the name served with reachability, contacts and knocks. Normalised and refused — not truncated, not stripped — if it carries invisible or text-reordering characters. Lists carry names in a map beside them rather than on each entry, so a name is looked up when read rather than frozen into a knock. |
 
-**Tests:** 103 offline, plus 6 Postgres-backed run separately
+**Tests:** 109 offline, plus 6 Postgres-backed run separately
 (`cargo test -- --ignored pg_ --test-threads=1`). The Postgres set exists
 because two postage bugs were Postgres-only and every test at the time ran
 in-memory.
@@ -48,10 +49,11 @@ in-memory.
 | Send NIM in a chat | A plus button in the composer opens a menu of things a message can be other than text; the one action there now is a transfer to the person you are talking to. The wallet moves the money, then a card is posted into the thread. Message plaintext is framed (`\0knock1\n` + JSON) so text still travels as itself and an unrecognised frame degrades to "not supported in this version" rather than raw JSON. Confirmed working on Android and iOS. |
 | Groups | Rooms in the chat list beside direct chats, told apart by a plain glyph rather than an identicon. A room view labels every incoming message with who said it and carries a standing "not encrypted" notice. Create with a name, a price and an approval switch; share by link (`?group=<id>`); the owner's controls live in the same sheet everyone else sees. Local history keys threads on `group ?? peer`, so a room and a direct chat with the same person stay apart. |
 | Payment cards | Not chat bubbles: bordered, tailless, laid out in rows and given a minimum width, so a payment is distinguishable from something someone said without reading either. Reports what the sender said they paid, and nothing more. |
+| Paid postage survives a failure | A knock is a payment then a request, and the wallet returns before the transaction is in a block — so the relay used to refuse the knock for being early, after the money had gone. The proof is now written to storage *before* the relay is told anything, the request retries on a 1/2/4/8s backoff, and a payment already made is always reused. Paying twice would strand the first payment forever: its commitment binds a nonce only that device ever had. A sweep on every foreground finishes anything still owed, so the guarantee is "once you have paid, the knock is sent" rather than "…if you come back and tap again". |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
 | Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
-**Tests:** 97. Typecheck clean.
+**Tests:** 113. Typecheck clean.
 
 ---
 
@@ -63,6 +65,27 @@ in-memory.
 - **Rate limiting.** Nothing. Sign-in and knock endpoints are the exposure.
 - **Expiry sweep.** Challenges and sessions are checked on read but never
   deleted, so both tables grow without bound.
+- **The relay chooses the text the wallet asks you to approve.**
+  `auth.ts` signs `challenge.message` verbatim, whatever the relay returns, with
+  no check on it. A hostile or compromised relay can therefore put arbitrary
+  text in front of a user inside a wallet approval dialog, indistinguishable
+  from Knock's own. The client already knows the exact format, so the fix is to
+  build the message locally from the parts — nonce, its own encryption key,
+  expiry — and have the relay supply data rather than a string to be approved.
+  Independent of anything else; worth doing before strangers use a relay they
+  did not deploy.
+- **Postage depends on one public node, and one went down.** Verification needs
+  `getTransactionByHash`, which needs a *history* node — one without the index
+  refuses every lookup however healthy it otherwise is. `rpc.nimiqwatch.com`,
+  the default until then, spent 2026-08-24 answering `no available server` to
+  everything, and with it down no knock could be paid for at all. It stays the
+  default, but `KNOCK_NIMIQ_RPC` now takes a comma-separated list: each request
+  starts with whoever answered last and moves on from any node that cannot
+  answer, so one going down costs a timeout rather than the feature. That is
+  several dependencies instead of one, not none — a history node we operate is
+  still the only version of this that does not rest on somebody else.
+  Cheapest mitigation is to let `KNOCK_NIMIQ_RPC` take a list and try each in
+  turn; the real one is a history node we operate.
 - **Hosting.** Relay, database, and app not deployed anywhere.
 
 ### Unverified
@@ -73,6 +96,16 @@ in-memory.
   provider and throw before any transaction.
 - **Mainnet.** All testing has been local against
   `rpc.nimiqwatch.com` / `rpc.testnet.nimiqwatch.com`.
+
+### Settled by the device probes
+
+- **Signed-message construction, address derivation and determinism**, on
+  iPhone (iOS 18.1.1), 2026-08-24. The wallet signs the Nimiq signed-message
+  wrapper rather than raw UTF-8; the returned public key derives to the wallet's
+  own address; and **signatures are deterministic** — the same message signed
+  twice gives byte-identical output. That last one was the open question behind
+  signature-derived encryption keys, and the answer is that they would work.
+  Not being built: see multi-device below.
 
 ### Known limits
 
@@ -127,6 +160,23 @@ in-memory.
   knock path cannot work. Worth settling before a public deploy.
 - **No explorer link on a payment card.** Linking out needs to know whether the
   relay is on mainnet or testnet, which `/v1/info` does not report.
+- **One device per address, and changing it loses your mail.** The encryption
+  key is random and lives in `localStorage`, so it is per device *and per
+  origin*. Signing in somewhere else publishes a new certificate, "newest wins",
+  and the previous device silently stops being able to read new messages —
+  anything already sealed to the old key is unreadable for good. During
+  development a changed LAN IP is enough to trigger it, because the IP is part
+  of the origin; a stable domain removes that particular trigger but not the
+  underlying limit.
+
+  Two ways out were considered. Deriving the key from a wallet signature works
+  (the probe confirms determinism) and is far less work, but it makes the wallet
+  a single point of compromise for all message history and only holds if the
+  client stops signing relay-supplied text — see the deploy blocker above. The
+  chosen direction is instead **a set of device keys per address**, with senders
+  encrypting to every registered key: real multi-device, no new secret derived
+  from the wallet, and a bigger change to both the key directory and the sender
+  path. Not built.
 - **Local nicknames.** A name is chosen by its owner, so two contacts can wear
   the same one and a stranger can wear yours. Letting you rename someone in
   your own copy is the unspoofable half of this feature, and is not built.

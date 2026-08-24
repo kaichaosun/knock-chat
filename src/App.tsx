@@ -24,6 +24,7 @@ import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import { messageId, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
+import type { Receipt } from "@/lib/receipts"
 import { encode as encodePayload, payment } from "@/lib/payload"
 import { sendNim } from "@/lib/payments"
 import { formatNim } from "@/lib/postage"
@@ -76,7 +77,26 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     relayStatus,
   } = useMessages(owner, deviceSecretKey, session.invalidate)
 
-  const { knocks, reach, knock, accept, decline } = useKnocks(wallet, owner)
+  /**
+   * A knock that was paid for earlier and has only now got through.
+   *
+   * Recorded here rather than in the hook because the sender's history lives
+   * here — and without this the knock would go out leaving no trace of itself
+   * on the device that sent it.
+   */
+  const onKnockRedeemed = useCallback(
+    (receipt: Receipt, sent: { id: string }) => {
+      recordOutgoing(receipt.peer, receipt.body, `knock:${sent.id}`)
+      toast.success("Your payment confirmed — the knock is on its way.")
+    },
+    [recordOutgoing],
+  )
+
+  const { knocks, reach, knock, accept, decline, held } = useKnocks(
+    wallet,
+    owner,
+    onKnockRedeemed,
+  )
   const { groups, refresh: refreshGroups, inspect, create, join, say } = useGroups(wallet, owner)
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
@@ -353,6 +373,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       myAddress={address}
       peer={knockPeer ?? undefined}
       onReach={reach}
+      held={held}
       onKnock={async (peer, body, policyLuna) => {
         if (!deviceSecretKey) throw new Error("no device key")
         const sent = await knock(peer, body, policyLuna, deviceSecretKey)

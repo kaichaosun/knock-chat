@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CheckCircle2, Clock, DoorOpen, Loader2 } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet"
 import { compact, isValidAddress, normalizeInput, shortenAddress } from "@/lib/address"
 import { rememberOne, sanitize } from "@/lib/names"
+import type { Receipt } from "@/lib/receipts"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { cn } from "@/lib/utils"
@@ -29,6 +30,7 @@ export function KnockSheet({
   peer,
   suggestions,
   onReach,
+  held,
   onKnock,
   onOpenThread,
 }: {
@@ -40,6 +42,8 @@ export function KnockSheet({
   peer?: string
   suggestions: Array<{ label: string; address: string }>
   onReach: (peer: string) => Promise<Reachability>
+  /** The payment already made for this address, if one is waiting to be used. */
+  held: (peer: string) => Receipt | null
   onKnock: (peer: string, body: string, policyLuna: number) => Promise<void>
   onOpenThread: (peer: string) => void
 }) {
@@ -59,9 +63,29 @@ export function KnockSheet({
     }
   }, [open, peer])
 
+  // The address a message was last put back for, so editing it sticks: the
+  // words are restored once when the recipient becomes known, never again.
+  const restoredFor = useRef<string | null>(null)
+
   const typed = compact(value)
   const valid = isValidAddress(value)
   const isSelf = valid && typed === compact(myAddress)
+
+  // Put back what they wrote last time, once the recipient is known. They can
+  // send it as it stands or write something else; the payment is bound to who
+  // paid, not to the words, so changing it costs nothing.
+  useEffect(() => {
+    if (!open) {
+      restoredFor.current = null
+      return
+    }
+    if (!valid || isSelf) return
+    if (restoredFor.current === typed) return
+    restoredFor.current = typed
+
+    const earlier = held(value)?.body
+    if (earlier) setBody(earlier)
+  }, [open, valid, isSelf, typed, value, held])
 
   // Ask the relay what this address costs as soon as one is fully typed.
   useEffect(() => {
@@ -100,6 +124,15 @@ export function KnockSheet({
   }
 
   const cost = reach ? reach.policy.amount_luna : 0
+  /**
+   * Already paid for, on an attempt that did not get through.
+   *
+   * Shown rather than silently reused, because the button otherwise offers to
+   * charge for something already bought — and that offer is what cost people
+   * money before the payment was written down.
+   */
+  const holding = valid && !isSelf ? held(value) : null
+  const alreadyPaid = holding !== null
   /**
    * What this address says it is called.
    *
@@ -203,6 +236,12 @@ export function KnockSheet({
 
           {reach && !reach.channel_open && !reach.knock_pending && (
             <>
+              {alreadyPaid && (
+                <p className="text-muted-foreground px-1 text-[12px] leading-snug">
+                  This is what you wrote last time. Send it as it is, or change it.
+                </p>
+              )}
+
               <textarea
                 rows={3}
                 value={body}
@@ -223,13 +262,19 @@ export function KnockSheet({
                 className="h-13 w-full rounded-2xl text-base"
               >
                 {sending ? <Loader2 className="animate-spin" /> : null}
-                {cost === 0 ? "Knock" : `Knock — ${formatNim(cost)} NIM`}
+                {alreadyPaid
+                  ? "Knock — already paid"
+                  : cost === 0
+                    ? "Knock"
+                    : `Knock — ${formatNim(cost)} NIM`}
               </Button>
 
               <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-                {cost === 0
-                  ? "They've made themselves free to reach."
-                  : `They keep the ${formatNim(cost)} NIM whether or not they answer.`}
+                {alreadyPaid
+                  ? "You've already paid for this one. Sending it again won't charge you."
+                  : cost === 0
+                    ? "They've made themselves free to reach."
+                    : `They keep the ${formatNim(cost)} NIM whether or not they answer.`}
               </p>
             </>
           )}

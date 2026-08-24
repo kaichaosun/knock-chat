@@ -174,9 +174,7 @@ function RoomIntro({ group }: { group: Group }) {
       <GroupAvatar size="lg" />
       <p className="mt-4 text-base font-semibold">{group.name}</p>
       <p className="text-muted-foreground mt-2 text-sm text-balance">
-        Nothing said here yet. Anyone in the room sees what you write — and being here
-        together doesn't open a private chat, so writing to someone directly still costs
-        their postage.
+        Nothing said here yet. Anyone in the room sees what you write.
       </p>
     </div>
   )

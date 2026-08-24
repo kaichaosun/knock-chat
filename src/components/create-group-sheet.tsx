@@ -76,8 +76,7 @@ export function CreateGroupSheet({
         <SheetHeader className="px-0">
           <SheetTitle>New group</SheetTitle>
           <SheetDescription>
-            A room you share by link. Messages here aren't encrypted, and being in it
-            together doesn't open a private chat with anyone.
+            A room you share by link, and messages here aren't encrypted.
           </SheetDescription>
         </SheetHeader>
 
