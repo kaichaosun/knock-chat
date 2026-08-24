@@ -3,6 +3,7 @@ import { Check, Copy, Loader2, ShieldOff, UserMinus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { QrCode } from "@/components/qr-code"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -14,6 +15,7 @@ import {
 import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
+import { groupLink } from "@/lib/group-link"
 import { labelIn, nameIn, remember } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
 import {
@@ -26,14 +28,6 @@ import {
   type JoinRequest,
 } from "@/lib/relay"
 import { cn } from "@/lib/utils"
-
-/** A link that opens this room in the app. */
-export function groupLink(id: string): string {
-  const url = new URL(window.location.href)
-  url.search = `?group=${id}`
-  url.hash = ""
-  return url.toString()
-}
 
 /**
  * What a room is, who is in it, and — for its owner — the controls.
@@ -138,6 +132,10 @@ export function GroupSheet({
 
         <div className="space-y-6 pb-8">
           <section className="space-y-2">
+            {/* For the case a link cannot reach: two phones on a table. */}
+            <div className="flex justify-center pb-1">
+              <QrCode value={groupLink(group.id)} className="size-44 rounded-2xl" />
+            </div>
             <Button
               variant="secondary"
               className="h-11 w-full rounded-2xl"

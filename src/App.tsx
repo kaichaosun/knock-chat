@@ -16,6 +16,7 @@ import { TabBar, type Tab } from "@/components/tab-bar"
 import { Button } from "@/components/ui/button"
 import { CreateGroupSheet } from "@/components/create-group-sheet"
 import { GroupRoom } from "@/components/group-room"
+import { JoinByLinkSheet } from "@/components/join-by-link-sheet"
 import { JoinGroupSheet } from "@/components/join-group-sheet"
 import { useGroups } from "@/hooks/use-groups"
 import { useKnocks } from "@/hooks/use-knocks"
@@ -127,6 +128,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [invited, setInvited] = useState<Group | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
+  const [pasting, setPasting] = useState(false)
 
   // Let the hardware/gesture back control leave a thread instead of the app.
   useEffect(() => {
@@ -178,8 +180,29 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     void refreshGroupDetail()
   }, [openGroup, refreshGroupDetail])
 
-  // A link carries a room id. Looked up rather than joined on sight: what it
-  // costs has to be visible before anyone pays it.
+  /**
+   * Show the door a room id leads to.
+   *
+   * Looked up rather than joined on sight: what it costs has to be visible
+   * before anyone pays it. One path whether the id came from the URL the app
+   * was opened with or from something pasted in.
+   */
+  const openInvite = useCallback(
+    (id: string) => {
+      setPasting(false)
+      setInviteOpen(true)
+      setInviteLoading(true)
+      inspect(id)
+        .then((detail) => setInvited(detail.group))
+        .catch(() => {
+          setInviteOpen(false)
+          toast.error("That group link doesn't lead anywhere.")
+        })
+        .finally(() => setInviteLoading(false))
+    },
+    [inspect],
+  )
+
   useEffect(() => {
     if (!owner) return
     const id = new URLSearchParams(window.location.search).get("group")
@@ -189,16 +212,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     url.searchParams.delete("group")
     window.history.replaceState({}, "", url)
 
-    setInviteOpen(true)
-    setInviteLoading(true)
-    inspect(id)
-      .then((detail) => setInvited(detail.group))
-      .catch(() => {
-        setInviteOpen(false)
-        toast.error("That group link doesn't lead anywhere.")
-      })
-      .finally(() => setInviteLoading(false))
-  }, [owner, inspect])
+    openInvite(id)
+  }, [owner, openInvite])
 
   // How the open thread stands with its peer. A channel can be closed from the
   // other side at any time, so this is asked on open rather than assumed from
@@ -455,6 +470,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           return group
         }}
       />
+      <JoinByLinkSheet open={pasting} onOpenChange={setPasting} onFound={openInvite} />
       <JoinGroupSheet
         open={inviteOpen}
         onOpenChange={setInviteOpen}
@@ -582,6 +598,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             owner={address}
             loading={groupsLoading}
             onOpen={setOpenGroup}
+            onJoin={() => setPasting(true)}
             onLeft={(id) => {
               // The room goes, and its chat with it — the same shape as
               // removing a contact, which also takes the conversation.

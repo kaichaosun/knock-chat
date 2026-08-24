@@ -49,13 +49,14 @@ in-memory.
 | Send NIM in a chat | A plus button in the composer opens a menu of things a message can be other than text; the one action there now is a transfer to the person you are talking to. The wallet moves the money, then a card is posted into the thread. Message plaintext is framed (`\0knock1\n` + JSON) so text still travels as itself and an unrecognised frame degrades to "not supported in this version" rather than raw JSON. Confirmed working on Android and iOS. |
 | Groups | Rooms in the chat list beside direct chats, told apart by a plain glyph rather than an identicon. A room view labels every incoming message with who said it and carries a standing "not encrypted" notice. Create with a name, a price and an approval switch; share by link (`?group=<id>`); the owner's controls live in the same sheet everyone else sees. Local history keys threads on `group ?? peer`, so a room and a direct chat with the same person stay apart. |
 | Deleting a room's chat | Hides it until something is said in it, the way closing a direct chat already worked. A room is not made of its messages — you are in it either way — so emptying the thread alone left the row sitting there looking untouched. Leaving is the other act, and it lives in Groups. |
+| Getting into a group | A link (`?group=<id>`), a pasted link or bare id, or a QR code shown in the group's info. Pasting is matched rather than parsed, so a link that picked up a fragment, a redirect wrapper or trailing punctuation still resolves — and a bare id works, which matters because whether Nimiq Pay preserves a query string through its deeplink is still unanswered. QR costs ~8.5 kB gzip and inherits its colour from CSS, so it stays readable in dark mode. |
 | Groups tab | A third tab after Contacts, listing the rooms you are in. Swipe to **Leave** — the durable act, behind a confirmation that says what getting back in would cost. Deleting a room's chat in Chats stays what it always was: tidying this device. Same shape as Chats / Contacts, where the thread is a view and the tab beside it is the thing itself. |
 | Payment cards | Not chat bubbles: bordered, tailless, laid out in rows and given a minimum width, so a payment is distinguishable from something someone said without reading either. Reports what the sender said they paid, and nothing more. |
 | Paid postage survives a failure | A knock is a payment then a request, and the wallet returns before the transaction is in a block — so the relay used to refuse the knock for being early, after the money had gone. The proof is now written to storage *before* the relay is told anything, the request retries on a 1/2/4/8s backoff, and a payment already made is always reused. Paying twice would strand the first payment forever: its commitment binds a nonce only that device ever had. A sweep on every foreground finishes anything still owed, so the guarantee is "once you have paid, the knock is sent" rather than "…if you come back and tap again". |
 | Delivery states | `sending` / `sent` / `failed` / `blocked`. A retry restamps to now and moves to the end of the thread. `blocked` (402) offers no retry while the door is shut, and becomes retryable once it opens. |
 | Refresh | Messages poll while visible. Reachability is asked on opening a thread, then on a backoff of 10s / 20s / 40s / 80s while the door is shut, stopping the moment it opens. Nothing is asked of a backgrounded app, and an open conversation costs nothing. |
 
-**Tests:** 122. Typecheck clean.
+**Tests:** 128. Typecheck clean.
 
 ---
 
@@ -147,6 +148,12 @@ in-memory.
   somebody who joins later starts from an empty room. Fixing it means either
   keeping room messages server-side and serving a backlog, or fanning out on
   read — both change what the relay stores and for how long.
+- **No QR scanning.** A group's code can be shown but not read: the camera
+  needs `getUserMedia`, which needs a secure context, and the app runs on
+  `http://<lan-ip>` in development — the device probe reports
+  `secure context: false`. Nimiq Pay exposes no scanner of its own either. Needs
+  HTTPS before it is even testable, so sharing is one-directional for now:
+  show a code, and the other person opens the link.
 - **No group discovery.** Groups travel by link only. A public directory is
   what would make them serve finding people rather than only talking to people
   already found, and it brings public content and moderation with it.

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { DoorOpen, Loader2, Users } from "lucide-react"
+import { DoorOpen, Link as LinkIcon, Loader2, Users } from "lucide-react"
 import { toast } from "sonner"
 
 import { GroupAvatar } from "@/components/group-avatar"
@@ -31,6 +31,7 @@ export function Groups({
   loading,
   onOpen,
   onLeft,
+  onJoin,
 }: {
   groups: Group[]
   owner: string
@@ -39,6 +40,8 @@ export function Groups({
   onOpen: (id: string) => void
   /** Called once the relay has confirmed, so the chat goes with the room. */
   onLeft: (id: string) => void
+  /** Open the door a pasted link or id leads to. */
+  onJoin: () => void
 }) {
   const [revealed, setRevealed] = useState<string | null>(null)
   // Held until confirmed: getting back into a room can cost money, and for a
@@ -79,6 +82,10 @@ export function Groups({
         <p className="text-muted-foreground mt-2 max-w-[18rem] text-balance">
           Groups appear here once you make one, or open a link someone sends you.
         </p>
+        <Button onClick={onJoin} size="lg" className="mt-7 h-12 rounded-2xl px-6">
+          <LinkIcon />
+          Join with a link
+        </Button>
       </div>
     )
   }
@@ -113,6 +120,17 @@ export function Groups({
           )
         })}
       </ul>
+
+      <div className="pointer-events-none sticky bottom-0 flex justify-end px-5 pb-safe">
+        <Button
+          size="icon"
+          onClick={onJoin}
+          aria-label="Join a group with a link"
+          className="pointer-events-auto mb-5 size-14 rounded-full shadow-lg shadow-primary/30"
+        >
+          <LinkIcon className="size-5" />
+        </Button>
+      </div>
 
       <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
