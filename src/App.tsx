@@ -130,14 +130,28 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [inviteLoading, setInviteLoading] = useState(false)
   const [pasting, setPasting] = useState(false)
 
+  /**
+   * Whichever thread is open, if either is.
+   *
+   * A room and a chat are held separately because almost nothing a chat does
+   * applies to a room — but a few things apply to *any* open thread, and those
+   * belong here rather than being written twice and drifting. Both the back
+   * gesture and marking-as-read were written for chats alone and had to be
+   * found again once rooms existed.
+   */
+  const openThreadKey = openPeer ?? openGroup
+
   // Let the hardware/gesture back control leave a thread instead of the app.
   useEffect(() => {
-    if (!openPeer) return
-    window.history.pushState({ thread: openPeer }, "")
-    const onPop = () => setOpenPeer(null)
+    if (!openThreadKey) return
+    window.history.pushState({ thread: openThreadKey }, "")
+    const onPop = () => {
+      setOpenPeer(null)
+      setOpenGroup(null)
+    }
     window.addEventListener("popstate", onPop)
     return () => window.removeEventListener("popstate", onPop)
-  }, [openPeer])
+  }, [openThreadKey])
 
   // Names are learnt per identity: switching to a development identity should
   // not inherit what the previous one had been told.
@@ -240,6 +254,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   }, [openPeer, refreshReach])
 
   const openMessages = openPeer ? threadWith(openPeer) : []
+  const roomMessages = openGroup ? threadWith(openGroup) : []
 
   // Accepting a knock delivers the message to the *recipient*, so the person who
   // knocked is told nothing at all when their door is opened, and their composer
@@ -277,10 +292,22 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     if (openPeer) markRead(openPeer)
   }, [openPeer, openMessages.length, markRead])
 
+  // And the same for a room. A separate effect because a room is opened
+  // separately — the thing that made this easy to miss in the first place.
+  useEffect(() => {
+    if (openGroup) markRead(openGroup)
+  }, [openGroup, roomMessages.length, markRead])
+
+  /** Leave whichever thread is open. Used by both back buttons. */
   const closeThreadView = useCallback(() => {
-    // Unwind the entry pushed above so back doesn't need two presses.
+    // Unwind the entry pushed above so back doesn't need two presses. Going
+    // straight to the state instead would leave that entry behind, and the
+    // next back press would spend itself on nothing.
     if (window.history.state?.thread) window.history.back()
-    else setOpenPeer(null)
+    else {
+      setOpenPeer(null)
+      setOpenGroup(null)
+    }
   }, [])
 
   const copy = useCallback(async (text: string) => {
@@ -497,8 +524,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           group={room}
           detail={groupDetail}
           owner={address}
-          messages={threadWith(openGroup)}
-          onBack={() => setOpenGroup(null)}
+          messages={roomMessages}
+          onBack={closeThreadView}
           onSay={onSay}
           onRefreshDetail={() => {
             void refreshGroupDetail()
