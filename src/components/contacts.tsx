@@ -130,7 +130,7 @@ export function Contacts({
 
   return (
     <>
-      <ul className="divide-border/60 divide-y px-2 pb-24">
+      <ul className="px-2 pb-24">
         {contacts.map((contact) => (
           <SwipeRow
             key={contact.address}

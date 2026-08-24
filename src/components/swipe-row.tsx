@@ -50,7 +50,18 @@ export function SwipeRow({
   const showLabel = distance >= LABEL_PX
 
   return (
-    <li className="relative overflow-hidden rounded-2xl">
+    // The rule between rows starts where the text does, not at the edge of the
+    // screen: it separates what is being read, and running it under the avatar
+    // chops the column of faces in half instead of letting it read as a
+    // gutter. 4.375rem is px-3 + size-11 + gap-3.5 below — the row's own
+    // measurements, so the two cannot drift apart.
+    <li
+      className={cn(
+        "relative overflow-hidden rounded-2xl",
+        "after:bg-border/70 after:pointer-events-none after:absolute after:right-4",
+        "after:bottom-0 after:left-[4.375rem] after:h-px last:after:hidden",
+      )}
+    >
       {/* Grows in from the right edge as the row slides, so it is never wider than
           what the swipe has actually uncovered — otherwise it would show through
           any row that is not fully opaque. */}

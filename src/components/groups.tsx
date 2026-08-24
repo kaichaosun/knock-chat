@@ -92,7 +92,7 @@ export function Groups({
 
   return (
     <>
-      <ul className="divide-border/60 divide-y px-2 pb-24">
+      <ul className="px-2 pb-24">
         {groups.map((group) => {
           const mine = group.owner === owner
           return (

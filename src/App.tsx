@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { PenLine, Users } from "lucide-react"
 
@@ -26,6 +26,8 @@ import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import { toHex } from "@/lib/crypto"
+import { cn } from "@/lib/utils"
+import { fundGift } from "@/lib/gift-funding"
 import { messageId, withRooms, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import type { Receipt } from "@/lib/receipts"
@@ -36,7 +38,6 @@ import { NoKeyError } from "@/lib/keys"
 import { deviceKeyPair } from "@/lib/keys"
 import {
   RelayError,
-  createGift,
   getGiftTerms,
   type GiftTerms,
   type Group,
@@ -127,6 +128,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [knockPeer, setKnockPeer] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>("chats")
   const [profileOpen, setProfileOpen] = useState(false)
+  /** Whether the list under the header has been scrolled off its top. */
+  const [scrolled, setScrolled] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0 })
+    setScrolled(false)
+  }, [tab])
   // A room is a thread like any other, but nothing a direct chat does applies
   // to it — no reachability, no knocking — so it is opened separately rather
   // than threaded through logic that would have to keep asking which it is.
@@ -460,7 +469,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         }),
       )
 
-      const gift = await createGift(openGroup, {
+      // Through the retry, not straight at the relay: the money is already
+      // gone by this line, so a payment the chain has not caught up with yet
+      // must be asked about again rather than abandoned.
+      const gift = await fundGift(openGroup, {
         ...input,
         postage: { tx_hash: paid, nonce: toHex(nonce) },
       })
@@ -689,14 +701,33 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="bg-background/85 sticky top-0 z-10 border-b backdrop-blur-xl pt-safe">
-        <div className="flex items-center justify-between gap-3 px-4 py-3">
+      {/* The rule is kept transparent rather than removed, so turning it on
+          costs no layout shift. It means "there is something above you" — at
+          the top of a list there is nothing to separate from, and drawing a
+          line anyway is what makes a header look stuck on. */}
+      <header
+        className={cn(
+          "bg-background sticky top-0 z-10 border-b transition-colors duration-200 pt-safe",
+          scrolled ? "border-border" : "border-transparent",
+        )}
+      >
+        <div
+          className={cn(
+            "flex items-end justify-between gap-3 px-4 transition-[padding] duration-200",
+            scrolled ? "py-2.5" : "pt-1 pb-3",
+          )}
+        >
           <div className="flex items-baseline gap-2">
+            {/* Big at rest, small once you are reading — the title gives up
+                its space to the thing it names. */}
             <h1
               onClick={revealProbes}
-              className="text-xl font-extrabold tracking-tight select-none"
+              className={cn(
+                "font-extrabold tracking-[-0.02em] transition-[font-size,line-height] duration-200 select-none",
+                scrolled ? "text-[17px]" : "text-[28px]",
+              )}
             >
-              {tab === "chats" ? "Messages" : tab === "contacts" ? "Contacts" : "Groups"}
+              {tab === "chats" ? "Chats" : tab === "contacts" ? "Contacts" : "Groups"}
             </h1>
             {relayStatus === "offline" && (
               <span className="text-destructive text-[11px] font-semibold">offline</span>
@@ -707,14 +738,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             size="icon"
             onClick={() => setProfileOpen(true)}
             aria-label="Your profile"
-            className="size-10 rounded-full"
+            className="size-10 shrink-0 rounded-full"
           >
             <AddressAvatar address={address} size="sm" />
           </Button>
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div
+        ref={listRef}
+        onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
         {tab === "chats" ? (
           <>
             <KnockRequests

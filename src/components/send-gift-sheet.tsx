@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { parseNim } from "@/lib/payments"
+import { reason } from "@/lib/reason"
 import { formatNim } from "@/lib/postage"
 import { cn } from "@/lib/utils"
 
@@ -81,7 +82,7 @@ export function SendGiftSheet({
       await onSend({ total_luna: luna, shares, split, note: note.trim() })
       onOpenChange(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't leave the gift")
+      setError(reason(e, "Couldn't leave the gift"))
     } finally {
       setSending(false)
     }

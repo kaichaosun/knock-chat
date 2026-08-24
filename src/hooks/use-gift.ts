@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 
 import { remember } from "@/lib/names"
+import { reason } from "@/lib/reason"
 import { claimGift, getGift, type GiftDetail } from "@/lib/relay"
 
 /**
@@ -46,7 +47,7 @@ export function useGift(id: string) {
       await claimGift(id)
       await refresh()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't take a share")
+      setError(reason(e, "Couldn't take a share"))
       // Somebody else may have emptied it while this was in flight, so what the
       // card shows should be re-read rather than left as it was.
       await refresh()

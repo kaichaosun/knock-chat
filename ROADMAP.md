@@ -47,7 +47,7 @@ in-memory.
 | Profile | Address with copy, your display name, and your own postage price. |
 | Names | A directory fed by whatever the app already asks for — contacts, knocks, a reachability check — held per identity and cached in storage so a name shows on a cold start. Sanitised again on the way in, since the relay is not the last word on what is safe to draw. Shown alone only in the chat list; everywhere identity matters it sits above the address, never in place of it. |
 | Avatars | Nimiq identicons (`identicons-esm`), generated from the address and cached per address. Costs ~31 kB gzip of shape table, which buys a contact the same face they have in the Nimiq Wallet and Nimiq Pay. |
-| Send NIM in a chat | A plus button in the composer opens a menu of things a message can be other than text; the one action there now is a transfer to the person you are talking to. The wallet moves the money, then a card is posted into the thread. Message plaintext is framed (`\0knock1\n` + JSON) so text still travels as itself and an unrecognised frame degrades to "not supported in this version" rather than raw JSON. Confirmed working on Android and iOS. |
+| Send NIM in a chat | A plus button in the composer opens a menu of things a message can be other than text; the one action there now is a transfer to the person you are talking to. The wallet moves the money, then a card is posted into the thread. Message plaintext is framed (`\x1fknock1\n` + JSON — a NUL at first, until Postgres refused one in a `text` column, which encryption had been hiding) so text still travels as itself and an unrecognised frame degrades to "not supported in this version" rather than raw JSON. Confirmed working on Android and iOS. |
 | Groups | Rooms in the chat list beside direct chats, told apart by a plain glyph rather than an identicon. A room view labels every incoming message with who said it and carries a standing "not encrypted" notice. Create with a name, a price and an approval switch; share by link (`?group=<id>`); the owner's controls live in the same sheet everyone else sees. Local history keys threads on `group ?? peer`, so a room and a direct chat with the same person stay apart. |
 | Deleting a room's chat | Hides it until something is said in it, the way closing a direct chat already worked. A room is not made of its messages — you are in it either way — so emptying the thread alone left the row sitting there looking untouched. Leaving is the other act, and it lives in Groups. |
 | Getting into a group | A link (`?group=<id>`), a pasted link or bare id, or a QR code shown in the group's info. Pasting is matched rather than parsed, so a link that picked up a fragment, a redirect wrapper or trailing punctuation still resolves — and a bare id works, which matters because whether Nimiq Pay preserves a query string through its deeplink is still unanswered. QR costs ~8.5 kB gzip and inherits its colour from CSS, so it stays readable in dark mode. |
@@ -147,6 +147,19 @@ in-memory.
 - **Gift payouts are unverified end to end.** Signing, serialization and the
   claim race are tested, and the transaction format was checked against a live
   mainnet node — but no gift has been funded, claimed and paid on a real chain.
+- **Gift funding has no receipt.** A gift is paid for before it exists, so a
+  failure between the wallet returning and the relay accepting strands the NIM
+  at the relay: no gift, no refund, nothing on either side tying the payment to
+  a person. Not observed in the wild, but knocks hit the same race often enough
+  to be given a backoff and a durable receipt, and gifts run the identical
+  sequence for more money. A 402 is now retried on a backoff, which covers the
+  likely cause (the transaction not yet visible to the RPC), but a closed tab
+  or a dead network still loses it. The receipt — survives a restart, redeemed
+  later — is the part still missing.
+
+  A payment to the relay wallet is only gift funding if its data field carries
+  a `knock:` commitment; an empty one is somebody sending NIM by hand. Worth
+  knowing before reading an unmatched transaction as a lost gift.
 
 - **Groups are not encrypted.** Direct messages are end-to-end encrypted;
   group bodies are plain text and the relay can read them. A deliberate cut for

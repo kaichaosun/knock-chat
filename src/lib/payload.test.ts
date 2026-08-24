@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { decode, encode, giftNote, invite, payment, preview, text } from "./payload"
 
 /** The frame marker, spelled out here so a test can forge one by hand. */
-const FRAME = "\u0000knock1\n"
+const FRAME = "\u001fknock1\n"
 
 describe("text", () => {
   it("travels as itself, so old messages and older clients still work", () => {
@@ -166,5 +166,22 @@ describe("gift", () => {
     const left = encode(giftNote(ID, 1_000_000, 5, "have some"))
     expect(preview(left, "out")).toBe("You left 10 NIM")
     expect(preview(left, "in")).toBe("Left 10 NIM for the room")
+  })
+})
+
+describe("the frame itself", () => {
+  it("carries nothing a text column will refuse", () => {
+    // It was a NUL byte until Postgres rejected one: `invalid byte sequence for
+    // encoding "UTF8": 0x00`. Encrypted messages hid it, since base64 has no
+    // NUL — a group message, stored as written, did not.
+    const framed = encode(giftNote("9d23068a-287d-407d-ac4c-53f20451c5e2", 100, 2, "hi"))
+    expect(framed).not.toContain("\u0000")
+  })
+
+  it("still cannot be typed", () => {
+    // The whole point of the marker: a person cannot produce one by writing a
+    // message, so "this is not text" stays a decision rather than a guess.
+    expect(decode("\u001f")).toEqual({ kind: "text", text: "\u001f" })
+    expect(decode("hello")).toEqual({ kind: "text", text: "hello" })
   })
 })

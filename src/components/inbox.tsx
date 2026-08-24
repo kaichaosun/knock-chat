@@ -39,7 +39,7 @@ export function Inbox({
 
   return (
     <div className="relative h-full">
-      <ul className="divide-border/60 divide-y px-2 pb-28">
+      <ul className="px-2 pb-28">
         {conversations.map((conversation) => (
           <ConversationRow
             key={conversation.key}
