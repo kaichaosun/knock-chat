@@ -3,6 +3,14 @@ import { Check, Copy, Loader2, ShieldOff, UserMinus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { QrCode } from "@/components/qr-code"
 import { Button } from "@/components/ui/button"
 import {
@@ -67,6 +75,9 @@ export function GroupSheet({
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [saving, setSaving] = useState<"name" | "price" | null>(null)
+  // Held until confirmed. It is a small icon in a list of faces, and getting
+  // somebody back in can cost them money — or be up to the owner entirely.
+  const [removing, setRemoving] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -110,6 +121,7 @@ export function GroupSheet({
     setBusy(address)
     try {
       await removeGroupMember(group.id, address)
+      setRemoving(null)
       onChanged()
       toast.success(
         group.requires_approval
@@ -403,7 +415,7 @@ export function GroupSheet({
                       variant="ghost"
                       aria-label={`Remove ${labelIn(names, address)}`}
                       disabled={busy === address}
-                      onClick={() => void remove(address)}
+                      onClick={() => setRemoving(address)}
                       className="text-muted-foreground size-9 shrink-0 rounded-full"
                     >
                       {busy === address ? (
@@ -419,6 +431,42 @@ export function GroupSheet({
           </section>
         </div>
       </SheetContent>
+
+      <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
+        <DialogContent className="max-w-[20rem] rounded-3xl">
+          <DialogHeader className="items-center">
+            {removing && <AddressAvatar address={removing} />}
+            <DialogTitle className="mt-2">Remove them?</DialogTitle>
+            {removing && nameIn(names, removing) && (
+              <p className="text-[15px] font-semibold">{nameIn(names, removing)}</p>
+            )}
+            <p className="font-mono text-[13px] font-semibold tracking-tight">
+              {removing ? shortenAddress(removing) : ""}
+            </p>
+            <DialogDescription className="text-balance">
+              {group.requires_approval
+                ? "They keep what they've already read and lose the room. Coming back means asking you again."
+                : group.join_price_luna > 0
+                  ? `They keep what they've already read and lose the room. Coming back would cost them ${formatNim(group.join_price_luna)} NIM again.`
+                  : "They keep what they've already read and lose the room — though with an open door they can walk straight back in."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setRemoving(null)}>
+              Keep
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={busy !== null}
+              className="h-11 rounded-2xl"
+              onClick={() => removing && void remove(removing)}
+            >
+              {busy === removing && <Loader2 className="animate-spin" />}
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   )
 }

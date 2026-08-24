@@ -171,13 +171,24 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [conversations, groups, dismissed],
   )
 
-  /** Open whichever kind of thread this key names. */
+  /**
+   * Open whichever kind of thread this key names.
+   *
+   * Membership cannot be the test. Being removed from a room takes it out of
+   * `groups` while its thread stays right where it was, and treating that key
+   * as an address means asking the relay about a uuid — which answers, truly
+   * and uselessly, that it is the wrong length. What the thread is made of is
+   * the thing that does not change.
+   */
   const openAnyThread = useCallback(
     (thread: string) => {
-      if (groups.some((group) => group.id === thread)) setOpenGroup(thread)
+      const isRoom =
+        groups.some((group) => group.id === thread) ||
+        threadWith(thread).some((message) => message.group === thread)
+      if (isRoom) setOpenGroup(thread)
       else setOpenPeer(thread)
     },
-    [groups],
+    [groups, threadWith],
   )
 
   const refreshGroupDetail = useCallback(async () => {
@@ -516,13 +527,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     </>
   )
 
-  const room = groups.find((group) => group.id === openGroup)
+  // A room you have been removed from still has its history, and the relay will
+  // still describe the room itself to anyone — just without its members. So the
+  // thread stays readable; only the composer goes.
+  const joined = groups.find((group) => group.id === openGroup)
+  const room = joined ?? (groupDetail?.group.id === openGroup ? groupDetail.group : undefined)
   if (openGroup && room) {
     return (
       <>
         <GroupRoom
           group={room}
           detail={groupDetail}
+          member={joined !== undefined}
           owner={address}
           messages={roomMessages}
           onBack={closeThreadView}

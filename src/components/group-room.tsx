@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, Info } from "lucide-react"
+import { ChevronLeft, DoorClosed, Info } from "lucide-react"
 
 import { Composer } from "@/components/composer"
 import { GroupAvatar } from "@/components/group-avatar"
@@ -22,6 +22,7 @@ import { dayLabel } from "@/lib/time"
 export function GroupRoom({
   group,
   detail,
+  member,
   owner,
   messages,
   onBack,
@@ -32,6 +33,8 @@ export function GroupRoom({
   group: Group
   /** Members and settings; null until the first read lands. */
   detail: GroupDetail | null
+  /** False once you are no longer in the room — history stays, writing goes. */
+  member: boolean
   owner: string
   messages: Message[]
   onBack: () => void
@@ -141,7 +144,19 @@ export function GroupRoom({
         <div ref={bottom} />
       </div>
 
-      <Composer onSend={onSay} onAttach={() => setDetails(true)} />
+      {member ? (
+        <Composer onSend={onSay} onAttach={() => setDetails(true)} />
+      ) : (
+        /* Read-only rather than gone: what was said is still yours to read, and
+           a composer that cannot send is worse than none. */
+        <div className="bg-background/85 border-t backdrop-blur-xl">
+          <p className="text-muted-foreground flex items-center justify-center gap-2 px-5 py-4 text-[13px]">
+            <DoorClosed className="size-4 shrink-0" />
+            You're not in this group any more.
+          </p>
+          <div className="pb-safe" />
+        </div>
+      )}
 
       <GroupSheet
         open={details}
