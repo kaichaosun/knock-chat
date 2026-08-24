@@ -147,6 +147,7 @@ export function GroupRoom({
                     onRetry={() => {}}
                     onOpenInvite={onOpenInvite}
                     channelOpen
+                    owner={owner}
                   />
                 </div>
               ))}

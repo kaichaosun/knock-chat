@@ -1,5 +1,7 @@
-import { Clock, Gift as GiftIcon, Loader2 } from "lucide-react"
+import { useState } from "react"
+import { ChevronRight, Clock, Gift as GiftIcon, Loader2 } from "lucide-react"
 
+import { GiftDetailSheet } from "@/components/gift-detail-sheet"
 import { Button } from "@/components/ui/button"
 import { useGift } from "@/hooks/use-gift"
 import type { GiftNote } from "@/lib/payload"
@@ -18,12 +20,16 @@ export function GiftCard({
   note,
   outgoing,
   faded,
+  owner,
 }: {
   note: GiftNote
   outgoing: boolean
   faded: boolean
+  /** Your address, so your own share is named in the breakdown. */
+  owner: string | null
 }) {
-  const { detail, claiming, error, claim } = useGift(note.gift)
+  const { detail, claiming, error, claim, refresh } = useGift(note.gift)
+  const [showing, setShowing] = useState(false)
 
   const gift = detail?.gift
   const shares = gift?.shares ?? note.shares
@@ -35,66 +41,103 @@ export function GiftCard({
   const expired = gift ? Date.parse(gift.expires_at) <= Date.now() : false
   const mine = detail?.claims.find((claim) => claim.amount_luna === yours)
 
+  const open = () => {
+    // Re-read on the way in: the card may have been sitting in a thread for a
+    // while, and the breakdown is the one place a stale number would show.
+    void refresh()
+    setShowing(true)
+  }
+
   return (
-    <div
-      className={cn(
-        "bg-card min-w-56 overflow-hidden rounded-2xl border shadow-sm",
-        faded && "opacity-60",
-      )}
-    >
-      <div className="brand-gradient flex items-center gap-3 px-3.5 py-3 text-white">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/20">
-          <GiftIcon className="size-4.5" strokeWidth={2} />
-        </span>
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold text-white/75">
-            {outgoing ? "You left a gift" : "A gift for the room"}
+    <>
+      {/* A div rather than a button: the claim control lives inside, and a
+          button holding a button is not valid markup. The role and key
+          handling put the keyboard back. */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={open}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault()
+            open()
+          }
+        }}
+        className={cn(
+          "bg-card min-w-56 cursor-pointer overflow-hidden rounded-2xl border text-left shadow-sm",
+          "focus-visible:ring-ring/60 focus-visible:ring-2 focus-visible:outline-none",
+          faded && "opacity-60",
+        )}
+      >
+        <div className="brand-gradient flex items-center gap-3 px-3.5 py-3 text-white">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/20">
+            <GiftIcon className="size-4.5" strokeWidth={2} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-white/75">
+              {outgoing ? "You left a gift" : "A gift for the room"}
+            </p>
+            <p className="text-xl leading-tight font-bold tabular-nums">
+              {formatNim(note.total_luna)} NIM
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2 px-3.5 py-2.5">
+          {note.note && <p className="text-[13px] leading-snug">{note.note}</p>}
+
+          {yours !== null ? (
+            // Taken. What it says next depends on whether the money actually
+            // moved, which is a different question from whether the share is
+            // yours — and the one people care about.
+            <p className="text-success flex items-center gap-1.5 text-[13px] font-semibold">
+              <GiftIcon className="size-3.5 shrink-0" />
+              You got {formatNim(yours)} NIM
+              {mine && !mine.payout_tx && (
+                <span className="text-muted-foreground font-normal">· sending</span>
+              )}
+            </p>
+          ) : expired ? (
+            <p className="text-muted-foreground flex items-center gap-1.5 text-[12px]">
+              <Clock className="size-3 shrink-0" />
+              Over — what was left went back to the sender.
+            </p>
+          ) : left === 0 ? (
+            <p className="text-muted-foreground text-[12px]">All gone.</p>
+          ) : (
+            <Button
+              size="sm"
+              disabled={claiming}
+              onClick={(event) => {
+                // The card underneath opens the breakdown; taking a share is
+                // its own act and must not do both.
+                event.stopPropagation()
+                void claim()
+              }}
+              className="h-9 w-full rounded-xl"
+            >
+              {claiming && <Loader2 className="animate-spin" />}
+              Take a share
+            </Button>
+          )}
+
+          {/* The count doubles as the way in — a line that was already there,
+              now saying it can be opened. */}
+          <p className="text-muted-foreground flex items-center gap-0.5 text-[11px] tabular-nums">
+            {claimed} of {shares} taken
+            <ChevronRight className="size-3" />
           </p>
-          <p className="text-xl leading-tight font-bold tabular-nums">
-            {formatNim(note.total_luna)} NIM
-          </p>
+
+          {error && <p className="text-destructive text-[12px] leading-snug">{error}</p>}
         </div>
       </div>
 
-      <div className="space-y-2 px-3.5 py-2.5">
-        {note.note && <p className="text-[13px] leading-snug">{note.note}</p>}
-
-        {yours !== null ? (
-          // Taken. What it says next depends on whether the money actually
-          // moved, which is a different question from whether the share is
-          // yours — and the one people care about.
-          <p className="text-success flex items-center gap-1.5 text-[13px] font-semibold">
-            <GiftIcon className="size-3.5 shrink-0" />
-            You got {formatNim(yours)} NIM
-            {mine && !mine.payout_tx && (
-              <span className="text-muted-foreground font-normal">· sending</span>
-            )}
-          </p>
-        ) : expired ? (
-          <p className="text-muted-foreground flex items-center gap-1.5 text-[12px]">
-            <Clock className="size-3 shrink-0" />
-            Over — what was left went back to the sender.
-          </p>
-        ) : left === 0 ? (
-          <p className="text-muted-foreground text-[12px]">All gone.</p>
-        ) : (
-          <Button
-            size="sm"
-            disabled={claiming}
-            onClick={() => void claim()}
-            className="h-9 w-full rounded-xl"
-          >
-            {claiming && <Loader2 className="animate-spin" />}
-            Take a share
-          </Button>
-        )}
-
-        <p className="text-muted-foreground text-[11px] tabular-nums">
-          {claimed} of {shares} taken
-        </p>
-
-        {error && <p className="text-destructive text-[12px] leading-snug">{error}</p>}
-      </div>
-    </div>
+      <GiftDetailSheet
+        open={showing}
+        onOpenChange={setShowing}
+        detail={detail}
+        owner={owner}
+      />
+    </>
   )
 }

@@ -22,6 +22,7 @@ export function MessageBubble({
   onRetry,
   onOpenInvite,
   channelOpen,
+  owner = null,
 }: {
   message: Message
   onRetry: (message: Message) => void
@@ -29,6 +30,8 @@ export function MessageBubble({
   onOpenInvite: (group: string) => void
   /** Whether messages can get through at all right now. */
   channelOpen: boolean
+  /** Your address. Only a gift card needs it, and gifts live in rooms. */
+  owner?: string | null
 }) {
   const outgoing = message.direction === "out"
   const failed = message.status === "failed" || message.status === "blocked"
@@ -54,7 +57,7 @@ export function MessageBubble({
         {payload.kind === "payment" ? (
           <PaymentCard payment={payload.payment} outgoing={outgoing} faded={failed} />
         ) : payload.kind === "gift" ? (
-          <GiftCard note={payload.giftNote} outgoing={outgoing} faded={failed} />
+          <GiftCard note={payload.giftNote} outgoing={outgoing} faded={failed} owner={owner} />
         ) : payload.kind === "invite" ? (
           <InviteCard
             invite={payload.invite}
