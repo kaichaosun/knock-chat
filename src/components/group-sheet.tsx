@@ -17,17 +17,22 @@ import { shortenAddress } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
 import { groupLink } from "@/lib/group-link"
 import { labelIn, nameIn, remember } from "@/lib/names"
+import { parseNim } from "@/lib/payments"
 import { formatNim } from "@/lib/postage"
 import {
   answerJoinRequest,
   listJoinRequests,
   removeGroupMember,
   updateGroup,
+  LUNA_PER_NIM,
   type Group,
   type GroupDetail,
   type JoinRequest,
 } from "@/lib/relay"
 import { cn } from "@/lib/utils"
+
+/** Offered as taps, the same shape the profile sheet uses for postage. */
+const JOIN_PRESETS_NIM = [0, 1, 10, 100]
 
 /**
  * What a room is, who is in it, and — for its owner — the controls.
@@ -57,6 +62,17 @@ export function GroupSheet({
   const mine = group.owner === owner
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [busy, setBusy] = useState<string | null>(null)
+  // Seeded from the room each time the sheet opens, so it never shows a stale
+  // value after the owner changed it on another device.
+  const [name, setName] = useState("")
+  const [price, setPrice] = useState("")
+  const [saving, setSaving] = useState<"name" | "price" | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    setName(group.name)
+    setPrice(group.join_price_luna === 0 ? "" : formatNim(group.join_price_luna))
+  }, [open, group.name, group.join_price_luna])
 
   const loadRequests = useCallback(async () => {
     if (!mine || !group.requires_approval) {
@@ -116,6 +132,38 @@ export function GroupSheet({
     }
   }
 
+  const saveName = async () => {
+    setSaving("name")
+    try {
+      await updateGroup(group.id, { name: name.trim() })
+      onChanged()
+      toast.success("Name saved")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't save")
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  /** Blank means free, which is a price rather than an empty field. */
+  const luna = price.trim() === "" ? 0 : parseNim(price)
+
+  const savePrice = async (value: number) => {
+    setSaving("price")
+    try {
+      await updateGroup(group.id, { join_price_luna: value })
+      setPrice(value === 0 ? "" : formatNim(value))
+      onChanged()
+      toast.success(
+        value === 0 ? "Anyone with the link can get in" : `Joining now costs ${formatNim(value)} NIM`,
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't save")
+    } finally {
+      setSaving(null)
+    }
+  }
+
   const members = detail?.members ?? []
 
   return (
@@ -154,6 +202,91 @@ export function GroupSheet({
               Messages in a group aren't encrypted.
             </p>
           </section>
+
+          {mine && (
+            <section>
+              <h3 className="text-sm font-semibold">Name</h3>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={name}
+                  disabled={saving !== null}
+                  onChange={(event) => setName(event.target.value)}
+                  aria-label="Group name"
+                  className={cn(
+                    "bg-muted min-w-0 flex-1 rounded-2xl px-4 py-3 font-medium outline-none",
+                    "focus-visible:ring-ring/60 focus-visible:ring-2",
+                  )}
+                />
+                <Button
+                  disabled={saving !== null || name.trim() === "" || name.trim() === group.name}
+                  onClick={() => void saveName()}
+                  className="h-12 rounded-2xl px-5"
+                >
+                  {saving === "name" ? <Loader2 className="animate-spin" /> : <Check />}
+                  Save
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {mine && (
+            <section>
+              <h3 className="text-sm font-semibold">Cost to join</h3>
+              <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
+                What someone new pays you to get in. Changing it leaves everyone already
+                here where they are.
+              </p>
+
+              <div className="mt-2 flex gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <input
+                    value={price}
+                    inputMode="decimal"
+                    disabled={saving !== null}
+                    placeholder="Free"
+                    aria-label="Cost to join, in NIM"
+                    aria-invalid={luna === null}
+                    onChange={(event) => setPrice(event.target.value.replace(/[^\d.]/g, ""))}
+                    className={cn(
+                      "bg-muted w-full rounded-2xl py-3 pr-14 pl-4 font-semibold tabular-nums outline-none",
+                      "placeholder:text-muted-foreground/70 placeholder:font-normal",
+                      "focus-visible:ring-ring/60 focus-visible:ring-2",
+                      luna === null && "ring-destructive ring-2",
+                    )}
+                  />
+                  <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm font-medium">
+                    NIM
+                  </span>
+                </div>
+                <Button
+                  disabled={saving !== null || luna === null || luna === group.join_price_luna}
+                  onClick={() => luna !== null && void savePrice(luna)}
+                  className="h-12 rounded-2xl px-5"
+                >
+                  {saving === "price" ? <Loader2 className="animate-spin" /> : <Check />}
+                  Save
+                </Button>
+              </div>
+
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {JOIN_PRESETS_NIM.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    disabled={saving !== null}
+                    onClick={() => void savePrice(preset * LUNA_PER_NIM)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
+                      "active:bg-muted disabled:opacity-50",
+                      group.join_price_luna === preset * LUNA_PER_NIM && "border-primary text-primary",
+                    )}
+                  >
+                    {preset === 0 ? "Free" : `${preset} NIM`}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           {mine && (
             <section>

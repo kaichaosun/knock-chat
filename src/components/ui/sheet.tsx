@@ -71,9 +71,9 @@ function SheetContent({
             // layout viewport — otherwise a sheet that opens the keyboard opens
             // behind it. See `--keyboard-inset` in lib/viewport.
             "bottom-[var(--keyboard-inset,0px)]",
-            // And never taller than what is left to show it in, so a long sheet
-            // scrolls itself instead of running off the top of the screen.
-            "max-h-[var(--app-height,100dvh)] overflow-y-auto",
+            // Stops short of the top: a sheet that reaches the very top reads
+            // as a page. A long one scrolls inside that instead of growing.
+            "max-h-[var(--sheet-max)] overflow-y-auto",
           ],
           className
         )}

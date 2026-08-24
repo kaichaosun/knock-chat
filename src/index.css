@@ -120,6 +120,11 @@
 
   html {
     --safe-bottom: env(safe-area-inset-bottom);
+    /* How much of the screen a bottom sheet leaves alone at the top. Without
+       it a tall sheet reaches the very top and stops reading as a sheet — the
+       gap is what shows there is a page behind it. */
+    --sheet-gap: calc(env(safe-area-inset-top) + 3rem);
+    --sheet-max: calc(var(--app-height, 100dvh) - var(--sheet-gap));
     /* The WebView must not rubber-band the whole page; only lists scroll. */
     height: 100%;
     overscroll-behavior: none;
@@ -130,6 +135,9 @@
      lib/viewport.ts. Without this the composer floats above the keyboard. */
   html[data-keyboard="open"] {
     --safe-bottom: 0px;
+    /* And little room to give away: keep the hint of a gap, spend the rest on
+       the content, which is what the keyboard was opened for. */
+    --sheet-gap: 0.75rem;
   }
 
   body {
