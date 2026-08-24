@@ -13,8 +13,14 @@ export function Composer({
   disabled,
 }: {
   onSend: (body: string) => void
-  /** Opens the menu of things a message can be other than text. */
-  onAttach: () => void
+  /**
+   * Opens the menu of things a message can be other than text.
+   *
+   * Optional, and the button is absent without it. A room has nothing to attach
+   * today, and a `+` that opened something else instead would be worse than no
+   * `+` at all.
+   */
+  onAttach?: () => void
   disabled?: boolean
 }) {
   const [value, setValue] = useState("")
@@ -44,17 +50,19 @@ export function Composer({
         {/* Disabled alongside the composer, not independently: a transfer would
             still go through with the door shut, but the note about it would
             not, leaving money moved and no record of it in the thread. */}
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          onClick={onAttach}
-          disabled={disabled}
-          aria-label="Send something else"
-          className="text-muted-foreground size-11 shrink-0 rounded-full"
-        >
-          <Plus className="size-5" />
-        </Button>
+        {onAttach && (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={onAttach}
+            disabled={disabled}
+            aria-label="Send something else"
+            className="text-muted-foreground size-11 shrink-0 rounded-full"
+          >
+            <Plus className="size-5" />
+          </Button>
+        )}
 
         <textarea
           ref={textarea}

@@ -26,6 +26,7 @@ export function Conversation({
   onRetry,
   onCopyAddress,
   onPay,
+  onOpenInvite,
 }: {
   peer: string
   messages: Message[]
@@ -39,6 +40,8 @@ export function Conversation({
   onCopyAddress: (address: string) => void
   /** Raises the wallet for a transfer, then posts the note into the thread. */
   onPay: (peer: string, luna: number) => Promise<void>
+  /** Open the door an invite card points at. */
+  onOpenInvite: (group: string) => void
 }) {
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -140,6 +143,7 @@ export function Conversation({
                     key={message.id}
                     message={message}
                     onRetry={onRetry}
+                    onOpenInvite={onOpenInvite}
                     channelOpen={!shut}
                   />
                 ))}

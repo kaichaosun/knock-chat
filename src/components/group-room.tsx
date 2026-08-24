@@ -29,6 +29,8 @@ export function GroupRoom({
   onSay,
   onRefreshDetail,
   onOpenChat,
+  onOpenInvite,
+  onInvite,
 }: {
   group: Group
   /** Members and settings; null until the first read lands. */
@@ -42,6 +44,10 @@ export function GroupRoom({
   onRefreshDetail: () => void
   /** Knock on a member — a room opens no channel, so this still costs. */
   onOpenChat: (address: string) => void
+  /** Open the door an invite card points at. */
+  onOpenInvite: (group: string) => void
+  /** Send this room's invite into your chat with somebody. */
+  onInvite: (address: string) => void
 }) {
   const names = useNames()
   const bottom = useRef<HTMLDivElement>(null)
@@ -134,6 +140,7 @@ export function GroupRoom({
                   <MessageBubble
                     message={message}
                     onRetry={() => {}}
+                    onOpenInvite={onOpenInvite}
                     channelOpen
                   />
                 </div>
@@ -145,7 +152,10 @@ export function GroupRoom({
       </div>
 
       {member ? (
-        <Composer onSend={onSay} onAttach={() => setDetails(true)} />
+        /* No `+`: there is nothing a room message can be but text yet. Group
+           details are the header's job, and were only wired here as a
+           placeholder. */
+        <Composer onSend={onSay} />
       ) : (
         /* Read-only rather than gone: what was said is still yours to read, and
            a composer that cannot send is worse than none. */
@@ -169,6 +179,7 @@ export function GroupRoom({
         owner={owner}
         onChanged={onRefreshDetail}
         onOpenChat={onOpenChat}
+        onInvite={onInvite}
       />
     </div>
   )

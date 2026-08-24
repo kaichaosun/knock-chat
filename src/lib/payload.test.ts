@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { decode, encode, payment, preview, text } from "./payload"
+import { decode, encode, invite, payment, preview, text } from "./payload"
 
 /** The frame marker, spelled out here so a test can forge one by hand. */
 const FRAME = "\u0000knock1\n"
@@ -83,5 +83,51 @@ describe("preview", () => {
 
   it("never leaks a frame into a chat list", () => {
     expect(preview(`${FRAME}{"kind":"image"}`, "in")).toBe("Unsupported message")
+  })
+})
+
+describe("invite", () => {
+  const ID = "9d23068a-287d-407d-ac4c-53f20451c5e2"
+
+  it("survives a round trip", () => {
+    expect(decode(encode(invite(ID, "Nimiq builders")))).toEqual({
+      kind: "invite",
+      invite: { group: ID, name: "Nimiq builders" },
+    })
+  })
+
+  it("keeps a nameless invite openable", () => {
+    // The name is decoration; the id is the part that has to work.
+    expect(decode(encode(invite(ID, "")))).toEqual({
+      kind: "invite",
+      invite: { group: ID, name: "" },
+    })
+  })
+
+  it("refuses one that points at nothing", () => {
+    // A card for an unopenable room would be a button that cannot work.
+    for (const group of ["", "not-a-uuid", "9d23068a"]) {
+      const forged = FRAME + JSON.stringify({ kind: "invite", group, name: "x" })
+      expect(decode(forged), group).toEqual({ kind: "unknown" })
+    }
+  })
+
+  it("reads an id out of a link, since that is what gets pasted around", () => {
+    const forged = FRAME + JSON.stringify({
+      kind: "invite",
+      group: `http://192.168.1.101:5175/?group=${ID}`,
+      name: "Lobby",
+    })
+    expect(decode(forged)).toMatchObject({ invite: { group: ID } })
+  })
+
+  it("reads differently from each end in a chat list", () => {
+    const shared = encode(invite(ID, "Lobby"))
+    expect(preview(shared, "out")).toBe("You shared Lobby")
+    expect(preview(shared, "in")).toBe("Invited you to Lobby")
+  })
+
+  it("says something sensible when the name is missing", () => {
+    expect(preview(encode(invite(ID, "")), "in")).toBe("Invited you to a group")
   })
 })

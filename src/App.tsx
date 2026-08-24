@@ -27,7 +27,7 @@ import { copyText } from "@/lib/clipboard"
 import { messageId, withRooms, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import type { Receipt } from "@/lib/receipts"
-import { encode as encodePayload, payment } from "@/lib/payload"
+import { encode as encodePayload, invite, payment } from "@/lib/payload"
 import { sendNim } from "@/lib/payments"
 import { formatNim } from "@/lib/postage"
 import { NoKeyError } from "@/lib/keys"
@@ -384,6 +384,28 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [wallet, send],
   )
 
+  /**
+   * Bring somebody into the open room, through the chat you have with them.
+   *
+   * The invite rides inside the encrypted body like any other message, so the
+   * relay never learns which room was shared — and because it *is* a message it
+   * can only go where a channel already exists. A group cannot become a way to
+   * reach somebody who has not let you in.
+   */
+  const onInviteToRoom = useCallback(
+    async (peer: string) => {
+      const room = groups.find((group) => group.id === openGroup)
+      if (!room) return
+      try {
+        await send(peer, encodePayload(invite(room.id, room.name)))
+        toast.success(`Invite sent — it's in your chat with them.`)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Couldn't send that invite")
+      }
+    },
+    [groups, openGroup, send],
+  )
+
   /** Knock on a door we already know, reusing the sheet the compose flow uses. */
   const knockOnOpenPeer = useCallback(() => {
     setKnockPeer(openPeer)
@@ -551,6 +573,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             setOpenGroup(null)
             openThread(peer)
           }}
+          onOpenInvite={openInvite}
+          onInvite={onInviteToRoom}
         />
         {groupSheets}
       </>
@@ -570,6 +594,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onRetry={onRetrySend}
           onCopyAddress={copy}
           onPay={onPay}
+          onOpenInvite={openInvite}
         />
         {knockSheet}
         {composeMenu}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { Check, Copy, Loader2, ShieldOff, UserMinus, X } from "lucide-react"
+import { Check, Copy, Loader2, ShieldOff, UserMinus, UserPlus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { PickContactSheet } from "@/components/pick-contact-sheet"
 import { QrCode } from "@/components/qr-code"
 import { Button } from "@/components/ui/button"
 import {
@@ -57,6 +58,7 @@ export function GroupSheet({
   owner,
   onChanged,
   onOpenChat,
+  onInvite,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -65,6 +67,8 @@ export function GroupSheet({
   owner: string
   onChanged: () => void
   onOpenChat: (address: string) => void
+  /** Send this room's invite into your chat with them. */
+  onInvite: (address: string) => void
 }) {
   const names = useNames()
   const mine = group.owner === owner
@@ -78,6 +82,7 @@ export function GroupSheet({
   // Held until confirmed. It is a small icon in a list of faces, and getting
   // somebody back in can cost them money — or be up to the owner entirely.
   const [removing, setRemoving] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -385,9 +390,21 @@ export function GroupSheet({
           )}
 
           <section>
-            <h3 className="text-sm font-semibold">
-              {members.length > 1 ? `${members.length} in the room` : "In the room"}
-            </h3>
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="text-sm font-semibold">
+                {members.length > 1 ? `${members.length} in the room` : "In the room"}
+              </h3>
+              {/* Anyone in the room can bring somebody in — an invite is only a
+                  message, and the door decides who actually gets through. */}
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="text-primary flex items-center gap-1 text-[13px] font-semibold"
+              >
+                <UserPlus className="size-3.5" />
+                Add someone
+              </button>
+            </div>
             <ul className="mt-2 space-y-1">
               {members.map((address) => (
                 <li key={address} className="flex items-center gap-3 rounded-2xl py-1.5">
@@ -431,6 +448,13 @@ export function GroupSheet({
           </section>
         </div>
       </SheetContent>
+
+      <PickContactSheet
+        open={adding}
+        onOpenChange={setAdding}
+        members={members}
+        onPick={onInvite}
+      />
 
       <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">

@@ -23,6 +23,7 @@
  * the chain, and no screen built on it should imply otherwise.
  */
 
+import { groupIdFrom } from "./group-link"
 import { formatNim } from "./postage"
 
 const FRAME = "\u0000knock1\n"
@@ -42,9 +43,25 @@ export type Payment = {
   reference: string | null
 }
 
+/**
+ * A room somebody is pointing you at.
+ *
+ * The name travels with it so the card can be drawn at once, offline, without
+ * asking the relay about a room you may not join — but it is the sender's copy
+ * of the name, not the room's. What it costs and what it is really called are
+ * fetched when the invite is opened, which is the moment that matters.
+ */
+export type Invite = {
+  /** The room's id. Everything else about it is looked up. */
+  group: string
+  /** What the sender called it. A label, checked against nothing. */
+  name: string
+}
+
 export type Payload =
   | { kind: "text"; text: string }
   | { kind: "payment"; payment: Payment }
+  | { kind: "invite"; invite: Invite }
   /** A frame this build does not understand — a newer client, or damage. */
   | { kind: "unknown" }
 
@@ -56,11 +73,18 @@ export function payment(luna: number, reference: string | null): Payload {
   return { kind: "payment", payment: { luna, reference } }
 }
 
+export function invite(group: string, name: string): Payload {
+  return { kind: "invite", invite: { group, name } }
+}
+
 /** Turn a payload into the plaintext that gets encrypted. */
 export function encode(payload: Payload): string {
   if (payload.kind === "text") return payload.text
   if (payload.kind === "payment") {
     return FRAME + JSON.stringify({ kind: "payment", ...payload.payment })
+  }
+  if (payload.kind === "invite") {
+    return FRAME + JSON.stringify({ kind: "invite", ...payload.invite })
   }
   // `unknown` is something this build received and could not read. Re-encoding
   // it would mean claiming to have understood it.
@@ -85,6 +109,15 @@ export function decode(plain: string): Payload {
       }
       const reference = typeof value.reference === "string" ? value.reference : null
       return { kind: "payment", payment: { luna, reference } }
+    }
+
+    if (value.kind === "invite") {
+      // A room id that is not a room id points at nothing openable, and a card
+      // for it would be a button that cannot work.
+      const group = typeof value.group === "string" ? groupIdFrom(value.group) : null
+      if (!group) return { kind: "unknown" }
+      const name = typeof value.name === "string" ? value.name.trim() : ""
+      return { kind: "invite", invite: { group, name } }
     }
   } catch {
     // Damaged frame. Falls through to `unknown`, which is what it is.
@@ -111,6 +144,10 @@ export function preview(plain: string, direction: "in" | "out"): string {
     case "payment": {
       const amount = `${formatNim(payload.payment.luna)} NIM`
       return direction === "out" ? `Sent ${amount}` : `Received ${amount}`
+    }
+    case "invite": {
+      const room = payload.invite.name || "a group"
+      return direction === "out" ? `You shared ${room}` : `Invited you to ${room}`
     }
     case "unknown":
       return "Unsupported message"

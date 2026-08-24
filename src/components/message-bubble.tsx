@@ -3,13 +3,15 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Check,
+  ChevronRight,
   Clock,
   HelpCircle,
   LockKeyhole,
+  Users,
 } from "lucide-react"
 
 import type { Message } from "@/lib/messages"
-import { decode, type Payment } from "@/lib/payload"
+import { decode, type Invite, type Payment } from "@/lib/payload"
 import { formatNim } from "@/lib/postage"
 import { clockTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
@@ -17,10 +19,13 @@ import { cn } from "@/lib/utils"
 export function MessageBubble({
   message,
   onRetry,
+  onOpenInvite,
   channelOpen,
 }: {
   message: Message
   onRetry: (message: Message) => void
+  /** Open the door an invite points at. */
+  onOpenInvite: (group: string) => void
   /** Whether messages can get through at all right now. */
   channelOpen: boolean
 }) {
@@ -47,6 +52,13 @@ export function MessageBubble({
       <div className={cn("max-w-[80%]", outgoing && "flex flex-col items-end")}>
         {payload.kind === "payment" ? (
           <PaymentCard payment={payload.payment} outgoing={outgoing} faded={failed} />
+        ) : payload.kind === "invite" ? (
+          <InviteCard
+            invite={payload.invite}
+            outgoing={outgoing}
+            faded={failed}
+            onOpen={() => onOpenInvite(payload.invite.group)}
+          />
         ) : (
           <div
             className={cn(
@@ -141,6 +153,51 @@ function PaymentCard({
         </p>
       </div>
     </div>
+  )
+}
+
+/**
+ * A room somebody pointed you at.
+ *
+ * A card rather than a link, and tapping it opens the door rather than the
+ * room: what it costs to get in has to be seen before anything is paid, and
+ * that is the join sheet's job. The name here is the sender's — whatever the
+ * room is really called is fetched on the way in.
+ */
+function InviteCard({
+  invite,
+  outgoing,
+  faded,
+  onOpen,
+}: {
+  invite: Invite
+  outgoing: boolean
+  faded: boolean
+  onOpen: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        "bg-card flex min-w-52 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left shadow-sm",
+        "active:bg-muted transition-colors",
+        faded && "opacity-60",
+      )}
+    >
+      <span className="bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-full">
+        <Users className="size-4.5" strokeWidth={2} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-muted-foreground text-[11px] font-semibold">
+          {outgoing ? "You shared a group" : "Group invite"}
+        </p>
+        <p className="truncate text-[15px] leading-tight font-bold">
+          {invite.name || "A group"}
+        </p>
+      </div>
+      <ChevronRight className="text-muted-foreground ml-auto size-4 shrink-0" />
+    </button>
   )
 }
 
