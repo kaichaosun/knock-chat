@@ -57,7 +57,12 @@ export function GroupAvatar({
       <div
         aria-hidden
         className={cn(
-          "bg-accent text-accent-foreground flex shrink-0 items-center justify-center rounded-2xl",
+          // Drawn from the foreground rather than from a surface token, so it
+          // holds against whatever is behind it. A fixed tint has to pick one
+          // background to look right on, and this appears on three: a plain
+          // row, a pinned row, and a sheet. `bg-accent` was one of them, and
+          // dissolved into the other two.
+          "bg-foreground/10 text-foreground/55 flex shrink-0 items-center justify-center rounded-2xl",
           SIZES[size],
           className,
         )}
@@ -71,7 +76,9 @@ export function GroupAvatar({
     <div
       aria-hidden
       className={cn(
-        "bg-accent grid shrink-0 overflow-hidden",
+        // The ground behind the faces, seen through the quarters a room with
+        // fewer than four members leaves empty. Same reasoning as above.
+        "bg-foreground/10 grid shrink-0 overflow-hidden",
         // The inset and the gap do the same job from opposite sides — an
         // identicon is a hexagon running nearly the full width of its box, so
         // without them the faces collide with each other and with the tile's
