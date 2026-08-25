@@ -1,6 +1,27 @@
-import { MessageSquare, UserRound, UsersRound } from "lucide-react"
+import { MessageSquare, UserRound } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+/**
+ * Three people, without drawing anybody.
+ *
+ * The tab beside this one is already a person, so a second person only says
+ * "more of the same" — and at 20px the difference between one head and two is
+ * a few grey pixels. A triangle of dots is a different shape rather than a
+ * bigger crowd, which is what actually separates them at a glance.
+ *
+ * Filled rather than outlined: a 20px circle drawn with a 2px stroke is mostly
+ * hole, and washes out next to two solid glyphs.
+ */
+function Huddle({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <circle cx="12" cy="6.2" r="3" />
+      <circle cx="6.1" cy="16.4" r="3" />
+      <circle cx="17.9" cy="16.4" r="3" />
+    </svg>
+  )
+}
 
 export type Tab = "chats" | "contacts" | "groups"
 
@@ -19,7 +40,7 @@ export function TabBar({
     { id: "contacts" as const, label: "Contacts", icon: UserRound, badge: 0 },
     // Rooms, not people — a different glyph so the two are told apart at the
     // size a tab bar gives them.
-    { id: "groups" as const, label: "Groups", icon: UsersRound, badge: 0 },
+    { id: "groups" as const, label: "Groups", icon: Huddle, badge: 0 },
   ]
 
   return (
