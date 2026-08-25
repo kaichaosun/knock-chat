@@ -81,18 +81,21 @@ export function Conversation({
   return (
     <div className="flex h-full flex-col">
       <header className="bg-background/85 sticky top-0 z-10 border-b backdrop-blur-xl pt-safe">
-        <div className="flex items-center gap-1.5 px-1.5 py-2">
+        {/* 44px targets and the same vertical padding as the app's own header
+            when it is scrolled, so a chat does not read as a smaller room than
+            the list it opened from. */}
+        <div className="flex items-center gap-2 px-1.5 py-2.5">
           <Button
             variant="ghost"
             size="icon"
             onClick={onBack}
             aria-label="Back to messages"
-            className="size-10 shrink-0 rounded-full"
+            className="size-11 shrink-0 rounded-full"
           >
-            <ChevronLeft className="size-5" />
+            <ChevronLeft className="size-6" />
           </Button>
 
-          <AddressAvatar address={peer} size="sm" />
+          <AddressAvatar address={peer} size="sm" className="size-9" />
 
           {/* Name over address, never name instead of it. This header is the
               one place you are always looking at while reading what someone
@@ -108,13 +111,13 @@ export function Conversation({
           >
             {name ? (
               <>
-                <p className="truncate text-[15px] leading-tight font-semibold">{name}</p>
-                <p className="text-muted-foreground truncate font-mono text-[11px] tracking-tight">
+                <p className="truncate text-[17px] leading-tight font-semibold">{name}</p>
+                <p className="text-muted-foreground truncate font-mono text-[12px] tracking-tight">
                   {shortenAddress(peer)}
                 </p>
               </>
             ) : (
-              <p className="truncate font-mono text-[13px] font-semibold tracking-tight">
+              <p className="truncate font-mono text-[15px] font-semibold tracking-tight">
                 {shortenAddress(peer)}
               </p>
             )}
@@ -128,11 +131,10 @@ export function Conversation({
             size="icon"
             onClick={() => setShowing(true)}
             aria-label="Contact info"
-            className="size-10 shrink-0 rounded-full"
+            className="size-11 shrink-0 rounded-full"
           >
-            <Info className="size-5" />
+            <Info className="size-6" />
           </Button>
-
         </div>
       </header>
 

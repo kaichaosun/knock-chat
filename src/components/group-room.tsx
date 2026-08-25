@@ -77,26 +77,30 @@ export function GroupRoom({
   return (
     <div className="flex h-full flex-col">
       <header className="bg-background/85 sticky top-0 z-10 border-b backdrop-blur-xl pt-safe">
-        <div className="flex items-center gap-1.5 px-1.5 py-2">
+        {/* Sized with the one-to-one header in conversation.tsx — the two sit
+            at the same depth in the app and a room reading as the smaller of
+            them would be a difference that means nothing. */}
+        <div className="flex items-center gap-2 px-1.5 py-2.5">
           <Button
             variant="ghost"
             size="icon"
             onClick={onBack}
             aria-label="Back to messages"
-            className="size-10 shrink-0 rounded-full"
+            className="size-11 shrink-0 rounded-full"
           >
-            <ChevronLeft className="size-5" />
+            <ChevronLeft className="size-6" />
           </Button>
 
-          <GroupAvatar size="sm" members={detail?.members} />
+          <GroupAvatar size="sm" members={detail?.members} className="size-9" />
 
           <button
             type="button"
             onClick={() => setDetails(true)}
-            className="min-w-0 flex-1 px-1 text-left"
+            aria-label="Group details"
+            className="min-w-0 flex-1 px-1 text-left active:opacity-60"
           >
-            <p className="truncate text-[15px] leading-tight font-semibold">{group.name}</p>
-            <p className="text-muted-foreground truncate text-[11px]">
+            <p className="truncate text-[17px] leading-tight font-semibold">{group.name}</p>
+            <p className="text-muted-foreground truncate text-[12px]">
               {memberCount === 0
                 ? "Tap for details"
                 : memberCount === 1
@@ -110,9 +114,9 @@ export function GroupRoom({
             size="icon"
             onClick={() => setDetails(true)}
             aria-label="Group details"
-            className="size-10 shrink-0 rounded-full"
+            className="size-11 shrink-0 rounded-full"
           >
-            <Info className="size-4" />
+            <Info className="size-6" />
           </Button>
         </div>
       </header>
