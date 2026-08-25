@@ -835,6 +835,17 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           owner={address}
           messages={roomMessages}
           onBack={closeThreadView}
+          onDeleteChat={() => {
+            if (!openGroup) return
+            const thread = openGroup
+            // Out of the room first: what is being deleted is what is on
+            // screen, and there is nothing left to come back to.
+            closeThreadView()
+            deleteThread(thread)
+            forgetRoom(thread)
+            unpin(thread)
+            toast.success("Chat deleted.")
+          }}
           onSay={onSay}
           onRefreshDetail={() => {
             void refreshGroupDetail()

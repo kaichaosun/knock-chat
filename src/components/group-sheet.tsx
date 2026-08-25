@@ -56,6 +56,7 @@ export function GroupSheet({
   owner,
   onChanged,
   onDisbanded,
+  onDeleteChat,
   onOpenChat,
   onInvite,
 }: {
@@ -69,6 +70,8 @@ export function GroupSheet({
   onChanged: () => void
   /** Leave the room behind — it is not there to stay in. */
   onDisbanded: () => void
+  /** Offered only once the room is gone: the thread is all that is left of it. */
+  onDeleteChat: () => void
   onOpenChat: (address: string) => void
   /** Send this room's invite into your chat with them. */
   onInvite: (address: string) => void
@@ -233,6 +236,35 @@ export function GroupSheet({
             QR, the price, who is in it, ending it. A disbanded room is not
             there to act on, so the sheet keeps only its name and what became
             of it, above. */}
+        {gone && (
+          <div className="pb-8">
+            {/* The same row as the owner's disband, because it is the same kind
+                of thing: the last act available on a room, in red. What it ends
+                is smaller — a copy on one phone rather than a place for
+                everyone — so it says so plainly rather than asking twice. */}
+            <button
+              type="button"
+              onClick={() => {
+                onOpenChange(false)
+                onDeleteChat()
+              }}
+              className="active:bg-muted flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors"
+            >
+              <span className="bg-destructive/10 text-destructive flex size-11 shrink-0 items-center justify-center rounded-2xl">
+                <Trash2 className="size-5" strokeWidth={1.75} />
+              </span>
+              <span className="min-w-0">
+                <span className="text-destructive block text-[15px] font-semibold">
+                  Delete chat
+                </span>
+                <span className="text-muted-foreground block text-[13px] leading-snug">
+                  Takes the messages off this phone.
+                </span>
+              </span>
+            </button>
+          </div>
+        )}
+
         {!gone && (
           <div className="space-y-6 pb-8">
             <section className="space-y-2">

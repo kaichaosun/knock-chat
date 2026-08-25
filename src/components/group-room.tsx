@@ -28,6 +28,7 @@ export function GroupRoom({
   owner,
   messages,
   onBack,
+  onDeleteChat,
   onSay,
   onRefreshDetail,
   onOpenChat,
@@ -45,6 +46,8 @@ export function GroupRoom({
   owner: string
   messages: Message[]
   onBack: () => void
+  /** Offered only once the room is gone: the thread is all that is left. */
+  onDeleteChat: () => void
   onSay: (body: string) => void
   onRefreshDetail: () => void
   /** Knock on a member — a room opens no channel, so this still costs. */
@@ -214,6 +217,7 @@ export function GroupRoom({
         // The same way out the back arrow uses: to whichever list this was
         // opened from, where the room is now missing.
         onDisbanded={onBack}
+        onDeleteChat={onDeleteChat}
         onOpenChat={onOpenChat}
         onInvite={onInvite}
       />
