@@ -170,7 +170,6 @@ export function KnockSheet({
           ) : (
           <div className="relative">
             <input
-              autoFocus
               value={value}
               inputMode="text"
               autoCapitalize="characters"

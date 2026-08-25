@@ -57,6 +57,22 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        // Radix focuses the first tabbable thing in a sheet as it opens. On a
+        // phone that means the keyboard rises over the sheet before it has been
+        // read — and the field it lands on is whichever one happens to be first
+        // in the DOM, which is nobody's decision. Focus the panel itself
+        // instead: the trap and the screen-reader announcement both still work,
+        // and nothing types.
+        //
+        // A field that genuinely wants the caret asks for it with `autoFocus`.
+        // React applies that during the commit, before this runs, and Radix
+        // leaves focus alone once it is already inside the panel.
+        tabIndex={-1}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          const panel = event.currentTarget as HTMLElement | null
+          panel?.focus({ preventScroll: true })
+        }}
         className={cn(
           "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
           side === "right" &&
