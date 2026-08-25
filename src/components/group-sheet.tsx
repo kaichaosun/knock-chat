@@ -34,15 +34,11 @@ import {
   listJoinRequests,
   removeGroupMember,
   updateGroup,
-  LUNA_PER_NIM,
   type Group,
   type GroupDetail,
   type JoinRequest,
 } from "@/lib/relay"
 import { cn } from "@/lib/utils"
-
-/** Offered as taps, the same shape the profile sheet uses for postage. */
-const JOIN_PRESETS_NIM = [0, 1, 10, 100]
 
 /**
  * What a room is, who is in it, and — for its owner — the controls.
@@ -282,7 +278,7 @@ export function GroupSheet({
                     onClick={() => void saveName()}
                     className="h-12 rounded-2xl px-5"
                   >
-                    {saving === "name" ? <Loader2 className="animate-spin" /> : <Check />}
+                    {saving === "name" && <Loader2 className="animate-spin" />}
                     Save
                   </Button>
                 </div>
@@ -323,27 +319,9 @@ export function GroupSheet({
                     onClick={() => luna !== null && void savePrice(luna)}
                     className="h-12 rounded-2xl px-5"
                   >
-                    {saving === "price" ? <Loader2 className="animate-spin" /> : <Check />}
+                    {saving === "price" && <Loader2 className="animate-spin" />}
                     Save
                   </Button>
-                </div>
-
-                <div className="mt-2.5 flex flex-wrap gap-2">
-                  {JOIN_PRESETS_NIM.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      disabled={saving !== null}
-                      onClick={() => void savePrice(preset * LUNA_PER_NIM)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
-                        "active:bg-muted disabled:opacity-50",
-                        group.join_price_luna === preset * LUNA_PER_NIM && "border-primary text-primary",
-                      )}
-                    >
-                      {preset === 0 ? "Free" : `${preset} NIM`}
-                    </button>
-                  ))}
                 </div>
               </section>
             )}
