@@ -33,6 +33,8 @@ export function SwipeRow({
   revealed,
   onReveal,
   onLongPress,
+  className,
+  surface,
   children,
 }: {
   /** Read out for the Delete button; say what is being deleted. */
@@ -43,6 +45,13 @@ export function SwipeRow({
   onReveal: (open: boolean) => void
   /** Fires when the finger stays put. Omit and the row has no press. */
   onLongPress?: () => void
+  /** For the row's outer shape — rounding a run of rows into one block. */
+  className?: string
+  /**
+   * What the row is drawn on. Must be opaque: the Delete panel sits underneath
+   * and would wash through anything less.
+   */
+  surface?: string
   children: ReactNode
 }) {
   // Tracked in a ref rather than state: this updates on every touchmove, and
@@ -81,6 +90,7 @@ export function SwipeRow({
         "relative overflow-hidden rounded-2xl",
         "after:bg-border/70 after:pointer-events-none after:absolute after:right-4",
         "after:bottom-0 after:left-[4.375rem] after:h-px last:after:hidden",
+        className,
       )}
     >
       {/* Grows in from the right edge as the row slides, so it is never wider than
@@ -157,10 +167,10 @@ export function SwipeRow({
           else onClick()
         }}
         className={cn(
+          "relative flex w-full items-center gap-3.5 px-3 py-3.5 text-left transition-colors",
           // Opaque, always: a translucent row would let the Delete panel wash
           // through it while the finger is down.
-          "bg-background relative flex w-full items-center gap-3.5 px-3 py-3.5 text-left",
-          "active:bg-muted transition-colors",
+          surface ?? "bg-background active:bg-muted",
           // Otherwise iOS answers a held finger with its own text-selection
           // callout, on top of whatever the press opened.
           onLongPress && "[-webkit-touch-callout:none] select-none",

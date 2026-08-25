@@ -50,6 +50,11 @@ export function Inbox({
   // list arrived in. Done here rather than upstream because a pin is a fact
   // about this device, and the thread list is a fact about the relay.
   const ordered = arrange(conversations, pins)
+  // How far down the block reaches. `arrange` puts pinned rows first, so this
+  // is a count rather than a search — and rows whose thread has not loaded yet
+  // are not in the list, so it counts what is drawn rather than what is held.
+  const heldUp = ordered.findIndex((conversation) => !isPinned(pins, conversation.key))
+  const pinnedCount = heldUp === -1 ? ordered.length : heldUp
 
   return (
     // `min-h-full`, not `h-full`: the button below sticks to the bottom of the
@@ -60,7 +65,7 @@ export function Inbox({
     <div className="relative min-h-full">
       {/* Room for the button when there is one to clear. */}
       <ul className={cn("px-2", floating ? "pb-28" : "pb-24")}>
-        {ordered.map((conversation) => (
+        {ordered.map((conversation, index) => (
           <ConversationRow
             key={conversation.key}
             conversation={conversation}
@@ -68,7 +73,9 @@ export function Inbox({
             names={names}
             onOpen={onOpen}
             onDelete={onDelete}
-            pinned={isPinned(pins, conversation.key)}
+            pinned={index < pinnedCount}
+            blockStart={index === 0}
+            blockEnd={index === pinnedCount - 1}
             onLongPress={() => setHolding(conversation)}
             revealed={revealed === conversation.key}
             onReveal={(open) => setRevealed(open ? conversation.key : null)}
@@ -153,6 +160,8 @@ function ConversationRow({
   onOpen,
   onDelete,
   pinned,
+  blockStart,
+  blockEnd,
   onLongPress,
   revealed,
   onReveal,
@@ -164,6 +173,9 @@ function ConversationRow({
   onOpen: (thread: string) => void
   onDelete: (thread: string) => void
   pinned: boolean
+  /** Where this row sits in the pinned block, so only its ends are rounded. */
+  blockStart: boolean
+  blockEnd: boolean
   onLongPress: () => void
   revealed: boolean
   onReveal: (open: boolean) => void
@@ -190,6 +202,16 @@ function ConversationRow({
       onLongPress={onLongPress}
       revealed={revealed}
       onReveal={onReveal}
+      // One tinted block rather than a mark on every row: what is being said is
+      // that these belong together and sit above the rest, which is a fact
+      // about the group and not about any row in it. Rounded at the ends only,
+      // so a run of them reads as one shape instead of a stack of chips.
+      surface={pinned ? "bg-accent active:brightness-95" : undefined}
+      className={cn(
+        pinned && "rounded-none",
+        pinned && blockStart && "rounded-t-2xl",
+        pinned && blockEnd && "rounded-b-2xl",
+      )}
     >
       {group ? <GroupAvatar members={room?.members} /> : peer && <AddressAvatar address={peer} />}
 
@@ -204,11 +226,7 @@ function ConversationRow({
           >
             {title ?? (peer ? shortenAddress(peer) : "")}
           </span>
-          <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-[11px] tabular-nums">
-            {/* Beside the time, because the time is what a pinned row is no
-                longer sorted by — the mark is the answer to "why is this one
-                up here". */}
-            {pinned && <Pin className="size-3 -rotate-45" />}
+          <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
             {relativeTime(at)}
           </span>
         </div>
