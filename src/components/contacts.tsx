@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState, type Dispatch, type SetStateAction } from "react"
 import { DoorOpen, Loader2, Users } from "lucide-react"
 import { toast } from "sonner"
 
@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/dialog"
 import { shortenAddress } from "@/lib/address"
 import { useNames } from "@/hooks/use-names"
-import { forget, labelIn, nameIn, remember, type Directory } from "@/lib/names"
-import { listContacts, removeContact, type Contact } from "@/lib/relay"
+import { forget, labelIn, nameIn, type Directory } from "@/lib/names"
+import { removeContact, type Contact } from "@/lib/relay"
 import { relativeTime } from "@/lib/time"
 
 /**
@@ -49,37 +49,26 @@ function PeerName({ address, names }: { address: string; names: Directory }) {
  * exactly the case where a chat list is empty and useless.
  */
 export function Contacts({
-  signedIn,
+  contacts,
+  setContacts,
+  error,
   onOpen,
   onRemoved,
 }: {
-  signedIn: boolean
+  /** Null until the first read lands. Held above this screen so it survives a
+   *  trip to another tab — see [`useContacts`]. */
+  contacts: Contact[] | null
+  setContacts: Dispatch<SetStateAction<Contact[] | null>>
+  error: string
   onOpen: (peer: string) => void
   /** Called once the relay has confirmed, so the chat goes with the channel. */
   onRemoved: (peer: string) => void
 }) {
   const names = useNames()
-  const [contacts, setContacts] = useState<Contact[] | null>(null)
-  const [error, setError] = useState("")
   const [revealed, setRevealed] = useState<string | null>(null)
   // Held until confirmed: removing costs the other side real money to undo, so
   // it does not happen on a gesture alone.
   const [confirming, setConfirming] = useState<Contact | null>(null)
-
-  useEffect(() => {
-    if (!signedIn) return
-    let cancelled = false
-    listContacts()
-      .then((r) => {
-        if (cancelled) return
-        remember(r.names)
-        setContacts(r.contacts)
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Couldn't load"))
-    return () => {
-      cancelled = true
-    }
-  }, [signedIn])
 
   async function remove(contact: Contact) {
     setConfirming(null)

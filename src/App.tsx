@@ -19,6 +19,7 @@ import { GroupRoom } from "@/components/group-room"
 import { JoinByLinkSheet } from "@/components/join-by-link-sheet"
 import { JoinGroupSheet } from "@/components/join-group-sheet"
 import { SendGiftSheet } from "@/components/send-gift-sheet"
+import { useContacts } from "@/hooks/use-contacts"
 import { useGroups } from "@/hooks/use-groups"
 import { useKnocks } from "@/hooks/use-knocks"
 import { usePrefs } from "@/hooks/use-prefs"
@@ -125,6 +126,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     join,
     say,
   } = useGroups(wallet, owner)
+
+  // Above the tab switch, so leaving Contacts does not throw the list away and
+  // make every return a cold start. The rooms above already worked this way.
+  const { contacts, setContacts, error: contactsError } = useContacts(Boolean(owner), owner)
 
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [knocking, setKnocking] = useState(false)
@@ -970,7 +975,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             />
           </>
         ) : tab === "contacts" ? (
-          <Contacts signedIn onOpen={openThread} onRemoved={deleteThread} />
+          <Contacts
+            contacts={contacts}
+            setContacts={setContacts}
+            error={contactsError}
+            onOpen={openThread}
+            onRemoved={deleteThread}
+          />
         ) : (
           <Groups
             groups={groups}
