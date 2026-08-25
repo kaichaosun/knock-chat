@@ -487,7 +487,7 @@ export function GroupSheet({
                 Disband group
               </Button>
               <p className="text-muted-foreground mt-1 px-3 text-[13px] leading-snug">
-                Ends the room for everyone. Nobody is charged, and nobody is refunded.
+                Ends the room for everyone.
               </p>
             </section>
           )}
@@ -505,55 +505,63 @@ export function GroupSheet({
           person's own data; this one ends a place other people are using, and
           the cost of getting it wrong is not yours to pay. Asking for the name
           makes it impossible to do by accident and impossible to do to the
-          wrong room. */}
-      <Dialog open={disbanding} onOpenChange={(open) => !open && setDisbanding(false)}>
-        <DialogContent className="max-w-[21rem] rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Disband {group.name}?</DialogTitle>
-            <DialogDescription className="text-balance">
+          wrong room.
+
+          A sheet rather than a dialog, because it asks for typing: only the
+          sheet is anchored above the keyboard (`--keyboard-inset`), and only
+          the sheet refuses Radix's grab at the first field — a centred dialog
+          would raise the keyboard on open and then sit behind it. */}
+      <Sheet open={disbanding} onOpenChange={(open) => !open && setDisbanding(false)}>
+        <SheetContent
+          side="bottom"
+          className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe"
+        >
+          <SheetHeader className="px-0">
+            <SheetTitle>Disband {group.name}?</SheetTitle>
+            <SheetDescription>
               The room ends for everyone in it. Nobody can post or rejoin, and what
               people were charged to join is not refunded. Everyone keeps the messages
               already on their phone until they delete the chat.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          <label className="text-muted-foreground block text-[13px]">
-            Type <span className="text-foreground font-semibold">{group.name}</span> to
-            confirm
-            <input
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              aria-label={`Type ${group.name} to confirm`}
-              className={cn(
-                "bg-muted mt-2 w-full rounded-2xl px-4 py-3 font-medium outline-none",
-                "focus-visible:ring-ring/60 focus-visible:ring-2",
-              )}
-            />
-          </label>
+          <div className="space-y-3 pb-8">
+            <label className="text-muted-foreground block text-[13px]">
+              Type <span className="text-foreground font-semibold">{group.name}</span> to
+              confirm
+              <input
+                value={typed}
+                onChange={(event) => setTyped(event.target.value)}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-label={`Type ${group.name} to confirm`}
+                className={cn(
+                  "bg-muted mt-2 w-full rounded-2xl px-4 py-3.5 font-medium outline-none",
+                  "focus-visible:ring-ring/60 focus-visible:ring-2",
+                )}
+              />
+            </label>
 
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="ghost"
-              className="h-11 rounded-2xl"
-              onClick={() => setDisbanding(false)}
-            >
-              Keep it
-            </Button>
             <Button
               variant="destructive"
               disabled={!named || ending}
-              className="h-11 rounded-2xl"
               onClick={() => void disband()}
+              className="h-13 w-full rounded-2xl text-base"
             >
               {ending && <Loader2 className="animate-spin" />}
               Disband
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button
+              variant="ghost"
+              onClick={() => setDisbanding(false)}
+              className="text-muted-foreground h-11 w-full rounded-2xl"
+            >
+              Keep it
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
