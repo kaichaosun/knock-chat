@@ -233,7 +233,13 @@ export function KnockSheet({
             </div>
           )}
 
-          {reach && !reach.channel_open && !reach.knock_pending && (
+          {/* The whole task, from the moment the sheet opens: address, message,
+              knock. Waiting for the relay before drawing the last two left it
+              opening as a stub and then jumping twice as an address was typed —
+              and a sheet whose height is set by how far through you are is one
+              you cannot see the shape of before you start. What the relay
+              answers changes what the button says, not whether it is there. */}
+          {!reach?.channel_open && !reach?.knock_pending && (
             <>
               {alreadyPaid && (
                 <p className="text-muted-foreground px-1 text-[12px] leading-snug">
@@ -256,7 +262,7 @@ export function KnockSheet({
 
               <Button
                 size="lg"
-                disabled={!body.trim() || sending}
+                disabled={!reach || !body.trim() || sending}
                 onClick={submit}
                 className="h-13 w-full rounded-2xl text-base"
               >
@@ -269,11 +275,13 @@ export function KnockSheet({
               </Button>
 
               <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-                {alreadyPaid
-                  ? "You've already paid for this one. Sending it again won't charge you."
-                  : cost === 0
-                    ? "They've made themselves free to reach."
-                    : `They keep the ${formatNim(cost)} NIM whether or not they answer.`}
+                {!reach
+                  ? "Enter their address to see what it costs."
+                  : alreadyPaid
+                    ? "You've already paid for this one. Sending it again won't charge you."
+                    : cost === 0
+                      ? "They've made themselves free to reach."
+                      : `They keep the ${formatNim(cost)} NIM whether or not they answer.`}
               </p>
             </>
           )}
