@@ -69,7 +69,9 @@ export function MessageBubble({
           <div
             className={cn(
               "rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug whitespace-pre-wrap",
-              "wrap-anywhere",
+              // What someone wrote is worth lifting out of the page, so it opts
+              // back in to the selection the body switched off.
+              "wrap-anywhere select-text",
               outgoing
                 ? "brand-gradient rounded-br-md text-white shadow-sm"
                 : "bg-muted text-foreground rounded-bl-md",

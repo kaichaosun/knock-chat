@@ -148,8 +148,35 @@
     overflow: hidden;
     display: flex;
     justify-content: center;
-    /* A tap should never select text or flash a highlight in a native shell. */
+    /*
+     * A tap should never select text or flash a highlight in a native shell.
+     *
+     * WebKit is the only engine that turns a long press on ordinary text into
+     * a selection with a native callout — Open, Look Up, Translate — and the
+     * callout follows the selection rather than the element, landing wherever
+     * the finger is when the press completes. For a held list row that is the
+     * sheet which just opened underneath it, so scoping the rule to sheets was
+     * never going to be enough: the gesture starts before the sheet exists.
+     *
+     * Off by default everywhere, then, with the exceptions named below. Both
+     * properties are WebKit-only; no other engine needs telling.
+     */
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /*
+   * Where text is the point rather than the furniture: a field being edited,
+   * and what somebody wrote to you. `select-value` is absent on purpose — it is
+   * a utility, and utilities already outrank anything in this layer.
+   */
+  input,
+  textarea,
+  .select-text {
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   /*
