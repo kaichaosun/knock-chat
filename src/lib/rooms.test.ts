@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { adopt, forget, remember, roomIn, snapshot } from "./rooms"
+import { adopt, forget, markGone, remember, roomIn, snapshot } from "./rooms"
 import type { Group } from "./relay"
 
 const ME = "NQ34 248H 7RGK 4V8V 84HS PSA3 QYE8 EA1T 7HY2"
@@ -57,6 +57,41 @@ describe("remembering rooms", () => {
     const settled = snapshot()
     remember([room("a", "Lobby")])
     expect(snapshot()).toBe(settled)
+  })
+
+  it("drops the faces when a room ends", () => {
+    // The mosaic is drawn from the people who were in a room. A room that no
+    // longer exists is not somewhere anybody is.
+    remember([{ ...room("a", "Lobby"), members: [ME] }])
+    expect(roomIn(snapshot(), "a")?.members).toEqual([ME])
+    markGone("a")
+    expect(roomIn(snapshot(), "a")?.members).toBeUndefined()
+    expect(roomIn(snapshot(), "a")?.gone).toBe(true)
+    expect(roomIn(snapshot(), "a")?.name).toBe("Lobby")
+  })
+
+  it("stays ended even if an older list still mentions it", () => {
+    remember([{ ...room("a", "Lobby"), members: [ME] }])
+    markGone("a")
+    remember([{ ...room("a", "Lobby"), members: [ME] }])
+    expect(roomIn(snapshot(), "a")?.gone).toBe(true)
+    expect(roomIn(snapshot(), "a")?.members).toBeUndefined()
+  })
+
+  it("does not churn when told twice that a room ended", () => {
+    remember([room("a", "Lobby")])
+    markGone("a")
+    const settled = snapshot()
+    markGone("a")
+    expect(snapshot()).toBe(settled)
+  })
+
+  it("remembers the ending across a reload", () => {
+    remember([room("a", "Lobby")])
+    markGone("a")
+    adopt(null)
+    adopt(ME)
+    expect(roomIn(snapshot(), "a")?.gone).toBe(true)
   })
 
   it("forgets one outright", () => {

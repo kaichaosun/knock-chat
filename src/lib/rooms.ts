@@ -19,8 +19,18 @@ import type { Group } from "./relay"
 
 const STORAGE_PREFIX = "knock.rooms."
 
+/**
+ * A room as this device last knew it.
+ *
+ * `gone` is written when the relay answers that the room is not there any more.
+ * It is kept rather than derived because "not in your list of rooms" is also
+ * true of a room you were removed from, which is still a place — and the two
+ * should not look the same.
+ */
+export type RememberedRoom = Group & { gone?: true }
+
 /** Rooms by id, as the relay last described them. */
-export type Rooms = Record<string, Group>
+export type Rooms = Record<string, RememberedRoom>
 
 let owner: string | null = null
 let rooms: Rooms = {}
@@ -87,11 +97,26 @@ export function remember(seen: Group[]): void {
   const next = { ...rooms }
   for (const room of seen) {
     const held = next[room.id]
+    if (held?.gone) continue
     if (held && held.name === room.name && held.owner === room.owner) continue
     next[room.id] = room
     changed = true
   }
   if (changed) commit(next)
+}
+
+/**
+ * Note that a room has ended.
+ *
+ * Its faces go with it. The mosaic is drawn from the people who were in a room,
+ * and a room that no longer exists is not somewhere anybody is — keeping their
+ * marks on it would say otherwise. What is left is a name and the fact.
+ */
+export function markGone(id: string): void {
+  const held = rooms[id]
+  if (!held || held.gone) return
+  const { members: _members, ...rest } = held
+  commit({ ...rooms, [id]: { ...rest, gone: true } })
 }
 
 /** Drop a room, for when its conversation has gone too. */
@@ -112,6 +137,6 @@ export function snapshot(): Rooms {
   return rooms
 }
 
-export function roomIn(rooms: Rooms, id: string): Group | undefined {
+export function roomIn(rooms: Rooms, id: string): RememberedRoom | undefined {
   return rooms[id]
 }

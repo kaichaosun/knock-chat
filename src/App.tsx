@@ -37,7 +37,13 @@ import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftRecei
 import { messageId, withRooms, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import { adopt as adoptPins, unpin } from "@/lib/pins"
-import { adopt as adoptRooms, forget as forgetRoom, remember as rememberRooms, roomIn } from "@/lib/rooms"
+import {
+  adopt as adoptRooms,
+  forget as forgetRoom,
+  markGone as markRoomGone,
+  remember as rememberRooms,
+  roomIn,
+} from "@/lib/rooms"
 import type { Receipt } from "@/lib/receipts"
 import { encode as encodePayload, giftNote, invite, payment } from "@/lib/payload"
 import { sendNim, unwrapTransaction } from "@/lib/payments"
@@ -277,7 +283,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       setRoomGone(false)
     } catch (error) {
       // The room still opens; only its member list is missing.
-      if (error instanceof RelayError && error.status === 404) setRoomGone(true)
+      if (error instanceof RelayError && error.status === 404) {
+        setRoomGone(true)
+        // Written down, so the chat list draws it as ended too rather than
+        // inferring it from a membership list that cannot tell "ended" from
+        // "you were removed".
+        markRoomGone(openGroup)
+      }
     }
   }, [openGroup, inspect])
 
