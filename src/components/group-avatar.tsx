@@ -71,7 +71,21 @@ export function GroupAvatar({
     <div
       aria-hidden
       className={cn(
-        "bg-accent grid shrink-0 gap-px overflow-hidden rounded-2xl",
+        "bg-accent grid shrink-0 overflow-hidden",
+        // The inset and the gap do the same job from opposite sides — an
+        // identicon is a hexagon running nearly the full width of its box, so
+        // without them the faces collide with each other and with the tile's
+        // own edge, and four separate people read as one smear.
+        //
+        // Fixed pixels rather than percentages, deliberately. A percentage gap
+        // resolves against the grid's own content box, which is the kind of
+        // circular measurement WebKit and Blink have historically disagreed
+        // about — and this is drawn inside Nimiq Pay's web view, where losing
+        // that argument means the rows collapse and the faces disappear
+        // entirely. Three and two pixels read the same at all three sizes
+        // anyway; the radius stays proportional because border-radius
+        // percentages are not in dispute anywhere.
+        "rounded-[22%] p-[3px] gap-[2px]",
         // Always four slots, filled from the top left. A grid that changed
         // shape with the number of faces would give two rooms two different
         // marks for no reason a reader could see — the quarters are what makes
