@@ -891,16 +891,23 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               {tab === "chats" ? "Chats" : tab === "contacts" ? "Contacts" : "Groups"}
             </h1>
             {add && (
-              // A tinted glyph rather than a filled circle: this sits against
-              // the title, and a chip there would read as part of the word.
+              // The tap target is the button; what you see is the disc inside
+              // it, the same way the profile avatar is smaller than the control
+              // it sits in. A lone hairline plus beside an extrabold title
+              // reads as a stray mark rather than a control — the disc gives it
+              // an edge, and the heavier stroke gives it the weight of the word
+              // it stands next to. Tinted the way every other icon in the app
+              // is contained: see the rows of the attach menu.
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={add.onSelect}
                 aria-label={add.label}
-                className="text-primary -my-1 size-9 shrink-0 rounded-full"
+                className="-my-1 size-9 shrink-0 rounded-full"
               >
-                <Plus className="size-5" />
+                <span className="bg-accent text-accent-foreground flex size-7 items-center justify-center rounded-full">
+                  <Plus className="size-4" strokeWidth={2.75} />
+                </span>
               </Button>
             )}
             {relayStatus === "offline" && (
