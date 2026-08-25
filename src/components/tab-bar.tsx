@@ -54,7 +54,12 @@ export function TabBar({
             aria-current={active === id ? "page" : undefined}
             className={cn(
               "relative flex flex-1 flex-col items-center gap-1 py-2.5 transition-colors",
-              active === id ? "text-primary" : "text-muted-foreground",
+              // Blue against grey is a difference in hue at nearly the same
+              // lightness, and that is the one difference a glance across three
+              // tabs does not register. So the gap is opened in lightness and in
+              // weight instead — the resting tabs step back, the chosen one
+              // keeps its colour and gains ink.
+              active === id ? "text-primary" : "text-muted-foreground/75",
             )}
           >
             <span className="relative">
@@ -65,7 +70,9 @@ export function TabBar({
                 </span>
               )}
             </span>
-            <span className="text-[11px] font-medium">{label}</span>
+            <span className={cn("text-[11px]", active === id ? "font-bold" : "font-medium")}>
+              {label}
+            </span>
           </button>
         ))}
       </div>
