@@ -18,9 +18,20 @@
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <!-- Nimiq Pay has no icon API of its own, so the app icon it pins comes
-         from here — without a manifest it falls back to whatever favicon it
-         cached, which is how the old envelope outlived being replaced. -->
+    <!-- Nimiq Pay reads this for the app's name and description. It does NOT
+         read the icons in it, and it does not read the icon links above.
+
+         For the icon it probes two root paths directly — /favicon.ico and
+         /icon.svg — identifying itself by appending "Nimiq Pay" to the WebView
+         user agent. Nothing in this repo links to /icon.svg, so it looks unused
+         to a grep and to a bundler. Deleting it is what put a default globe in
+         the app once already, and the 404 that would have said so never came:
+         an unknown path is answered with this file, so the host got 200 and a
+         page of HTML where it expected an image.
+
+         None of this is documented — nimiq.dev/mini-apps covers deeplinks,
+         providers and permissions, and says nothing about icons. It was found
+         by logging what the host asked the dev server for. -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

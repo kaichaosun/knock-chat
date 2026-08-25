@@ -8,9 +8,13 @@ import { cn } from "@/lib/utils"
  * silhouette people recognise, and a rounded square around it would only blunt
  * the one distinctive edge it has.
  *
- * Served from `public/` at 512px and scaled down by the browser: it appears at
- * a handful of sizes across the app, and one file that is always sharp beats
- * three that have to be kept in step.
+ * Served from `public/` at its longest edge and scaled down by the browser: it
+ * appears at a handful of sizes across the app, and one file that is always
+ * sharp beats three that have to be kept in step.
+ *
+ * Wider than it is tall, and the real ratio is declared rather than squared off
+ * — a square box would reserve height the art never uses, and every caller
+ * would be centring against space that is not there.
  */
 export function BrandMark({ className }: { className?: string }) {
   return (
@@ -19,7 +23,7 @@ export function BrandMark({ className }: { className?: string }) {
       alt=""
       aria-hidden
       width={512}
-      height={512}
+      height={505}
       className={cn("object-contain select-none", className)}
     />
   )

@@ -143,7 +143,7 @@ export function SettingsSheet({
               Knock is rather than doing something with it — and the profile
               footer, which only had room for the name, points here. */}
           <section className="flex flex-col items-center gap-2 border-t pt-7 text-center">
-            <BrandMark className="size-14" />
+            <BrandMark className="w-12" />
             <h3 className="font-semibold">Knock</h3>
             <p className="text-muted-foreground max-w-[17rem] text-[13px] leading-snug text-balance">
               Messages between Nimiq wallets, with spam priced out instead of guessed at.
