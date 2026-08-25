@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { PenLine, Users } from "lucide-react"
+import { Link as LinkIcon, PenLine, Plus, Users } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 
@@ -146,6 +146,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [groupDetail, setGroupDetail] = useState<GroupDetail | null>(null)
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [composing, setComposing] = useState(false)
+  /** The two ways into a room, offered from the Groups tab's own plus. */
+  const [addingGroup, setAddingGroup] = useState(false)
   /** A room a link pointed at, waiting to be joined. */
   const [invited, setInvited] = useState<Group | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -679,16 +681,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     />
   )
 
-  /** What the compose button offers: a message, or a room. */
+  /** What the compose button offers: a message, or a room — yours or theirs. */
   const composeMenu = (
     <AttachMenu
       open={composing}
       onOpenChange={setComposing}
-      title="Start something"
+      title="New chat"
       actions={[
         {
           icon: PenLine,
-          label: "New message",
+          label: "Direct message",
           description: "Knock on someone's door with their address.",
           onSelect: () => {
             setKnockPeer(null)
@@ -700,6 +702,37 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           label: "New group",
           description: "A room you share by link. Not encrypted.",
           onSelect: () => setCreatingGroup(true),
+        },
+        {
+          // The Groups tab offers this too, but only while the tab is empty —
+          // once you are in one room, the way into a second one disappeared.
+          icon: LinkIcon,
+          label: "Join a group",
+          description: "Open a link or id somebody sent you.",
+          onSelect: () => setPasting(true),
+        },
+      ]}
+    />
+  )
+
+  /** The Groups tab's plus: make one, or get into someone else's. */
+  const groupMenu = (
+    <AttachMenu
+      open={addingGroup}
+      onOpenChange={setAddingGroup}
+      title="Add a new group"
+      actions={[
+        {
+          icon: Users,
+          label: "New group",
+          description: "A room you share by link. Not encrypted.",
+          onSelect: () => setCreatingGroup(true),
+        },
+        {
+          icon: LinkIcon,
+          label: "Join a group",
+          description: "Open a link or id somebody sent you.",
+          onSelect: () => setPasting(true),
         },
       ]}
     />
@@ -800,6 +833,27 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     )
   }
 
+  /**
+   * What the plus beside the title does here.
+   *
+   * Chats has none: its own compose button floats over the list, and a second
+   * way to do the same thing in the same view is a thing to wonder about
+   * rather than a shortcut. The other two tabs had nothing at all — everything
+   * you could add from them lived behind the Chats button, a tab away.
+   */
+  const add =
+    tab === "contacts"
+      ? {
+          label: "New message",
+          onSelect: () => {
+            setKnockPeer(null)
+            setKnocking(true)
+          },
+        }
+      : tab === "groups"
+        ? { label: "Add a new group", onSelect: () => setAddingGroup(true) }
+        : null
+
   return (
     <div className="flex h-full flex-col">
       {/* The rule is kept transparent rather than removed, so turning it on
@@ -812,28 +866,38 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           scrolled ? "border-border" : "border-transparent",
         )}
       >
-        <div
-          className={cn(
-            "flex items-end justify-between gap-3 px-4 transition-[padding] duration-200",
-            // Top padding is the same either way, so only the bottom and the
-            // font size animate — the avatar holds still while the title shrinks.
-            scrolled ? "py-2.5" : "pt-2.5 pb-3",
-          )}
-        >
-          <div className="flex items-baseline gap-2">
-            {/* Big at rest, small once you are reading — the title gives up
-                its space to the thing it names. */}
+        {/* Centred, not bottom-aligned. `items-end` was there to hold the
+            baseline still while the title shrank on scroll; with one fixed size
+            all it does is sit a 22px word on the floor of a 44px button. */}
+        <div className="flex items-center justify-between gap-3 px-4 pt-2.5 pb-3">
+          <div className="flex items-center gap-1.5">
+            {/* One size, whatever the list is doing. It used to shrink on
+                scroll, but only the words did — the avatar beside it cannot
+                shrink with them, so the row rearranged itself around a control
+                that held still, which reads as a glitch rather than as a
+                header making room. The rule below is what says you have
+                scrolled, and it costs the list nothing. */}
             <h1
               onClick={revealProbes}
-              className={cn(
-                "font-extrabold tracking-[-0.02em] transition-[font-size,line-height] duration-200 select-none",
-                scrolled ? "text-[17px]" : "text-[28px]",
-              )}
+              className="text-[22px] font-extrabold tracking-[-0.02em] select-none"
             >
               {tab === "chats" ? "Chats" : tab === "contacts" ? "Contacts" : "Groups"}
             </h1>
+            {add && (
+              // A tinted glyph rather than a filled circle: this sits against
+              // the title, and a chip there would read as part of the word.
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={add.onSelect}
+                aria-label={add.label}
+                className="text-primary -my-1 size-9 shrink-0 rounded-full"
+              >
+                <Plus className="size-5" />
+              </Button>
+            )}
             {relayStatus === "offline" && (
-              <span className="text-destructive text-[11px] font-semibold">offline</span>
+              <span className="text-destructive ml-0.5 text-[11px] font-semibold">offline</span>
             )}
           </div>
           {/* The button is 44px, the smallest target a thumb hits reliably;
@@ -911,6 +975,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
       {knockSheet}
       {composeMenu}
+      {groupMenu}
       {groupSheets}
 
       <ProfileSheet

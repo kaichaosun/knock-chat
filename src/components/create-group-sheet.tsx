@@ -83,7 +83,6 @@ export function CreateGroupSheet({
         <div className="space-y-4 pb-6">
           <div>
             <input
-              autoFocus
               value={name}
               disabled={creating}
               onChange={(event) => setName(event.target.value)}

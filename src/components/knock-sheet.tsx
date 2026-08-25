@@ -151,7 +151,7 @@ export function KnockSheet({
           <SheetDescription>
             {peer
               ? "This chat is closed. Knocking asks them to open it again — after that, messages are free both ways."
-              : "Reaching someone new costs once. After they let you in, messages are free both ways, forever."}
+              : "Knocking may cost once. After they let you in, messages are free both ways and encrypted."}
           </SheetDescription>
         </SheetHeader>
 

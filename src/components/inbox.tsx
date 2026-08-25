@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { MessageSquarePlus, PenLine } from "lucide-react"
+import { MessageSquarePlus, PenLine, Plus } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { GroupAvatar } from "@/components/group-avatar"
@@ -38,7 +38,12 @@ export function Inbox({
   }
 
   return (
-    <div className="relative h-full">
+    // `min-h-full`, not `h-full`: the button below sticks to the bottom of the
+    // scrollport, and a sticky box is confined to its containing block. At a
+    // flat 100% that block is one screen tall however long the list is, so the
+    // button would come unstuck a screenful down and scroll away with the rest.
+    // A minimum lets the box grow with the list it contains.
+    <div className="relative min-h-full">
       <ul className="px-2 pb-28">
         {conversations.map((conversation) => (
           <ConversationRow
@@ -58,10 +63,18 @@ export function Inbox({
         <Button
           size="icon"
           onClick={onCompose}
-          aria-label="New message"
-          className="pointer-events-auto mb-5 size-14 rounded-full shadow-lg shadow-primary/30"
+          aria-label="New chat"
+          className="bg-primary/85 pointer-events-auto mb-5 size-12 rounded-full shadow-md shadow-primary/20 backdrop-blur-sm"
         >
-          <PenLine className="size-5" />
+          {/* A plus, not a pen: this opens a menu of three unrelated things —
+              a message, a room of your own, a room of somebody else's — and a
+              pen claims the first of them. The one glyph that means "add
+              something" without saying which is the honest one here.
+
+              Small, and not quite opaque. A plus is the densest glyph in the
+              app — two full-length strokes crossing, no counters — so at the
+              size a drawn icon needs it reads twice as loud as one. */}
+          <Plus className="size-5" />
         </Button>
       </div>
     </div>

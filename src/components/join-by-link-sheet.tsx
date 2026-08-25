@@ -51,7 +51,6 @@ export function JoinByLinkSheet({
 
         <div className="space-y-3 pb-6">
           <textarea
-            autoFocus
             rows={3}
             value={value}
             onChange={(event) => setValue(event.target.value)}

@@ -39,7 +39,10 @@ export function Groups({
   onOpen: (id: string) => void
   /** Called once the relay has confirmed, so the chat goes with the room. */
   onLeft: (id: string) => void
-  /** Open the door a pasted link or id leads to. */
+  /** Open the door a pasted link or id leads to. Offered only while this tab
+   *  is empty — with rooms in the list, joining another is one of the three
+   *  things behind the compose button in Chats, where making one already
+   *  lived. A list tab is a list, the same way Contacts is. */
   onJoin: () => void
 }) {
   const [revealed, setRevealed] = useState<string | null>(null)
@@ -125,17 +128,6 @@ export function Groups({
           )
         })}
       </ul>
-
-      <div className="pointer-events-none sticky bottom-0 flex justify-end px-5 pb-safe">
-        <Button
-          size="icon"
-          onClick={onJoin}
-          aria-label="Join a group with a link"
-          className="pointer-events-auto mb-5 size-14 rounded-full shadow-lg shadow-primary/30"
-        >
-          <LinkIcon className="size-5" />
-        </Button>
-      </div>
 
       <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
