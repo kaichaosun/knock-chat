@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info } from "lucide-react"
 
+import { AddressAvatar } from "@/components/address-avatar"
 import { AttachMenu } from "@/components/attach-menu"
 import { Composer } from "@/components/composer"
 import { GroupAvatar } from "@/components/group-avatar"
@@ -16,9 +17,9 @@ import { dayLabel } from "@/lib/time"
 /**
  * A room.
  *
- * Close to a conversation and deliberately not identical: every incoming
- * message is labelled with who said it, because in a room that is not implied
- * by the thread.
+ * Close to a conversation and deliberately not identical: what somebody says
+ * is introduced by their face and their name, because in a room who is speaking
+ * is not implied by the thread.
  */
 export function GroupRoom({
   group,
@@ -138,29 +139,62 @@ export function GroupRoom({
               </span>
             </div>
             <div className="space-y-2">
-              {day.messages.map((message) => (
-                <div key={message.id}>
-                  {/* Who spoke, over their first-person bubble. Shown for every
-                      incoming message rather than only on a change of speaker:
-                      a room read in glances is not read in runs. */}
-                  {message.direction === "in" && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenChat(message.peer)}
-                      className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[11px] font-semibold"
-                    >
-                      {labelIn(names, message.peer)}
-                    </button>
-                  )}
-                  <MessageBubble
-                    message={message}
-                    onRetry={() => {}}
-                    onOpenInvite={onOpenInvite}
-                    channelOpen
-                    owner={owner}
-                  />
-                </div>
-              ))}
+              {day.messages.map((message, index) => {
+                if (message.direction !== "in") {
+                  return (
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      onRetry={() => {}}
+                      onOpenInvite={onOpenInvite}
+                      channelOpen
+                      owner={owner}
+                    />
+                  )
+                }
+                const opens = opensRun(day.messages[index - 1], message)
+                const who = labelIn(names, message.peer)
+                return (
+                  <div key={message.id} className="flex items-start gap-2">
+                    {/* A gutter, held open for the whole run rather than only
+                        where the face is drawn: without it the rest of what
+                        somebody says steps left out from under them. */}
+                    <div className="w-8 shrink-0">
+                      {opens && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenChat(message.peer)}
+                          aria-label={`Chat with ${who}`}
+                          className="block active:opacity-60"
+                        >
+                          <AddressAvatar address={message.peer} size="sm" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {/* Who spoke, over their first bubble. A face is the thing
+                          a room is read by at a glance, so the name no longer
+                          has to repeat itself down a run to carry that. */}
+                      {opens && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenChat(message.peer)}
+                          className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[11px] font-semibold"
+                        >
+                          {who}
+                        </button>
+                      )}
+                      <MessageBubble
+                        message={message}
+                        onRetry={() => {}}
+                        onOpenInvite={onOpenInvite}
+                        channelOpen
+                        owner={owner}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         ))}
@@ -235,6 +269,23 @@ function RoomIntro({ group, members }: { group: Group; members?: string[] }) {
       </p>
     </div>
   )
+}
+
+/**
+ * How long a speaker holds the floor before their next message is introduced
+ * again.
+ *
+ * A run is a burst of typing, not a whole afternoon. Somebody who says one
+ * thing in the morning and another after lunch is twice as easy to lose track
+ * of, so the second one gets their face back.
+ */
+const RUN_GAP_MS = 5 * 60_000
+
+/** Whether a message opens a run: a new speaker, or the same one after a gap. */
+function opensRun(previous: Message | undefined, message: Message): boolean {
+  if (!previous || previous.direction !== "in" || previous.peer !== message.peer) return true
+  const apart = new Date(message.at).getTime() - new Date(previous.at).getTime()
+  return !(apart < RUN_GAP_MS)
 }
 
 function groupByDay(messages: Message[]): Array<{ label: string; messages: Message[] }> {
