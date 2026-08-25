@@ -74,7 +74,14 @@ function SheetContent({
           panel?.focus({ preventScroll: true })
         }}
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
+          // `outline-none` because of the focus above. The panel is focused to
+          // anchor the trap, not to be operated, but the `*` rule in index.css
+          // gives everything an outline colour — so whenever WebKit decides
+          // programmatic focus counts as focus-visible, it rings the sheet. The
+          // sheet is full-width and anchored to the bottom, so the only part of
+          // that ring on screen is the top edge: a line that comes and goes
+          // with nothing you did.
+          "fixed z-50 flex flex-col gap-4 bg-background shadow-lg outline-none transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
           side === "right" &&
             "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
           side === "left" &&
@@ -82,7 +89,12 @@ function SheetContent({
           side === "top" &&
             "inset-x-0 top-0 h-auto border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
           side === "bottom" && [
-            "inset-x-0 h-auto border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+            // No top border. The shadcn default assumes a square-cornered panel
+            // flush to an edge, where the rule is what separates it from the
+            // page. This one is rounded and floats over a dimmed overlay, which
+            // does that already — and a border on one edge has to stop
+            // somewhere, which on a curve is a hairline dying halfway round it.
+            "inset-x-0 h-auto data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
             // Anchored to the bottom of what is visible, not the bottom of the
             // layout viewport — otherwise a sheet that opens the keyboard opens
             // behind it. See `--keyboard-inset` in lib/viewport.
