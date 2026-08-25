@@ -1,18 +1,20 @@
 import { describe, expect, it, vi } from "vitest"
 
 import {
+  carriesTime,
   conversations,
   deleteThread,
   emptySnapshot,
   markRead,
   mergeIncoming,
+  opensTurn,
   recordOutgoing,
   resend,
   setStatus,
   threadWith,
   withRooms,
 } from "./messages"
-import type { Snapshot } from "./messages"
+import type { Message, Snapshot } from "./messages"
 import type { Envelope } from "./relay"
 
 const ALICE = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
@@ -455,5 +457,64 @@ describe("a room with nothing said in it", () => {
   it("leaves the list alone when there is nothing to add", () => {
     const existing = conversations(mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1)))
     expect(withRooms(existing, [])).toBe(existing)
+  })
+})
+
+/** A message at a wall-clock time, written as `hh:mm:ss`. */
+function said(at: string, from: string | null = ALICE): Message {
+  const [h, m, sec] = at.split(":").map(Number)
+  return {
+    id: `m-${at}-${from ?? "me"}`,
+    peer: from ?? BOB,
+    direction: from ? "in" : "out",
+    body: "hi",
+    at: new Date(2026, 0, 1, h, m, sec ?? 0).toISOString(),
+    status: "sent",
+  }
+}
+
+describe("turns", () => {
+  it("open on the first thing said", () => {
+    expect(opensTurn(undefined, said("12:00"))).toBe(true)
+  })
+
+  it("stay open while the same person keeps talking", () => {
+    expect(opensTurn(said("12:00"), said("12:01"))).toBe(false)
+  })
+
+  it("open again when somebody else speaks", () => {
+    expect(opensTurn(said("12:00", ALICE), said("12:01", BOB))).toBe(true)
+  })
+
+  it("open again when your own message comes between", () => {
+    expect(opensTurn(said("12:00", null), said("12:01", ALICE))).toBe(true)
+  })
+
+  it("close after a gap, so a face comes back rather than going missing", () => {
+    expect(opensTurn(said("12:00"), said("12:06"))).toBe(true)
+  })
+})
+
+describe("the time on a bubble", () => {
+  it("is shown on the last message of a thread", () => {
+    expect(carriesTime(said("12:00"), undefined)).toBe(true)
+  })
+
+  it("is left off a message another follows in the same minute", () => {
+    expect(carriesTime(said("12:00:05"), said("12:00:40"))).toBe(false)
+  })
+
+  it("is shown once the minute turns over", () => {
+    expect(carriesTime(said("12:00:59"), said("12:01:01"))).toBe(true)
+  })
+
+  it("is shown when the next message is somebody else's", () => {
+    // Two people in the same minute are two stamps: the run is theirs, not the
+    // minute's.
+    expect(carriesTime(said("12:00:05", ALICE), said("12:00:40", BOB))).toBe(true)
+  })
+
+  it("is shown when the reply is yours", () => {
+    expect(carriesTime(said("12:00:05", ALICE), said("12:00:40", null))).toBe(true)
   })
 })

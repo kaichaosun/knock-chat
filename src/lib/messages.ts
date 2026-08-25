@@ -9,6 +9,7 @@
 
 import { compact } from "./address"
 import type { Envelope } from "./relay"
+import { sameMinute } from "./time"
 
 /**
  * An envelope after decryption: the body is plaintext, or the message is
@@ -59,6 +60,46 @@ export type Message = {
  */
 export function threadKey(message: Message): string {
   return message.group ?? message.peer
+}
+
+/**
+ * How long a turn stays open before the next message starts a new one.
+ *
+ * A turn is a burst of typing, not a whole afternoon. Somebody who says one
+ * thing in the morning and another after lunch is twice as easy to lose track
+ * of, so the second one is introduced again.
+ */
+export const TURN_GAP_MS = 5 * 60_000
+
+/**
+ * Whether two messages are the same person still talking.
+ *
+ * Outgoing is always you; incoming is somebody in particular, which only
+ * matters in a room — a direct thread has one other person in it, so the
+ * peer check is a no-op there rather than a special case.
+ */
+export function sameTurn(message: Message, next: Message): boolean {
+  if (message.direction !== next.direction) return false
+  return message.direction === "out" || message.peer === next.peer
+}
+
+/** Whether a message starts a fresh turn: a new speaker, or the same one after a gap. */
+export function opensTurn(previous: Message | undefined, message: Message): boolean {
+  if (!previous || !sameTurn(previous, message)) return true
+  const apart = new Date(message.at).getTime() - new Date(previous.at).getTime()
+  return !(apart < TURN_GAP_MS)
+}
+
+/**
+ * Whether a bubble shows its own time.
+ *
+ * The last of a same-minute run carries it for all of them. Repeating one
+ * stamp down five bubbles says nothing five times over, and the stamp people
+ * actually look for is the one at the end — when the talking stopped.
+ */
+export function carriesTime(message: Message, next: Message | undefined): boolean {
+  if (!next || !sameTurn(message, next)) return true
+  return !sameMinute(message.at, next.at)
 }
 
 export type Conversation = {

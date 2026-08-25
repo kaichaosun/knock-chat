@@ -23,6 +23,7 @@ export function MessageBubble({
   onOpenInvite,
   channelOpen,
   owner = null,
+  stamped = true,
 }: {
   message: Message
   onRetry: (message: Message) => void
@@ -32,9 +33,18 @@ export function MessageBubble({
   channelOpen: boolean
   /** Your address. Only a gift card needs it, and gifts live in rooms. */
   owner?: string | null
+  /**
+   * Whether this bubble shows the time. False for one the next message follows
+   * within the same minute, which then carries the stamp for both. See
+   * [`carriesTime`].
+   */
+  stamped?: boolean
 }) {
   const outgoing = message.direction === "out"
   const failed = message.status === "failed" || message.status === "blocked"
+  // A message still on its way, or one that never went, keeps its line whatever
+  // the run says: a retry nobody can see is a message nobody sends again.
+  const unsettled = outgoing && message.status !== "sent"
 
   // Kept and shown rather than hidden: a message this device cannot read is
   // still evidence someone wrote, and dropping it would leave a silent gap.
@@ -92,17 +102,19 @@ export function MessageBubble({
           </div>
         )}
 
-        <div
-          className={cn(
-            "text-muted-foreground mt-1 flex items-center gap-1 px-1 text-[11px]",
-            outgoing ? "flex-row-reverse" : "flex-row",
-          )}
-        >
-          <span className="tabular-nums">{clockTime(message.at)}</span>
-          {outgoing && (
-            <DeliveryState message={message} onRetry={onRetry} channelOpen={channelOpen} />
-          )}
-        </div>
+        {(stamped || unsettled) && (
+          <div
+            className={cn(
+              "text-muted-foreground mt-1 flex items-center gap-1 px-1 text-[11px]",
+              outgoing ? "flex-row-reverse" : "flex-row",
+            )}
+          >
+            <span className="tabular-nums">{clockTime(message.at)}</span>
+            {outgoing && (
+              <DeliveryState message={message} onRetry={onRetry} channelOpen={channelOpen} />
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

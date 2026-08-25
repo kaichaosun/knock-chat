@@ -10,7 +10,7 @@ import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
 import { labelIn } from "@/lib/names"
-import type { Message } from "@/lib/messages"
+import { carriesTime, opensTurn, type Message } from "@/lib/messages"
 import type { Group, GroupDetail } from "@/lib/relay"
 import { dayLabel } from "@/lib/time"
 
@@ -140,6 +140,7 @@ export function GroupRoom({
             </div>
             <div className="space-y-2">
               {day.messages.map((message, index) => {
+                const stamped = carriesTime(message, day.messages[index + 1])
                 if (message.direction !== "in") {
                   return (
                     <MessageBubble
@@ -149,10 +150,11 @@ export function GroupRoom({
                       onOpenInvite={onOpenInvite}
                       channelOpen
                       owner={owner}
+                      stamped={stamped}
                     />
                   )
                 }
-                const opens = opensRun(day.messages[index - 1], message)
+                const opens = opensTurn(day.messages[index - 1], message)
                 const who = labelIn(names, message.peer)
                 return (
                   <div key={message.id} className="flex items-start gap-2">
@@ -190,6 +192,7 @@ export function GroupRoom({
                         onOpenInvite={onOpenInvite}
                         channelOpen
                         owner={owner}
+                        stamped={stamped}
                       />
                     </div>
                   </div>
@@ -269,23 +272,6 @@ function RoomIntro({ group, members }: { group: Group; members?: string[] }) {
       </p>
     </div>
   )
-}
-
-/**
- * How long a speaker holds the floor before their next message is introduced
- * again.
- *
- * A run is a burst of typing, not a whole afternoon. Somebody who says one
- * thing in the morning and another after lunch is twice as easy to lose track
- * of, so the second one gets their face back.
- */
-const RUN_GAP_MS = 5 * 60_000
-
-/** Whether a message opens a run: a new speaker, or the same one after a gap. */
-function opensRun(previous: Message | undefined, message: Message): boolean {
-  if (!previous || previous.direction !== "in" || previous.peer !== message.peer) return true
-  const apart = new Date(message.at).getTime() - new Date(previous.at).getTime()
-  return !(apart < RUN_GAP_MS)
 }
 
 function groupByDay(messages: Message[]): Array<{ label: string; messages: Message[] }> {

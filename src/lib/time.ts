@@ -29,6 +29,19 @@ export function clockTime(iso: string): string {
   return then.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
 }
 
+/**
+ * Whether two times fall in the same clock minute.
+ *
+ * The unit is the one [`clockTime`] prints, so this answers the only question
+ * a thread asks of it: would these two bubbles show the same stamp?
+ */
+export function sameMinute(a: string, b: string): boolean {
+  const first = new Date(a).getTime()
+  const second = new Date(b).getTime()
+  if (Number.isNaN(first) || Number.isNaN(second)) return false
+  return Math.floor(first / MINUTE) === Math.floor(second / MINUTE)
+}
+
 /** Day separator label inside a thread. */
 export function dayLabel(iso: string, now = Date.now()): string {
   const then = new Date(iso)

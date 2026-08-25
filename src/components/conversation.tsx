@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
 import { canBeReached } from "@/lib/keys"
-import type { Message } from "@/lib/messages"
+import { carriesTime, type Message } from "@/lib/messages"
 import { nameIn } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
@@ -172,13 +172,14 @@ export function Conversation({
                 </span>
               </div>
               <div className="space-y-2">
-                {group.messages.map((message) => (
+                {group.messages.map((message, index) => (
                   <MessageBubble
                     key={message.id}
                     message={message}
                     onRetry={onRetry}
                     onOpenInvite={onOpenInvite}
                     channelOpen={!shut}
+                    stamped={carriesTime(message, group.messages[index + 1])}
                   />
                 ))}
               </div>
