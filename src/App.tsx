@@ -1033,7 +1033,6 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             owner={address}
             loading={groupsLoading}
             onOpen={setOpenGroup}
-            onJoin={() => setPasting(true)}
             onLeft={(id) => {
               // The room goes, and its chat with it — the same shape as
               // removing a contact, which also takes the conversation.

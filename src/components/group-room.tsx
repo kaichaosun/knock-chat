@@ -211,6 +211,9 @@ export function GroupRoom({
         gone={gone}
         owner={owner}
         onChanged={onRefreshDetail}
+        // The same way out the back arrow uses: to whichever list this was
+        // opened from, where the room is now missing.
+        onDisbanded={onBack}
         onOpenChat={onOpenChat}
         onInvite={onInvite}
       />

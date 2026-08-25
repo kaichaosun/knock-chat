@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Link as LinkIcon, Loader2, Users } from "lucide-react"
+import { Loader2, Users } from "lucide-react"
 import { toast } from "sonner"
 
 import { GroupAvatar } from "@/components/group-avatar"
@@ -30,7 +30,6 @@ export function Groups({
   loading,
   onOpen,
   onLeft,
-  onJoin,
 }: {
   groups: Group[]
   owner: string
@@ -39,11 +38,6 @@ export function Groups({
   onOpen: (id: string) => void
   /** Called once the relay has confirmed, so the chat goes with the room. */
   onLeft: (id: string) => void
-  /** Open the door a pasted link or id leads to. Offered only while this tab
-   *  is empty — with rooms in the list, joining another is one of the three
-   *  things behind the compose button in Chats, where making one already
-   *  lived. A list tab is a list, the same way Contacts is. */
-  onJoin: () => void
 }) {
   const [revealed, setRevealed] = useState<string | null>(null)
   // Held until confirmed: getting back into a room can cost money, and for a
@@ -84,10 +78,6 @@ export function Groups({
         <p className="text-muted-foreground mt-2 max-w-[18rem] text-balance">
           Groups appear here once you make one, or open a link someone sends you.
         </p>
-        <Button onClick={onJoin} size="lg" className="mt-7 h-12 rounded-2xl px-6">
-          <LinkIcon />
-          Join with a link
-        </Button>
       </div>
     )
   }
@@ -137,7 +127,7 @@ export function Groups({
             <p className="text-[15px] font-semibold">{confirming?.name}</p>
             <DialogDescription className="text-balance">
               {confirming?.owner === owner
-                ? "You own this group, so you can't leave it. Open it and tap its name to disband it instead — that ends the room for everyone."
+                ? "You own this group, so you can't leave it. To end it for everyone, open it and tap the info button."
                 : confirming?.requires_approval
                   ? "You'd stop seeing what's said here, and getting back in means asking the owner again."
                   : confirming && confirming.join_price_luna > 0

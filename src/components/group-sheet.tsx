@@ -59,6 +59,7 @@ export function GroupSheet({
   gone,
   owner,
   onChanged,
+  onDisbanded,
   onOpenChat,
   onInvite,
 }: {
@@ -70,6 +71,8 @@ export function GroupSheet({
   gone: boolean
   owner: string
   onChanged: () => void
+  /** Leave the room behind — it is not there to stay in. */
+  onDisbanded: () => void
   onOpenChat: (address: string) => void
   /** Send this room's invite into your chat with them. */
   onInvite: (address: string) => void
@@ -94,6 +97,9 @@ export function GroupSheet({
       await disbandGroup(group.id)
       setDisbanding(false)
       onOpenChange(false)
+      // Out of the room as well as out of the sheet. Staying would leave the
+      // person who just ended it reading a bar that tells them so.
+      onDisbanded()
       onChanged()
       toast.success(`${group.name} is gone. Everyone keeps what was said.`)
     } catch (error) {
