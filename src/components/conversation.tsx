@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, Clock, Coins, Copy, DoorClosed } from "lucide-react"
+import { ChevronLeft, Clock, Coins, DoorClosed, Info } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { AttachMenu } from "@/components/attach-menu"
 import { Composer } from "@/components/composer"
 import { SendNimSheet } from "@/components/send-nim-sheet"
+import { ContactSheet } from "@/components/contact-sheet"
 import { MessageBubble } from "@/components/message-bubble"
-import { RenameContactSheet } from "@/components/rename-contact-sheet"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
-import { formatAddress, shortenAddress } from "@/lib/address"
+import { shortenAddress } from "@/lib/address"
 import type { Message } from "@/lib/messages"
 import { nameIn } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
@@ -49,7 +49,7 @@ export function Conversation({
   const name = nameIn(useNames(), peer)
   const [attaching, setAttaching] = useState(false)
   const [paying, setPaying] = useState(false)
-  const [renaming, setRenaming] = useState(false)
+  const [showing, setShowing] = useState(false)
 
   // Knocking costs money, so it is its own deliberate act behind its own button
   // — never something an ordinary-looking send turns into.
@@ -98,14 +98,12 @@ export function Conversation({
               one place you are always looking at while reading what someone
               wrote, so it is where the address has to stay visible.
 
-              Tapping it names them, which is where every other messenger puts
-              that too — and it is the right place for a second reason here: the
-              name you would want to give somebody is the one you thought of
-              while reading what they wrote. */}
+              Tapping it opens who they are, which is where every other
+              messenger puts that too. */}
           <button
             type="button"
-            onClick={() => setRenaming(true)}
-            aria-label="Name this contact"
+            onClick={() => setShowing(true)}
+            aria-label="Contact info"
             className="min-w-0 flex-1 px-1 text-left active:opacity-60"
           >
             {name ? (
@@ -122,14 +120,17 @@ export function Conversation({
             )}
           </button>
 
+          {/* One control, and it is the one that answers "who am I talking
+              to". Copying an address is something you do once and lives inside
+              here; checking who someone is happens over and over. */}
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => onCopyAddress(formatAddress(peer))}
-            aria-label="Copy address"
+            onClick={() => setShowing(true)}
+            aria-label="Contact info"
             className="size-10 shrink-0 rounded-full"
           >
-            <Copy className="size-4" />
+            <Info className="size-5" />
           </Button>
 
         </div>
@@ -183,7 +184,12 @@ export function Conversation({
         ]}
       />
 
-      <RenameContactSheet open={renaming} onOpenChange={setRenaming} address={peer} />
+      <ContactSheet
+        open={showing}
+        onOpenChange={setShowing}
+        address={peer}
+        onCopy={onCopyAddress}
+      />
 
       <SendNimSheet
         open={paying}
