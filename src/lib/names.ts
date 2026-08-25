@@ -11,6 +11,12 @@
  * cached name can be out of date; that is the trade, and the address beside it
  * is what stays true.
  *
+ * Two layers, kept apart. What someone calls themselves comes from the relay and
+ * is replaced whenever they change it; what *you* call them is yours, never
+ * leaves this device, and wins wherever both exist. They are stored separately
+ * so a relay answer can never quietly overwrite a name you chose, and so the
+ * name you overrode is still there to show you what you overrode.
+ *
  * A name is never an identity. Nothing here resolves a name back to an address,
  * two people may pick the same one, and the relay does not check that anyone is
  * who they say. Every surface that shows a name to help you recognise someone
@@ -20,10 +26,24 @@
 import { compact, shortenAddress } from "./address"
 import { MAX_NAME_LEN, type Names } from "./relay"
 
-/** Names by address, keyed by [`key`] so spacing and case can never split an entry. */
-export type Directory = Record<string, string>
+/** One layer of names, keyed by [`key`] so spacing and case cannot split an entry. */
+type Layer = Record<string, string>
+
+/** Both layers of the directory. Read it through [`nameIn`] rather than by hand. */
+export type Directory = {
+  /** What each address calls itself, as the relay last reported it. */
+  given: Layer
+  /** What you decided to call them. This device only — the relay never sees it. */
+  chosen: Layer
+}
 
 const STORAGE_PREFIX = "knock.names."
+/**
+ * Your own names live under their own key rather than in the same object.
+ * Keeping them apart is what lets the relay's copy be rewritten wholesale on
+ * every answer without any risk of taking your names down with it.
+ */
+const CHOSEN_PREFIX = "knock.nicknames."
 
 /**
  * The directory key for an address.
@@ -83,11 +103,15 @@ export function sanitize(raw: string): string | null {
 }
 
 let owner: string | null = null
-let directory: Directory = {}
+let directory: Directory = { given: {}, chosen: {} }
 const listeners = new Set<() => void>()
 
 function storageKey(forOwner: string): string {
   return `${STORAGE_PREFIX}${key(forOwner)}`
+}
+
+function chosenKey(forOwner: string): string {
+  return `${CHOSEN_PREFIX}${key(forOwner)}`
 }
 
 function announce(): void {
@@ -102,25 +126,32 @@ function announce(): void {
  */
 export function adopt(nextOwner: string | null): void {
   owner = nextOwner
-  directory = {}
-  if (nextOwner) {
-    try {
-      const raw = localStorage.getItem(storageKey(nextOwner))
-      const parsed: unknown = raw ? JSON.parse(raw) : null
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        // Storage is user-writable, and was written by an older build at least
-        // once — take only what still looks like a name.
-        for (const [address, name] of Object.entries(parsed as Record<string, unknown>)) {
-          if (typeof name !== "string") continue
-          const clean = sanitize(name)
-          if (clean) directory[key(address)] = clean
-        }
-      }
-    } catch {
-      // Malformed or unavailable storage just means an empty directory.
-    }
+  directory = {
+    given: nextOwner ? load(storageKey(nextOwner)) : {},
+    chosen: nextOwner ? load(chosenKey(nextOwner)) : {},
   }
   announce()
+}
+
+/** Whatever is at `at` that still looks like a name, keyed the way this file keys. */
+function load(at: string): Layer {
+  const names: Layer = {}
+  try {
+    const raw = localStorage.getItem(at)
+    const parsed: unknown = raw ? JSON.parse(raw) : null
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      // Storage is user-writable, and was written by an older build at least
+      // once — take only what still looks like a name.
+      for (const [address, name] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof name !== "string") continue
+        const clean = sanitize(name)
+        if (clean) names[key(address)] = clean
+      }
+    }
+  } catch {
+    // Malformed or unavailable storage just means nothing was known.
+  }
+  return names
 }
 
 /**
@@ -133,14 +164,15 @@ export function adopt(nextOwner: string | null): void {
  */
 export function remember(names: Names): void {
   let changed = false
+  const given = { ...directory.given }
   for (const [address, raw] of Object.entries(names)) {
     const at = key(address)
     const clean = sanitize(raw)
-    if (!clean || directory[at] === clean) continue
-    directory[at] = clean
+    if (!clean || given[at] === clean) continue
+    given[at] = clean
     changed = true
   }
-  if (changed) commit()
+  if (changed) commit({ given })
 }
 
 /**
@@ -152,34 +184,72 @@ export function remember(names: Names): void {
 export function rememberOne(address: string, name: string | null): void {
   const at = key(address)
   const clean = name === null ? null : sanitize(name)
+  const given = { ...directory.given }
   if (clean === null) {
-    if (!(at in directory)) return
-    delete directory[at]
+    if (!(at in given)) return
+    delete given[at]
   } else {
-    if (directory[at] === clean) return
-    directory[at] = clean
+    if (given[at] === clean) return
+    given[at] = clean
   }
-  commit()
+  commit({ given })
 }
 
-/** Drop an address, for when there is no longer any relationship to name. */
+/**
+ * Set what you call someone, or clear it with `null` to fall back to theirs.
+ *
+ * Local by design: this is a note to yourself about who an address is, and
+ * sending it anywhere would turn a private label into a claim about somebody.
+ * It also means a rename is instant and cannot fail — there is nothing to ask.
+ */
+export function rename(address: string, name: string | null): void {
+  const at = key(address)
+  const clean = name === null ? null : sanitize(name)
+  const chosen = { ...directory.chosen }
+  if (clean === null) {
+    if (!(at in chosen)) return
+    delete chosen[at]
+  } else {
+    if (chosen[at] === clean) return
+    chosen[at] = clean
+  }
+  commit({ chosen })
+}
+
+/**
+ * Drop an address, for when there is no longer any relationship to name.
+ *
+ * Takes your own name for them with it. Removing a contact undoes the reason
+ * you had for naming them, and leaving the name behind would put it back on the
+ * screen the day they knocked again.
+ */
 export function forget(address: string): void {
   const at = key(address)
-  if (!(at in directory)) return
-  delete directory[at]
-  commit()
+  if (!(at in directory.given) && !(at in directory.chosen)) return
+  const given = { ...directory.given }
+  const chosen = { ...directory.chosen }
+  delete given[at]
+  delete chosen[at]
+  commit({ given, chosen })
 }
 
-function commit(): void {
-  directory = { ...directory }
+function commit(next: Partial<Directory>): void {
+  directory = { ...directory, ...next }
   if (owner) {
-    try {
-      localStorage.setItem(storageKey(owner), JSON.stringify(directory))
-    } catch {
-      // Quota or private mode — the session keeps working, it just won't persist.
-    }
+    // Only the layer that moved: a relay answer arrives far more often than a
+    // rename, and it has no business rewriting the file your names are in.
+    if (next.given) save(storageKey(owner), next.given)
+    if (next.chosen) save(chosenKey(owner), next.chosen)
   }
   announce()
+}
+
+function save(at: string, names: Layer): void {
+  try {
+    localStorage.setItem(at, JSON.stringify(names))
+  } catch {
+    // Quota or private mode — the session keeps working, it just won't persist.
+  }
 }
 
 export function subscribe(listener: () => void): () => void {
@@ -192,9 +262,26 @@ export function snapshot(): Directory {
   return directory
 }
 
-/** What `address` calls itself, or `null` if it has not said. */
+/**
+ * What to call `address`: your name for them, else theirs, else `null`.
+ *
+ * Yours wins because you wrote it down after knowing who they were, and theirs
+ * can change under you at any time — that is the whole reason to be able to
+ * write one down.
+ */
 export function nameIn(directory: Directory, address: string): string | null {
-  return directory[key(address)] ?? null
+  const at = key(address)
+  return directory.chosen[at] ?? directory.given[at] ?? null
+}
+
+/** What `address` calls itself, ignoring any name you gave them. */
+export function givenNameIn(directory: Directory, address: string): string | null {
+  return directory.given[key(address)] ?? null
+}
+
+/** What you call `address`, or `null` if you have not named them. */
+export function chosenNameIn(directory: Directory, address: string): string | null {
+  return directory.chosen[key(address)] ?? null
 }
 
 /**

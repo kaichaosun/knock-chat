@@ -1,6 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { adopt, forget, labelIn, nameIn, remember, rememberOne, sanitize, snapshot } from "./names"
+import {
+  adopt,
+  chosenNameIn,
+  forget,
+  givenNameIn,
+  labelIn,
+  nameIn,
+  remember,
+  rememberOne,
+  rename,
+  sanitize,
+  snapshot,
+} from "./names"
 import { MAX_NAME_LEN } from "./relay"
 
 const ALICE = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
@@ -120,6 +132,74 @@ describe("the directory", () => {
   })
 })
 
+describe("a name you chose", () => {
+  it("is what every screen shows", () => {
+    remember({ [ALICE]: "alice" })
+    rename(ALICE, "the landlord")
+    expect(nameIn(snapshot(), ALICE)).toBe("the landlord")
+    expect(labelIn(snapshot(), ALICE)).toBe("the landlord")
+  })
+
+  it("names someone who never named themselves", () => {
+    rename(ALICE, "the landlord")
+    expect(nameIn(snapshot(), ALICE)).toBe("the landlord")
+  })
+
+  it("keeps theirs visible underneath, so it can be shown as what you overrode", () => {
+    remember({ [ALICE]: "alice" })
+    rename(ALICE, "the landlord")
+    expect(givenNameIn(snapshot(), ALICE)).toBe("alice")
+    expect(chosenNameIn(snapshot(), ALICE)).toBe("the landlord")
+  })
+
+  it("survives the relay changing theirs", () => {
+    // The whole point of writing one down: their name can move under you.
+    rename(ALICE, "the landlord")
+    remember({ [ALICE]: "something else entirely" })
+    expect(nameIn(snapshot(), ALICE)).toBe("the landlord")
+  })
+
+  it("is not reported back as theirs", () => {
+    // Nothing sends this anywhere, and nothing should mistake it for a claim
+    // the address made about itself.
+    rename(ALICE, "the landlord")
+    expect(givenNameIn(snapshot(), ALICE)).toBeNull()
+  })
+
+  it("clears back to theirs", () => {
+    remember({ [ALICE]: "alice" })
+    rename(ALICE, "the landlord")
+    rename(ALICE, null)
+    expect(nameIn(snapshot(), ALICE)).toBe("alice")
+  })
+
+  it("is sanitized like any other name", () => {
+    rename(ALICE, "  the​ landlord  ")
+    expect(chosenNameIn(snapshot(), ALICE)).toBe("the landlord")
+  })
+
+  it("goes when the contact goes", () => {
+    remember({ [ALICE]: "alice" })
+    rename(ALICE, "the landlord")
+    forget(ALICE)
+    expect(nameIn(snapshot(), ALICE)).toBeNull()
+  })
+
+  it("does not churn when set to what it already is", () => {
+    rename(ALICE, "the landlord")
+    const settled = snapshot()
+    rename(ALICE, "the landlord")
+    expect(snapshot()).toBe(settled)
+  })
+
+  it("survives a reload", () => {
+    rename(ALICE, "the landlord")
+    adopt(null)
+    adopt(ME)
+    expect(nameIn(snapshot(), ALICE)).toBe("the landlord")
+  })
+})
+
 describe("persistence", () => {
   it("survives a reload", () => {
     remember({ [ALICE]: "alice" })
@@ -152,6 +232,6 @@ describe("persistence", () => {
   it("treats malformed storage as an empty directory", () => {
     stubStorage({ [`knock.names.${ME.replace(/ /g, "")}`]: "{ not json" })
     expect(() => adopt(ME)).not.toThrow()
-    expect(snapshot()).toEqual({})
+    expect(snapshot()).toEqual({ given: {}, chosen: {} })
   })
 })

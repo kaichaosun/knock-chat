@@ -6,6 +6,7 @@ import { AttachMenu } from "@/components/attach-menu"
 import { Composer } from "@/components/composer"
 import { SendNimSheet } from "@/components/send-nim-sheet"
 import { MessageBubble } from "@/components/message-bubble"
+import { RenameContactSheet } from "@/components/rename-contact-sheet"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
 import { formatAddress, shortenAddress } from "@/lib/address"
@@ -48,6 +49,7 @@ export function Conversation({
   const name = nameIn(useNames(), peer)
   const [attaching, setAttaching] = useState(false)
   const [paying, setPaying] = useState(false)
+  const [renaming, setRenaming] = useState(false)
 
   // Knocking costs money, so it is its own deliberate act behind its own button
   // — never something an ordinary-looking send turns into.
@@ -94,8 +96,18 @@ export function Conversation({
 
           {/* Name over address, never name instead of it. This header is the
               one place you are always looking at while reading what someone
-              wrote, so it is where the address has to stay visible. */}
-          <div className="min-w-0 flex-1 px-1">
+              wrote, so it is where the address has to stay visible.
+
+              Tapping it names them, which is where every other messenger puts
+              that too — and it is the right place for a second reason here: the
+              name you would want to give somebody is the one you thought of
+              while reading what they wrote. */}
+          <button
+            type="button"
+            onClick={() => setRenaming(true)}
+            aria-label="Name this contact"
+            className="min-w-0 flex-1 px-1 text-left active:opacity-60"
+          >
             {name ? (
               <>
                 <p className="truncate text-[15px] leading-tight font-semibold">{name}</p>
@@ -108,7 +120,7 @@ export function Conversation({
                 {shortenAddress(peer)}
               </p>
             )}
-          </div>
+          </button>
 
           <Button
             variant="ghost"
@@ -170,6 +182,8 @@ export function Conversation({
           },
         ]}
       />
+
+      <RenameContactSheet open={renaming} onOpenChange={setRenaming} address={peer} />
 
       <SendNimSheet
         open={paying}
