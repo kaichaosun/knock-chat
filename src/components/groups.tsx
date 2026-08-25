@@ -103,7 +103,7 @@ export function Groups({
               revealed={revealed === group.id}
               onReveal={(open) => setRevealed(open ? group.id : null)}
             >
-              <GroupAvatar />
+              <GroupAvatar members={group.members} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold">{group.name}</p>
                 {/* The door, not the calendar. How old a room is tells nobody
@@ -140,7 +140,7 @@ export function Groups({
       <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
           <DialogHeader className="items-center">
-            <GroupAvatar />
+            <GroupAvatar members={confirming?.members} />
             <DialogTitle className="mt-2">Leave this group?</DialogTitle>
             <p className="text-[15px] font-semibold">{confirming?.name}</p>
             <DialogDescription className="text-balance">

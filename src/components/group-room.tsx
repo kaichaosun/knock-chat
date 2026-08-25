@@ -88,7 +88,7 @@ export function GroupRoom({
             <ChevronLeft className="size-5" />
           </Button>
 
-          <GroupAvatar size="sm" />
+          <GroupAvatar size="sm" members={detail?.members} />
 
           <button
             type="button"
@@ -118,7 +118,7 @@ export function GroupRoom({
       </header>
 
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
-        {messages.length === 0 && <RoomIntro group={group} />}
+        {messages.length === 0 && <RoomIntro group={group} members={detail?.members} />}
 
         {groups.map((day) => (
           <div key={day.label}>
@@ -206,10 +206,10 @@ export function GroupRoom({
   )
 }
 
-function RoomIntro({ group }: { group: Group }) {
+function RoomIntro({ group, members }: { group: Group; members?: string[] }) {
   return (
     <div className="flex flex-col items-center px-8 py-14 text-center">
-      <GroupAvatar size="lg" />
+      <GroupAvatar size="lg" members={members} />
       <p className="mt-4 text-base font-semibold">{group.name}</p>
       <p className="text-muted-foreground mt-2 text-sm text-balance">
         Nothing said here yet. Anyone in the room sees what you write.

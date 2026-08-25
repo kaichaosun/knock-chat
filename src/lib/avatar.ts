@@ -13,10 +13,15 @@ import { formatAddress } from "./address"
 
 /**
  * The same address is drawn repeatedly — a row in the inbox, the header of its
- * conversation, the contact list — so an LRU makes all but the first free. Small
- * on purpose: each entry is an ~8 KB data URI, and a phone holds few contacts.
+ * conversation, the contact list — so an LRU makes all but the first free.
+ *
+ * Sized for the worst case rather than the common one: a room's mark is a
+ * mosaic of up to four members, so a screen of rooms asks for several times as
+ * many faces as it has rows. At roughly 8 KB a data URI this is about a
+ * megabyte held at full stretch, which is cheaper than redrawing on every
+ * scroll.
  */
-const cache = createIdenticonCache(32)
+const cache = createIdenticonCache(128)
 
 /**
  * A `data:` URI of the identicon for `address`.

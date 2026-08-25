@@ -108,7 +108,7 @@ function ConversationRow({
       revealed={revealed}
       onReveal={onReveal}
     >
-      {group ? <GroupAvatar /> : peer && <AddressAvatar address={peer} />}
+      {group ? <GroupAvatar members={room?.members} /> : peer && <AddressAvatar address={peer} />}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">

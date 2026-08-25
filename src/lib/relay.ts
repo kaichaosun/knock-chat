@@ -219,6 +219,15 @@ export type Group = {
   /** Whether the owner still has to say yes after they have paid. */
   requires_approval: boolean
   created_at: string
+  /**
+   * The earliest few members, when the relay sent them.
+   *
+   * Only the list endpoint carries these — it returns rooms you are already in,
+   * so it gives away nothing joining did not. Everywhere else a `Group` arrives
+   * without them, which is why this is optional rather than an empty array
+   * standing in for "a room with nobody in it".
+   */
+  members?: string[]
 }
 
 /** A room and who is in it. `members` is empty unless you are one. */
