@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { Copy, Loader2, Wifi, WifiOff } from "lucide-react"
+import { Copy, Loader2, Settings, Wifi, WifiOff } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { SettingsSheet } from "@/components/settings-sheet"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import type { RelayStatus } from "@/hooks/use-messages"
@@ -20,7 +21,7 @@ const PRESETS_NIM = [0, 1, 10, 100]
  *
  * Both are public — anyone can read your address and your price from the relay
  * — which is what makes this a profile rather than settings. Preferences only
- * you experience would belong somewhere else.
+ * you experience live in [`SettingsSheet`], which opens from the bottom of here.
  */
 export function ProfileSheet({
   open,
@@ -50,6 +51,7 @@ export function ProfileSheet({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingName, setSavingName] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Read the current values each time the sheet opens, so it never shows a
   // stale one after being changed on another device.
@@ -269,10 +271,37 @@ export function ProfileSheet({
                   : "Checking relay"}
             </span>
             <span className="bg-border h-3 w-px" />
-            <span>{mode === "nimiq-pay" ? "Nimiq Pay" : "Development identity"}</span>
+            {/* The app's own name, not the host's — inside Nimiq Pay the host
+                is the one thing nobody needs telling. Set in words rather than
+                with the mark, which belongs at the size it can be read at, in
+                About. A dev identity hangs off the name rather than replacing
+                it, kept short because spelling it out wraps the line on a small
+                phone, and coloured because that is what makes two words read as
+                a warning. */}
+            <span className="font-semibold">
+              Knock
+              {mode === "dev" && <span className="text-warning"> · dev identity</span>}
+            </span>
+
+            {/* At the far end of the line the app already ends on. Settings are
+                not part of the profile — the profile is what the relay
+                publishes about you — so they get a way in rather than a place
+                of their own. The negative margin keeps the tap target a target
+                without making the line taller. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Settings"
+              onClick={() => setSettingsOpen(true)}
+              className="text-muted-foreground -my-2 ml-auto shrink-0 rounded-full"
+            >
+              <Settings className="size-4" />
+            </Button>
           </section>
         </div>
       </SheetContent>
+
+      <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Sheet>
   )
 }

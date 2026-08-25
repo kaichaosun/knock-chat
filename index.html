@@ -31,15 +31,21 @@
     <title>Knock</title>
     <script>
       // Set the theme before first paint so there is no flash of the wrong one.
-      // Nimiq Pay does not expose its theme, so follow the system setting.
-      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        document.documentElement.classList.add("dark")
+      // A module cannot do this — by the time one loads, the wrong theme has
+      // already been on screen — so the choice is read here and lib/theme.ts
+      // takes over from there. The storage key is the one thing the two have to
+      // agree on; keep them in step.
+      try {
+        var chosen = localStorage.getItem("knock.theme")
+      } catch (error) {
+        // Private mode, or storage turned off. Nothing was ever chosen.
       }
-      window
-        .matchMedia("(prefers-color-scheme: dark)")
-        .addEventListener("change", (event) => {
-          document.documentElement.classList.toggle("dark", event.matches)
-        })
+      var dark =
+        chosen === "dark" ||
+        (chosen !== "light" &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches)
+      document.documentElement.classList.toggle("dark", dark)
+      document.documentElement.style.colorScheme = dark ? "dark" : "light"
     </script>
   </head>
   <body>
