@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { Check, Copy, Loader2, ShieldOff, UserMinus, UserPlus, X } from "lucide-react"
+import { Check, Copy, Loader2, ShieldOff, Trash2, UserMinus, UserPlus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -30,6 +30,7 @@ import { parseNim } from "@/lib/payments"
 import { formatNim } from "@/lib/postage"
 import {
   answerJoinRequest,
+  disbandGroup,
   listJoinRequests,
   removeGroupMember,
   updateGroup,
@@ -72,6 +73,29 @@ export function GroupSheet({
 }) {
   const names = useNames()
   const mine = group.owner === owner
+  /** Open once the owner asks to disband, holding what they have typed. */
+  const [disbanding, setDisbanding] = useState(false)
+  const [typed, setTyped] = useState("")
+  const [ending, setEnding] = useState(false)
+  // Typed exactly, because the confirm is the only thing standing between a
+  // tap and everybody else's room. Trimmed at the ends only — a name can have
+  // spaces inside it, and matching those is the point.
+  const named = typed.trim() === group.name.trim()
+
+  async function disband() {
+    setEnding(true)
+    try {
+      await disbandGroup(group.id)
+      setDisbanding(false)
+      onOpenChange(false)
+      onChanged()
+      toast.success(`${group.name} is gone. Everyone keeps what was said.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't disband it")
+    } finally {
+      setEnding(false)
+    }
+  }
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   // Seeded from the room each time the sheet opens, so it never shows a stale
@@ -446,6 +470,27 @@ export function GroupSheet({
               ))}
             </ul>
           </section>
+
+          {/* Last, and only for the person who can. Not beside the settings it
+              sits under — those change a room, and this ends one. */}
+          {mine && (
+            <section className="border-t pt-5">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setTyped("")
+                  setDisbanding(true)
+                }}
+                className="text-destructive h-11 w-full justify-start rounded-2xl px-3"
+              >
+                <Trash2 className="size-4" />
+                Disband group
+              </Button>
+              <p className="text-muted-foreground mt-1 px-3 text-[13px] leading-snug">
+                Ends the room for everyone. Nobody is charged, and nobody is refunded.
+              </p>
+            </section>
+          )}
         </div>
       </SheetContent>
 
@@ -455,6 +500,60 @@ export function GroupSheet({
         members={members}
         onPick={onInvite}
       />
+
+      {/* Typed, not tapped. Every other confirm in the app protects one
+          person's own data; this one ends a place other people are using, and
+          the cost of getting it wrong is not yours to pay. Asking for the name
+          makes it impossible to do by accident and impossible to do to the
+          wrong room. */}
+      <Dialog open={disbanding} onOpenChange={(open) => !open && setDisbanding(false)}>
+        <DialogContent className="max-w-[21rem] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Disband {group.name}?</DialogTitle>
+            <DialogDescription className="text-balance">
+              The room ends for everyone in it. Nobody can post or rejoin, and what
+              people were charged to join is not refunded. Everyone keeps the messages
+              already on their phone until they delete the chat.
+            </DialogDescription>
+          </DialogHeader>
+
+          <label className="text-muted-foreground block text-[13px]">
+            Type <span className="text-foreground font-semibold">{group.name}</span> to
+            confirm
+            <input
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-label={`Type ${group.name} to confirm`}
+              className={cn(
+                "bg-muted mt-2 w-full rounded-2xl px-4 py-3 font-medium outline-none",
+                "focus-visible:ring-ring/60 focus-visible:ring-2",
+              )}
+            />
+          </label>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="ghost"
+              className="h-11 rounded-2xl"
+              onClick={() => setDisbanding(false)}
+            >
+              Keep it
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!named || ending}
+              className="h-11 rounded-2xl"
+              onClick={() => void disband()}
+            >
+              {ending && <Loader2 className="animate-spin" />}
+              Disband
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">

@@ -137,7 +137,7 @@ export function Groups({
             <p className="text-[15px] font-semibold">{confirming?.name}</p>
             <DialogDescription className="text-balance">
               {confirming?.owner === owner
-                ? "You own this group, so you can't leave it."
+                ? "You own this group, so you can't leave it. Open it and tap its name to disband it instead — that ends the room for everyone."
                 : confirming?.requires_approval
                   ? "You'd stop seeing what's said here, and getting back in means asking the owner again."
                   : confirming && confirming.join_price_luna > 0

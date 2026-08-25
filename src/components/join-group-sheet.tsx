@@ -110,6 +110,17 @@ export function JoinGroupSheet({
                     : "Join"
                   : `${group.requires_approval ? "Ask to join" : "Join"} — ${formatNim(group.join_price_luna)} NIM`}
               </Button>
+
+              {/* Only where money is involved, and only before it is spent. The
+                  owner can end the room whenever they like, and what you paid
+                  to get in does not come back — which is a thing to know while
+                  deciding, not afterwards. */}
+              {!free && (
+                <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
+                  Paid to the owner, and not refundable. If they disband the group, it
+                  is not returned.
+                </p>
+              )}
             </>
           )}
         </div>

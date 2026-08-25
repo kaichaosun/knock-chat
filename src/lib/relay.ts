@@ -309,6 +309,22 @@ export function answerJoinRequest(id: string, request_id: string, admit: boolean
   )
 }
 
+/**
+ * End a room for everybody in it. Owner only; the relay checks.
+ *
+ * Named rather than a `DELETE` on the room, matching every other thing you do
+ * to a group here — and so it cannot be reached by anything that merely meant
+ * to tidy up a resource.
+ *
+ * Gifts outlive it. The relay may still be holding money owed into the room,
+ * and that keeps going home on its own; nothing here waits for it.
+ */
+export function disbandGroup(id: string): Promise<{ id: string }> {
+  return request<{ id: string }>(`/v1/groups/${encodeURIComponent(id)}/disband`, {
+    method: "POST",
+  })
+}
+
 export function removeGroupMember(id: string, address: string): Promise<{ address: string }> {
   return request<{ address: string }>(
     `/v1/groups/${encodeURIComponent(id)}/members/${encodeURIComponent(address)}`,
