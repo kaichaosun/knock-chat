@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils"
 const REVEAL_PX = 92
 const COMMIT_PX = 45
 const SLOP_PX = 8
+/** How long a finger has to stay put before it counts as a press rather than
+ *  the start of a swipe. */
+const HOLD_MS = 450
 /** Width at which the icon and label fit; below it they would be clipped. */
 const LABEL_PX = 64
 
@@ -18,6 +21,10 @@ const LABEL_PX = 64
  * hold things that are expensive or impossible to get back — a conversation, or
  * a channel someone paid to open — and a target you can hit by accident is the
  * wrong shape for that.
+ *
+ * A held finger is reported separately and changes nothing about the swipe: the
+ * two are told apart by whether the finger moved, which is the same question the
+ * swipe already had to answer.
  */
 export function SwipeRow({
   actionLabel,
@@ -25,6 +32,7 @@ export function SwipeRow({
   onClick,
   revealed,
   onReveal,
+  onLongPress,
   children,
 }: {
   /** Read out for the Delete button; say what is being deleted. */
@@ -33,6 +41,8 @@ export function SwipeRow({
   onClick: () => void
   revealed: boolean
   onReveal: (open: boolean) => void
+  /** Fires when the finger stays put. Omit and the row has no press. */
+  onLongPress?: () => void
   children: ReactNode
 }) {
   // Tracked in a ref rather than state: this updates on every touchmove, and
@@ -41,7 +51,18 @@ export function SwipeRow({
   // Set once a gesture has travelled far enough to be a swipe. The browser fires a
   // click after touchend, and without this that click would open the row too.
   const swiped = useRef(false)
+  // The pending press, and whether one already fired. The second exists for the
+  // same reason `swiped` does: a click still arrives after the finger lifts, and
+  // opening the thread behind the menu that just opened would be a surprise.
+  const holding = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const held = useRef(false)
   const [drag, setDrag] = useState(0)
+
+  const stopHolding = () => {
+    if (holding.current === null) return
+    clearTimeout(holding.current)
+    holding.current = null
+  }
 
   const distance = revealed ? REVEAL_PX : drag
   // Either fully there or not at all — a partly faded label reads as blurry, and a
@@ -94,17 +115,29 @@ export function SwipeRow({
           const touch = event.touches[0]
           start.current = { x: touch.clientX, y: touch.clientY }
           swiped.current = false
+          held.current = false
+          if (!onLongPress) return
+          holding.current = setTimeout(() => {
+            holding.current = null
+            held.current = true
+            onLongPress()
+          }, HOLD_MS)
         }}
         onTouchMove={(event) => {
           if (!start.current) return
           const touch = event.touches[0]
           const dx = start.current.x - touch.clientX
+          // Any real movement means this is a swipe or a scroll, not a press.
+          const dy = touch.clientY - start.current.y
+          if (Math.abs(dx) > SLOP_PX || Math.abs(dy) > SLOP_PX) stopHolding()
           // Ignore mostly-vertical gestures so the list still scrolls.
           if (Math.abs(touch.clientY - start.current.y) > Math.abs(dx)) return
           if (Math.abs(dx) > SLOP_PX) swiped.current = true
           setDrag(Math.max(0, Math.min(dx, REVEAL_PX)))
         }}
+        onTouchCancel={stopHolding}
         onTouchEnd={() => {
+          stopHolding()
           if (drag > COMMIT_PX) onReveal(true)
           else if (revealed) onReveal(false)
           setDrag(0)
@@ -116,6 +149,10 @@ export function SwipeRow({
             swiped.current = false
             return
           }
+          if (held.current) {
+            held.current = false
+            return
+          }
           if (revealed) onReveal(false)
           else onClick()
         }}
@@ -124,6 +161,9 @@ export function SwipeRow({
           // through it while the finger is down.
           "bg-background relative flex w-full items-center gap-3.5 px-3 py-3.5 text-left",
           "active:bg-muted transition-colors",
+          // Otherwise iOS answers a held finger with its own text-selection
+          // callout, on top of whatever the press opened.
+          onLongPress && "[-webkit-touch-callout:none] select-none",
           drag === 0 && "transition-transform",
         )}
       >

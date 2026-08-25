@@ -34,6 +34,7 @@ import { AlreadyPaidError, fundGift } from "@/lib/gift-funding"
 import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftReceipt } from "@/lib/gift-receipts"
 import { messageId, withRooms, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
+import { adopt as adoptPins, unpin } from "@/lib/pins"
 import type { Receipt } from "@/lib/receipts"
 import { encode as encodePayload, giftNote, invite, payment } from "@/lib/payload"
 import { sendNim, unwrapTransaction } from "@/lib/payments"
@@ -197,6 +198,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // Names are learnt per identity: switching to a development identity should
   // not inherit what the previous one had been told.
   useEffect(() => adoptNames(owner), [owner])
+  useEffect(() => adoptPins(owner), [owner])
 
   const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
 
@@ -953,6 +955,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               onCompose={() => setComposing(true)}
               onDelete={(thread) => {
                 deleteThread(thread)
+                // The pin goes with it. A key held up for a thread that no
+                // longer exists is invisible until the thread comes back, and
+                // then it is a pin nobody asked for.
+                unpin(thread)
                 // Deleting a thread is tidying this device, never leaving
                 // anything — which is why the durable thing has its own tab.
                 toast.success(

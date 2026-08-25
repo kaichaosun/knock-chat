@@ -1,13 +1,16 @@
 import { useState } from "react"
-import { MessageSquarePlus, PenLine, Plus } from "lucide-react"
+import { MessageSquarePlus, PenLine, Pin, PinOff, Plus } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { AttachMenu } from "@/components/attach-menu"
 import { GroupAvatar } from "@/components/group-avatar"
 import { SwipeRow } from "@/components/swipe-row"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
+import { usePins } from "@/hooks/use-pins"
 import { shortenAddress } from "@/lib/address"
 import { labelIn, nameIn, type Directory } from "@/lib/names"
+import { arrange, isPinned, toggle as togglePin } from "@/lib/pins"
 import { preview } from "@/lib/payload"
 import type { Conversation } from "@/lib/messages"
 import type { Group } from "@/lib/relay"
@@ -34,11 +37,19 @@ export function Inbox({
   // Only one row open at a time, so a stray Delete is never left lurking under
   // a row the user has moved on from.
   const [revealed, setRevealed] = useState<string | null>(null)
+  /** The thread a held finger opened the menu for. */
+  const [holding, setHolding] = useState<Conversation | null>(null)
   const names = useNames()
+  const pins = usePins()
   const rooms = new Map(groups.map((group) => [group.id, group]))
   if (conversations.length === 0) {
     return <EmptyInbox onCompose={onCompose} />
   }
+
+  // Pinned first, in the order they were pinned; the rest keep the recency the
+  // list arrived in. Done here rather than upstream because a pin is a fact
+  // about this device, and the thread list is a fact about the relay.
+  const ordered = arrange(conversations, pins)
 
   return (
     // `min-h-full`, not `h-full`: the button below sticks to the bottom of the
@@ -49,7 +60,7 @@ export function Inbox({
     <div className="relative min-h-full">
       {/* Room for the button when there is one to clear. */}
       <ul className={cn("px-2", floating ? "pb-28" : "pb-24")}>
-        {conversations.map((conversation) => (
+        {ordered.map((conversation) => (
           <ConversationRow
             key={conversation.key}
             conversation={conversation}
@@ -57,6 +68,8 @@ export function Inbox({
             names={names}
             onOpen={onOpen}
             onDelete={onDelete}
+            pinned={isPinned(pins, conversation.key)}
+            onLongPress={() => setHolding(conversation)}
             revealed={revealed === conversation.key}
             onReveal={(open) => setRevealed(open ? conversation.key : null)}
           />
@@ -83,8 +96,42 @@ export function Inbox({
           </Button>
         </div>
       )}
+
+      {/* What a held finger opens. One row today, and a menu rather than a
+          straight toggle because the next thing anyone wants here — mute, mark
+          read — is another row in it, where a gesture that does exactly one
+          thing has nowhere to put the second. */}
+      <AttachMenu
+        open={holding !== null}
+        onOpenChange={(open) => !open && setHolding(null)}
+        title={holding ? threadLabel(holding, rooms, names) : ""}
+        actions={
+          holding
+            ? [
+                {
+                  icon: isPinned(pins, holding.key) ? PinOff : Pin,
+                  label: isPinned(pins, holding.key) ? "Unpin" : "Pin to top",
+                  description: isPinned(pins, holding.key)
+                    ? "Let it sit by when it last stirred again."
+                    : "Hold it above the rest. The newest pin goes highest.",
+                  onSelect: () => togglePin(holding.key),
+                },
+              ]
+            : []
+        }
+      />
     </div>
   )
+}
+
+/** What to call a thread in a menu title: the room's name, or whoever it is with. */
+function threadLabel(
+  conversation: Conversation,
+  rooms: Map<string, Group>,
+  names: Directory,
+): string {
+  if (conversation.group) return rooms.get(conversation.group)?.name ?? "Group"
+  return conversation.peer ? labelIn(names, conversation.peer) : "Chat"
 }
 
 function ConversationRow({
@@ -93,6 +140,8 @@ function ConversationRow({
   names,
   onOpen,
   onDelete,
+  pinned,
+  onLongPress,
   revealed,
   onReveal,
 }: {
@@ -102,6 +151,8 @@ function ConversationRow({
   names: Directory
   onOpen: (thread: string) => void
   onDelete: (thread: string) => void
+  pinned: boolean
+  onLongPress: () => void
   revealed: boolean
   onReveal: (open: boolean) => void
 }) {
@@ -124,6 +175,7 @@ function ConversationRow({
       }
       onAction={() => onDelete(key)}
       onClick={() => onOpen(key)}
+      onLongPress={onLongPress}
       revealed={revealed}
       onReveal={onReveal}
     >
@@ -140,7 +192,11 @@ function ConversationRow({
           >
             {title ?? (peer ? shortenAddress(peer) : "")}
           </span>
-          <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+          <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-[11px] tabular-nums">
+            {/* Beside the time, because the time is what a pinned row is no
+                longer sorted by — the mark is the answer to "why is this one
+                up here". */}
+            {pinned && <Pin className="size-3 -rotate-45" />}
             {relativeTime(at)}
           </span>
         </div>
