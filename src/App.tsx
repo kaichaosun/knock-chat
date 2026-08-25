@@ -23,6 +23,7 @@ import { useContacts } from "@/hooks/use-contacts"
 import { useGroups } from "@/hooks/use-groups"
 import { useKnocks } from "@/hooks/use-knocks"
 import { usePrefs } from "@/hooks/use-prefs"
+import { useRooms } from "@/hooks/use-rooms"
 import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
@@ -36,6 +37,7 @@ import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftRecei
 import { messageId, withRooms, type Message } from "@/lib/messages"
 import { adopt as adoptNames, rememberOne } from "@/lib/names"
 import { adopt as adoptPins, unpin } from "@/lib/pins"
+import { adopt as adoptRooms, forget as forgetRoom, remember as rememberRooms, roomIn } from "@/lib/rooms"
 import type { Receipt } from "@/lib/receipts"
 import { encode as encodePayload, giftNote, invite, payment } from "@/lib/payload"
 import { sendNim, unwrapTransaction } from "@/lib/payments"
@@ -131,6 +133,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // make every return a cold start. The rooms above already worked this way.
   const { contacts, setContacts, error: contactsError } = useContacts(Boolean(owner), owner)
 
+  /**
+   * What this device knows about rooms, including ones the relay has stopped
+   * describing. A disbanded room leaves its conversation behind; without this
+   * the thread would have no name and nothing to open.
+   */
+  const rooms = useRooms()
+  useEffect(() => rememberRooms(groups), [groups])
+
   const [openPeer, setOpenPeer] = useState<string | null>(null)
   const [knocking, setKnocking] = useState(false)
   // Set when knocking on a door we already know, so the sheet fixes the address
@@ -204,6 +214,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // not inherit what the previous one had been told.
   useEffect(() => adoptNames(owner), [owner])
   useEffect(() => adoptPins(owner), [owner])
+  useEffect(() => adoptRooms(owner), [owner])
 
   const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
 
@@ -250,17 +261,29 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [groups, threadWith],
   )
 
+  /**
+   * Whether the relay says this room no longer exists.
+   *
+   * Only a 404 counts. Any other failure is a relay we could not reach, and
+   * telling somebody their room was disbanded because their train went into a
+   * tunnel would be worse than saying nothing.
+   */
+  const [roomGone, setRoomGone] = useState(false)
+
   const refreshGroupDetail = useCallback(async () => {
     if (!openGroup) return
     try {
       setGroupDetail(await inspect(openGroup))
-    } catch {
+      setRoomGone(false)
+    } catch (error) {
       // The room still opens; only its member list is missing.
+      if (error instanceof RelayError && error.status === 404) setRoomGone(true)
     }
   }, [openGroup, inspect])
 
   useEffect(() => {
     setGroupDetail(null)
+    setRoomGone(false)
     void refreshGroupDetail()
   }, [openGroup, refreshGroupDetail])
 
@@ -782,7 +805,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // still describe the room itself to anyone — just without its members. So the
   // thread stays readable; only the composer goes.
   const joined = groups.find((group) => group.id === openGroup)
-  const room = joined ?? (groupDetail?.group.id === openGroup ? groupDetail.group : undefined)
+  // Last resort, and only a resort: the live list wins, then whatever the relay
+  // will still say about the room, then what this device remembers of it. The
+  // last one is all that is left of a room somebody disbanded.
+  const room =
+    joined ??
+    (groupDetail?.group.id === openGroup ? groupDetail.group : undefined) ??
+    (openGroup ? roomIn(rooms, openGroup) : undefined)
   if (openGroup && room) {
     return (
       <>
@@ -790,6 +819,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           group={room}
           detail={groupDetail}
           member={joined !== undefined}
+          gone={roomGone}
           owner={address}
           messages={roomMessages}
           onBack={closeThreadView}
@@ -960,6 +990,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               onCompose={() => setComposing(true)}
               onDelete={(thread) => {
                 deleteThread(thread)
+                // And what was remembered of the room, if it was one. Nothing
+                // is left to put a name on.
+                forgetRoom(thread)
                 // The pin goes with it. A key held up for a thread that no
                 // longer exists is invisible until the thread comes back, and
                 // then it is a pin nobody asked for.

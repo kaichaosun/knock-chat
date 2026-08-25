@@ -8,6 +8,7 @@ import { SwipeRow } from "@/components/swipe-row"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
 import { usePins } from "@/hooks/use-pins"
+import { useRooms } from "@/hooks/use-rooms"
 import { shortenAddress } from "@/lib/address"
 import { labelIn, nameIn, type Directory } from "@/lib/names"
 import { arrange, isPinned, toggle as togglePin } from "@/lib/pins"
@@ -41,7 +42,12 @@ export function Inbox({
   const [holding, setHolding] = useState<Conversation | null>(null)
   const names = useNames()
   const pins = usePins()
-  const rooms = new Map(groups.map((group) => [group.id, group]))
+  const remembered = useRooms()
+  // Remembered first, live over the top. A room that was disbanded is only in
+  // the first, and without it its thread would be titled "Group" — the row
+  // would lose its name at the moment there is nothing left to look it up with.
+  const rooms = new Map<string, Group>(Object.entries(remembered))
+  for (const group of groups) rooms.set(group.id, group)
   if (conversations.length === 0) {
     return <EmptyInbox onCompose={onCompose} />
   }

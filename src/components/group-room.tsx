@@ -24,6 +24,7 @@ export function GroupRoom({
   group,
   detail,
   member,
+  gone,
   owner,
   messages,
   onBack,
@@ -39,6 +40,8 @@ export function GroupRoom({
   detail: GroupDetail | null
   /** False once you are no longer in the room — history stays, writing goes. */
   member: boolean
+  /** The relay no longer has this room: its owner ended it. */
+  gone: boolean
   owner: string
   messages: Message[]
   onBack: () => void
@@ -168,11 +171,15 @@ export function GroupRoom({
         <Composer onSend={onSay} onAttach={onGift && (() => setAttaching(true))} />
       ) : (
         /* Read-only rather than gone: what was said is still yours to read, and
-           a composer that cannot send is worse than none. */
+           a composer that cannot send is worse than none. Two ways to end up
+           here and they are not the same — one room carried on without you, the
+           other stopped existing. */
         <div className="bg-background/85 border-t backdrop-blur-xl">
           <p className="text-muted-foreground flex items-center justify-center gap-2 px-5 py-4 text-[13px]">
             <DoorClosed className="size-4 shrink-0" />
-            You're not in this group any more.
+            {gone
+              ? "This group was removed, no more messages."
+              : "You're not in this group any more."}
           </p>
           <div className="pb-safe" />
         </div>
