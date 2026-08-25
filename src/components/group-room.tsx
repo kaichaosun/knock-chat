@@ -208,6 +208,7 @@ export function GroupRoom({
         }}
         group={group}
         detail={detail}
+        gone={gone}
         owner={owner}
         onChanged={onRefreshDetail}
         onOpenChat={onOpenChat}

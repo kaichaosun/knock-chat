@@ -56,6 +56,7 @@ export function GroupSheet({
   onOpenChange,
   group,
   detail,
+  gone,
   owner,
   onChanged,
   onOpenChat,
@@ -65,6 +66,8 @@ export function GroupSheet({
   onOpenChange: (open: boolean) => void
   group: Group
   detail: GroupDetail | null
+  /** The relay no longer has this room: its owner ended it. */
+  gone: boolean
   owner: string
   onChanged: () => void
   onOpenChat: (address: string) => void
@@ -72,7 +75,10 @@ export function GroupSheet({
   onInvite: (address: string) => void
 }) {
   const names = useNames()
-  const mine = group.owner === owner
+  // Nothing below acts on anything but a live room, and a disbanded one is not
+  // there to act on. Dropping the owner's half is most of that; the rest goes
+  // with the body, below.
+  const mine = group.owner === owner && !gone
   /** Open once the owner asks to disband, holding what they have typed. */
   const [disbanding, setDisbanding] = useState(false)
   const [typed, setTyped] = useState("")
@@ -213,285 +219,293 @@ export function GroupSheet({
         <SheetHeader className="px-0">
           <SheetTitle>{group.name}</SheetTitle>
           <SheetDescription>
-            {group.join_price_luna === 0
-              ? "Anyone with the link can get in."
-              : `Getting in costs ${formatNim(group.join_price_luna)} NIM, paid to the owner.`}
+            {gone
+              ? "This group was disbanded. Nobody can post or rejoin, and the messages on your phone are yours to keep or delete."
+              : group.join_price_luna === 0
+                ? "Anyone with the link can get in."
+                : `Getting in costs ${formatNim(group.join_price_luna)} NIM, paid to the owner.`}
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-6 pb-8">
-          <section className="space-y-2">
-            {/* For the case a link cannot reach: two phones on a table. */}
-            <div className="flex justify-center pb-1">
-              <QrCode value={groupLink(group.id)} className="size-44 rounded-2xl" />
-            </div>
-            <Button
-              variant="secondary"
-              className="h-11 w-full rounded-2xl"
-              onClick={async () => {
-                const ok = await copyText(groupLink(group.id))
-                toast[ok ? "success" : "info"](
-                  ok ? "Invite link copied" : "Couldn't reach the clipboard",
-                )
-              }}
-            >
-              <Copy className="size-4" />
-              Copy invite link
-            </Button>
-            <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-[12px] leading-snug">
-              <ShieldOff className="mt-0.5 size-3 shrink-0" />
-              Messages in a group aren't encrypted.
-            </p>
-          </section>
-
-          {mine && (
-            <section>
-              <h3 className="text-sm font-semibold">Name</h3>
-              <div className="mt-2 flex gap-2">
-                <input
-                  value={name}
-                  disabled={saving !== null}
-                  onChange={(event) => setName(event.target.value)}
-                  aria-label="Group name"
-                  className={cn(
-                    "bg-muted min-w-0 flex-1 rounded-2xl px-4 py-3 font-medium outline-none",
-                    "focus-visible:ring-ring/60 focus-visible:ring-2",
-                  )}
-                />
-                <Button
-                  disabled={saving !== null || name.trim() === "" || name.trim() === group.name}
-                  onClick={() => void saveName()}
-                  className="h-12 rounded-2xl px-5"
-                >
-                  {saving === "name" ? <Loader2 className="animate-spin" /> : <Check />}
-                  Save
-                </Button>
+        {/* Everything here acts on the room through the relay — the link, the
+            QR, the price, who is in it, ending it. A disbanded room is not
+            there to act on, so the sheet keeps only its name and what became
+            of it, above. */}
+        {!gone && (
+          <div className="space-y-6 pb-8">
+            <section className="space-y-2">
+              {/* For the case a link cannot reach: two phones on a table. */}
+              <div className="flex justify-center pb-1">
+                <QrCode value={groupLink(group.id)} className="size-44 rounded-2xl" />
               </div>
-            </section>
-          )}
-
-          {mine && (
-            <section>
-              <h3 className="text-sm font-semibold">Cost to join</h3>
-              <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
-                What someone new pays you to get in. Changing it leaves everyone already
-                here where they are.
+              <Button
+                variant="secondary"
+                className="h-11 w-full rounded-2xl"
+                onClick={async () => {
+                  const ok = await copyText(groupLink(group.id))
+                  toast[ok ? "success" : "info"](
+                    ok ? "Invite link copied" : "Couldn't reach the clipboard",
+                  )
+                }}
+              >
+                <Copy className="size-4" />
+                Copy invite link
+              </Button>
+              <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-[12px] leading-snug">
+                <ShieldOff className="mt-0.5 size-3 shrink-0" />
+                Messages in a group aren't encrypted.
               </p>
+            </section>
 
-              <div className="mt-2 flex gap-2">
-                <div className="relative min-w-0 flex-1">
+            {mine && (
+              <section>
+                <h3 className="text-sm font-semibold">Name</h3>
+                <div className="mt-2 flex gap-2">
                   <input
-                    value={price}
-                    inputMode="decimal"
+                    value={name}
                     disabled={saving !== null}
-                    placeholder="Free"
-                    aria-label="Cost to join, in NIM"
-                    aria-invalid={luna === null}
-                    onChange={(event) => setPrice(event.target.value.replace(/[^\d.]/g, ""))}
+                    onChange={(event) => setName(event.target.value)}
+                    aria-label="Group name"
                     className={cn(
-                      "bg-muted w-full rounded-2xl py-3 pr-14 pl-4 font-semibold tabular-nums outline-none",
-                      "placeholder:text-muted-foreground/70 placeholder:font-normal",
+                      "bg-muted min-w-0 flex-1 rounded-2xl px-4 py-3 font-medium outline-none",
                       "focus-visible:ring-ring/60 focus-visible:ring-2",
-                      luna === null && "ring-destructive ring-2",
                     )}
                   />
-                  <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm font-medium">
-                    NIM
-                  </span>
+                  <Button
+                    disabled={saving !== null || name.trim() === "" || name.trim() === group.name}
+                    onClick={() => void saveName()}
+                    className="h-12 rounded-2xl px-5"
+                  >
+                    {saving === "name" ? <Loader2 className="animate-spin" /> : <Check />}
+                    Save
+                  </Button>
                 </div>
-                <Button
-                  disabled={saving !== null || luna === null || luna === group.join_price_luna}
-                  onClick={() => luna !== null && void savePrice(luna)}
-                  className="h-12 rounded-2xl px-5"
-                >
-                  {saving === "price" ? <Loader2 className="animate-spin" /> : <Check />}
-                  Save
-                </Button>
-              </div>
+              </section>
+            )}
 
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {JOIN_PRESETS_NIM.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    disabled={saving !== null}
-                    onClick={() => void savePrice(preset * LUNA_PER_NIM)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
-                      "active:bg-muted disabled:opacity-50",
-                      group.join_price_luna === preset * LUNA_PER_NIM && "border-primary text-primary",
-                    )}
-                  >
-                    {preset === 0 ? "Free" : `${preset} NIM`}
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {mine && (
-            <section>
-              <h3 className="text-sm font-semibold">Who can get in</h3>
-              <div className="mt-2 flex gap-2">
-                {[false, true].map((approval) => (
-                  <button
-                    key={String(approval)}
-                    type="button"
-                    onClick={() => void setApproval(approval)}
-                    className={cn(
-                      "flex-1 rounded-2xl border px-3 py-2.5 text-left text-[13px] transition-colors",
-                      group.requires_approval === approval && "border-primary text-primary",
-                    )}
-                  >
-                    <span className="block font-semibold">
-                      {approval ? "You approve" : "Anyone with the link"}
-                    </span>
-                    <span className="text-muted-foreground block text-[11px] leading-snug">
-                      {approval ? "They ask, you answer" : "They walk straight in"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {!group.requires_approval && (
-                <p className="text-warning mt-2 text-[12px] leading-snug">
-                  With an open door, removing someone doesn't hold — they can walk back in.
+            {mine && (
+              <section>
+                <h3 className="text-sm font-semibold">Cost to join</h3>
+                <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
+                  What someone new pays you to get in. Changing it leaves everyone already
+                  here where they are.
                 </p>
-              )}
-            </section>
-          )}
 
-          {mine && requests.length > 0 && (
-            <section>
-              <h3 className="text-sm font-semibold">
-                {requests.length === 1 ? "Someone wants in" : `${requests.length} want in`}
-              </h3>
-              <ul className="mt-2 space-y-2">
-                {requests.map((request) => (
-                  <li
-                    key={request.id}
-                    className="bg-card flex items-center gap-3 rounded-2xl border p-2.5"
-                  >
-                    <AddressAvatar address={request.address} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      {nameIn(names, request.address) && (
-                        <p className="truncate text-[13px] leading-tight font-semibold">
-                          {nameIn(names, request.address)}
-                        </p>
+                <div className="mt-2 flex gap-2">
+                  <div className="relative min-w-0 flex-1">
+                    <input
+                      value={price}
+                      inputMode="decimal"
+                      disabled={saving !== null}
+                      placeholder="Free"
+                      aria-label="Cost to join, in NIM"
+                      aria-invalid={luna === null}
+                      onChange={(event) => setPrice(event.target.value.replace(/[^\d.]/g, ""))}
+                      className={cn(
+                        "bg-muted w-full rounded-2xl py-3 pr-14 pl-4 font-semibold tabular-nums outline-none",
+                        "placeholder:text-muted-foreground/70 placeholder:font-normal",
+                        "focus-visible:ring-ring/60 focus-visible:ring-2",
+                        luna === null && "ring-destructive ring-2",
                       )}
-                      <p className="text-muted-foreground truncate font-mono text-[11px]">
-                        {shortenAddress(request.address)}
+                    />
+                    <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm font-medium">
+                      NIM
+                    </span>
+                  </div>
+                  <Button
+                    disabled={saving !== null || luna === null || luna === group.join_price_luna}
+                    onClick={() => luna !== null && void savePrice(luna)}
+                    className="h-12 rounded-2xl px-5"
+                  >
+                    {saving === "price" ? <Loader2 className="animate-spin" /> : <Check />}
+                    Save
+                  </Button>
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {JOIN_PRESETS_NIM.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      disabled={saving !== null}
+                      onClick={() => void savePrice(preset * LUNA_PER_NIM)}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
+                        "active:bg-muted disabled:opacity-50",
+                        group.join_price_luna === preset * LUNA_PER_NIM && "border-primary text-primary",
+                      )}
+                    >
+                      {preset === 0 ? "Free" : `${preset} NIM`}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {mine && (
+              <section>
+                <h3 className="text-sm font-semibold">Who can get in</h3>
+                <div className="mt-2 flex gap-2">
+                  {[false, true].map((approval) => (
+                    <button
+                      key={String(approval)}
+                      type="button"
+                      onClick={() => void setApproval(approval)}
+                      className={cn(
+                        "flex-1 rounded-2xl border px-3 py-2.5 text-left text-[13px] transition-colors",
+                        group.requires_approval === approval && "border-primary text-primary",
+                      )}
+                    >
+                      <span className="block font-semibold">
+                        {approval ? "You approve" : "Anyone with the link"}
+                      </span>
+                      <span className="text-muted-foreground block text-[11px] leading-snug">
+                        {approval ? "They ask, you answer" : "They walk straight in"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {!group.requires_approval && (
+                  <p className="text-warning mt-2 text-[12px] leading-snug">
+                    With an open door, removing someone doesn't hold — they can walk back in.
+                  </p>
+                )}
+              </section>
+            )}
+
+            {mine && requests.length > 0 && (
+              <section>
+                <h3 className="text-sm font-semibold">
+                  {requests.length === 1 ? "Someone wants in" : `${requests.length} want in`}
+                </h3>
+                <ul className="mt-2 space-y-2">
+                  {requests.map((request) => (
+                    <li
+                      key={request.id}
+                      className="bg-card flex items-center gap-3 rounded-2xl border p-2.5"
+                    >
+                      <AddressAvatar address={request.address} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        {nameIn(names, request.address) && (
+                          <p className="truncate text-[13px] leading-tight font-semibold">
+                            {nameIn(names, request.address)}
+                          </p>
+                        )}
+                        <p className="text-muted-foreground truncate font-mono text-[11px]">
+                          {shortenAddress(request.address)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-1.5">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Decline"
+                          disabled={busy === request.id}
+                          onClick={() => void answer(request, false)}
+                          className="size-9 rounded-full"
+                        >
+                          <X className="size-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          aria-label="Let them in"
+                          disabled={busy === request.id}
+                          onClick={() => void answer(request, true)}
+                          className="size-9 rounded-full"
+                        >
+                          {busy === request.id ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Check className="size-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section>
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-sm font-semibold">
+                  {members.length > 1 ? `${members.length} in the room` : "In the room"}
+                </h3>
+                {/* Anyone in the room can bring somebody in — an invite is only a
+                    message, and the door decides who actually gets through. */}
+                <button
+                  type="button"
+                  onClick={() => setAdding(true)}
+                  className="text-primary flex items-center gap-1 text-[13px] font-semibold"
+                >
+                  <UserPlus className="size-3.5" />
+                  Add someone
+                </button>
+              </div>
+              <ul className="mt-2 space-y-1">
+                {members.map((address) => (
+                  <li key={address} className="flex items-center gap-3 rounded-2xl py-1.5">
+                    <AddressAvatar address={address} size="sm" />
+                    <button
+                      type="button"
+                      disabled={address === owner}
+                      onClick={() => {
+                        onOpenChat(address)
+                        onOpenChange(false)
+                      }}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="truncate text-[13px] font-semibold">
+                        {address === owner ? "You" : labelIn(names, address)}
                       </p>
-                    </div>
-                    <div className="flex shrink-0 gap-1.5">
+                      <p className="text-muted-foreground truncate font-mono text-[11px]">
+                        {shortenAddress(address)}
+                        {address === group.owner && " · owner"}
+                      </p>
+                    </button>
+                    {mine && address !== group.owner && (
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label="Decline"
-                        disabled={busy === request.id}
-                        onClick={() => void answer(request, false)}
-                        className="size-9 rounded-full"
+                        aria-label={`Remove ${labelIn(names, address)}`}
+                        disabled={busy === address}
+                        onClick={() => setRemoving(address)}
+                        className="text-muted-foreground size-9 shrink-0 rounded-full"
                       >
-                        <X className="size-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        aria-label="Let them in"
-                        disabled={busy === request.id}
-                        onClick={() => void answer(request, true)}
-                        className="size-9 rounded-full"
-                      >
-                        {busy === request.id ? (
+                        {busy === address ? (
                           <Loader2 className="size-4 animate-spin" />
                         ) : (
-                          <Check className="size-4" />
+                          <UserMinus className="size-4" />
                         )}
                       </Button>
-                    </div>
+                    )}
                   </li>
                 ))}
               </ul>
             </section>
-          )}
 
-          <section>
-            <div className="flex items-baseline justify-between gap-3">
-              <h3 className="text-sm font-semibold">
-                {members.length > 1 ? `${members.length} in the room` : "In the room"}
-              </h3>
-              {/* Anyone in the room can bring somebody in — an invite is only a
-                  message, and the door decides who actually gets through. */}
-              <button
-                type="button"
-                onClick={() => setAdding(true)}
-                className="text-primary flex items-center gap-1 text-[13px] font-semibold"
-              >
-                <UserPlus className="size-3.5" />
-                Add someone
-              </button>
-            </div>
-            <ul className="mt-2 space-y-1">
-              {members.map((address) => (
-                <li key={address} className="flex items-center gap-3 rounded-2xl py-1.5">
-                  <AddressAvatar address={address} size="sm" />
-                  <button
-                    type="button"
-                    disabled={address === owner}
-                    onClick={() => {
-                      onOpenChat(address)
-                      onOpenChange(false)
-                    }}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <p className="truncate text-[13px] font-semibold">
-                      {address === owner ? "You" : labelIn(names, address)}
-                    </p>
-                    <p className="text-muted-foreground truncate font-mono text-[11px]">
-                      {shortenAddress(address)}
-                      {address === group.owner && " · owner"}
-                    </p>
-                  </button>
-                  {mine && address !== group.owner && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label={`Remove ${labelIn(names, address)}`}
-                      disabled={busy === address}
-                      onClick={() => setRemoving(address)}
-                      className="text-muted-foreground size-9 shrink-0 rounded-full"
-                    >
-                      {busy === address ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <UserMinus className="size-4" />
-                      )}
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* Last, and only for the person who can. Not beside the settings it
-              sits under — those change a room, and this ends one. */}
-          {mine && (
-            <section className="border-t pt-5">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setTyped("")
-                  setDisbanding(true)
-                }}
-                className="text-destructive h-11 w-full justify-start rounded-2xl px-3"
-              >
-                <Trash2 className="size-4" />
-                Disband group
-              </Button>
-              <p className="text-muted-foreground mt-1 px-3 text-[13px] leading-snug">
-                Ends the room for everyone.
-              </p>
-            </section>
-          )}
-        </div>
+            {/* Last, and only for the person who can. Not beside the settings it
+                sits under — those change a room, and this ends one. */}
+            {mine && (
+              <section className="border-t pt-5">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setTyped("")
+                    setDisbanding(true)
+                  }}
+                  className="text-destructive h-11 w-full justify-start rounded-2xl px-3"
+                >
+                  <Trash2 className="size-4" />
+                  Disband group
+                </Button>
+                <p className="text-muted-foreground mt-1 px-3 text-[13px] leading-snug">
+                  Ends the room for everyone.
+                </p>
+              </section>
+            )}
+          </div>
+        )}
       </SheetContent>
 
       <PickContactSheet
