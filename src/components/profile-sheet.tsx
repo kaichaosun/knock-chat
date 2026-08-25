@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Check, Copy, Loader2, Wifi, WifiOff } from "lucide-react"
+import { Copy, Loader2, Wifi, WifiOff } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -41,6 +41,12 @@ export function ProfileSheet({
   const [name, setName] = useState("")
   /** What the relay last confirmed, so Save can tell a change from a re-tap. */
   const [savedName, setSavedName] = useState("")
+  /**
+   * The same for the price, kept in luna rather than NIM — luna is what is
+   * actually sent, so "1" and "1.0" compare equal instead of reading as an edit.
+   * Null until the relay answers, and again if it never does.
+   */
+  const [savedLuna, setSavedLuna] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingName, setSavingName] = useState(false)
@@ -53,10 +59,14 @@ export function ProfileSheet({
     getReachability(address)
       .then((r) => {
         setNim(String(r.policy.amount_luna / LUNA_PER_NIM))
+        setSavedLuna(r.policy.amount_luna)
         setName(r.name ?? "")
         setSavedName(r.name ?? "")
       })
-      .catch(() => setNim(""))
+      .catch(() => {
+        setNim("")
+        setSavedLuna(null)
+      })
       .finally(() => setLoading(false))
   }, [open, address])
 
@@ -68,6 +78,10 @@ export function ProfileSheet({
   const nameLength = [...name.trim()].length
   const nameTooLong = nameLength > MAX_NAME_LEN
   const nameChanged = name.trim() !== savedName
+
+  // What Save would send, and whether sending it would change anything.
+  const luna = valid ? Math.round(parsed * LUNA_PER_NIM) : null
+  const priceChanged = luna !== null && luna !== savedLuna
 
   const saveName = async () => {
     setSavingName(true)
@@ -84,12 +98,13 @@ export function ProfileSheet({
     }
   }
 
-  const save = async (value: number) => {
+  const save = async () => {
+    if (luna === null) return
     setSaving(true)
     try {
-      await setPolicy(Math.round(value * LUNA_PER_NIM))
-      setNim(String(value))
-      toast.success(value === 0 ? "Anyone can reach you now" : `Knocks now cost ${value} NIM`)
+      await setPolicy(luna)
+      setSavedLuna(luna)
+      toast.success(parsed === 0 ? "Anyone can reach you now" : `Knocks now cost ${parsed} NIM`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't save")
     } finally {
@@ -166,7 +181,7 @@ export function ProfileSheet({
                 onClick={() => void saveName()}
                 className="h-12 rounded-2xl px-5"
               >
-                {savingName ? <Loader2 className="animate-spin" /> : <Check />}
+                {savingName && <Loader2 className="animate-spin" />}
                 Save
               </Button>
             </div>
@@ -199,11 +214,11 @@ export function ProfileSheet({
                 </span>
               </div>
               <Button
-                disabled={!valid || saving || loading}
-                onClick={() => save(parsed)}
+                disabled={!priceChanged || saving || loading}
+                onClick={() => void save()}
                 className="h-12 rounded-2xl px-5"
               >
-                {saving ? <Loader2 className="animate-spin" /> : <Check />}
+                {saving && <Loader2 className="animate-spin" />}
                 Save
               </Button>
             </div>
@@ -214,11 +229,11 @@ export function ProfileSheet({
                   key={preset}
                   type="button"
                   disabled={saving || loading}
-                  onClick={() => save(preset)}
+                  onClick={() => setNim(String(preset))}
                   className={cn(
                     "rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors",
                     "active:bg-muted disabled:opacity-50",
-                    Number(nim) === preset && "border-primary text-primary",
+                    valid && parsed === preset && "border-primary text-primary",
                   )}
                 >
                   {preset === 0 ? "Free" : `${preset} NIM`}
@@ -226,10 +241,11 @@ export function ProfileSheet({
               ))}
             </div>
 
-            {Number(nim) === 0 && !loading && (
+            {valid && parsed === 0 && !loading && (
+              // Worded as what free means rather than what is in force, because
+              // this shows both before Save and after it.
               <p className="text-warning mt-2.5 text-[12px] leading-snug">
-                Anyone can reach you without paying. Useful for testing, but it removes
-                the spam protection.
+                Free means anyone can reach you without paying.
               </p>
             )}
           </section>
