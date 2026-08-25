@@ -10,6 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { canBeReached } from "@/lib/keys"
 import { compact, isValidAddress, normalizeInput, shortenAddress } from "@/lib/address"
 import { rememberOne, sanitize } from "@/lib/names"
 import type { Receipt } from "@/lib/receipts"
@@ -53,12 +54,22 @@ export function KnockSheet({
   const [checking, setChecking] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState("")
+  /**
+   * Whether there is anybody at this address to answer.
+   *
+   * Null until asked. A knock is sealed to the recipient's key, and somebody who
+   * has never opened Knock has published none — so the price on the button is
+   * for something that cannot happen, and saying so first is the whole point of
+   * a screen you look at before paying.
+   */
+  const [reachable, setReachable] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (open) {
       setValue(peer ? normalizeInput(peer) : "")
       setBody("")
       setReach(null)
+      setReachable(null)
       setError("")
     }
   }, [open, peer])
@@ -91,11 +102,15 @@ export function KnockSheet({
   useEffect(() => {
     if (!valid || isSelf) {
       setReach(null)
+      setReachable(null)
       return
     }
     let cancelled = false
     setChecking(true)
     setError("")
+    // Asked alongside the price, because the two are only useful together: what
+    // it costs, and whether it can happen at all.
+    void canBeReached(value).then((yes) => !cancelled && setReachable(yes))
     onReach(value)
       .then((r) => {
         if (cancelled) return
@@ -262,20 +277,29 @@ export function KnockSheet({
 
               <Button
                 size="lg"
-                disabled={!reach || !body.trim() || sending}
+                disabled={!reach || reachable === false || !body.trim() || sending}
                 onClick={submit}
                 className="h-13 w-full rounded-2xl text-base"
               >
                 {sending ? <Loader2 className="animate-spin" /> : null}
-                {alreadyPaid
-                  ? "Knock — already paid"
-                  : cost === 0
-                    ? "Knock"
-                    : `Knock — ${formatNim(cost)} NIM`}
+                {/* No price on a door nobody is behind. The relay quotes its
+                    default for an address it has never seen, which is right —
+                    anyone can be knocked on before they have set a price — but
+                    quoting it here would put a number on something that cannot
+                    happen, greyed out or not. */}
+                {reachable === false
+                  ? "Knock"
+                  : alreadyPaid
+                    ? "Knock — already paid"
+                    : cost === 0
+                      ? "Knock"
+                      : `Knock — ${formatNim(cost)} NIM`}
               </Button>
 
               <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-                {!reach
+                {reachable === false
+                  ? "Nobody has opened Knock at this address, so there is no key to seal a message to and no way for them to answer."
+                  : !reach
                   ? "Enter their address to see what it costs."
                   : alreadyPaid
                     ? "You've already paid for this one. Sending it again won't charge you."

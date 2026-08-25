@@ -174,6 +174,27 @@ export async function checkRegisteredKey(
 }
 
 /**
+ * Whether anybody could be written to at this address.
+ *
+ * A knock is paid for on chain and then sealed to the recipient's key. Somebody
+ * who has never opened Knock has published none, so there is nothing to seal to
+ * and no way for them to answer — asked here so a screen can say that while
+ * somebody is deciding, rather than after they have pressed the button. The
+ * payment is safe either way: [`keyForPeer`] runs before the transaction does.
+ *
+ * A relay that cannot be reached answers `true`. Refusing to let somebody knock
+ * because their connection wobbled is worse than letting the attempt fail.
+ */
+export async function canBeReached(peer: string): Promise<boolean> {
+  try {
+    await request<KeyCertificate>(`/v1/keys/${encodeURIComponent(formatAddress(peer))}`)
+    return true
+  } catch (error) {
+    return !(error instanceof Error && "status" in error && error.status === 404)
+  }
+}
+
+/**
  * The conversation key for talking to `peer`, fetching and verifying their
  * certificate if this device has not seen it yet.
  *

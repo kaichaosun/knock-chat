@@ -10,6 +10,7 @@ import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
+import { canBeReached } from "@/lib/keys"
 import type { Message } from "@/lib/messages"
 import { nameIn } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
@@ -55,6 +56,24 @@ export function Conversation({
   // — never something an ordinary-looking send turns into.
   const shut = reach !== null && !reach.channel_open
   const waiting = shut && reach.knock_pending
+
+  /**
+   * Whether there is anybody at this address to answer a knock.
+   *
+   * The prompt below offers to spend money reaching them, and somebody who has
+   * never opened Knock has published no key to seal a message to — so the offer
+   * cannot be met however much is paid. Asked only while the door is shut,
+   * which is the only time it is offered.
+   */
+  const [reachable, setReachable] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!shut) return
+    let cancelled = false
+    void canBeReached(peer).then((yes) => !cancelled && setReachable(yes))
+    return () => {
+      cancelled = true
+    }
+  }, [shut, peer])
   const cost = reach?.policy.amount_luna ?? 0
 
   // Keep the newest message in view as the thread grows.
@@ -169,7 +188,9 @@ export function Conversation({
         <div ref={bottom} />
       </div>
 
-      {shut && <KnockPrompt waiting={waiting} cost={cost} onKnock={onKnock} />}
+      {shut && (
+        <KnockPrompt waiting={waiting} cost={cost} reachable={reachable} onKnock={onKnock} />
+      )}
 
       <Composer onSend={onSend} onAttach={() => setAttaching(true)} disabled={shut} />
 
@@ -207,10 +228,13 @@ export function Conversation({
 function KnockPrompt({
   waiting,
   cost,
+  reachable,
   onKnock,
 }: {
   waiting: boolean
   cost: number
+  /** False when nobody has ever opened Knock here. Null until asked. */
+  reachable: boolean | null
   onKnock: () => void
 }) {
   return (
@@ -223,9 +247,14 @@ function KnockPrompt({
       <p className="flex-1 text-balance">
         {waiting
           ? "Knock sent. You can write again once they answer."
-          : "This chat is closed. Knock to ask them to reopen it."}
+          : reachable === false
+            ? "Nobody has opened Knock at this address, so there is nobody here to let you in."
+            : "This chat is closed. Knock to ask them to reopen it."}
       </p>
-      {!waiting && (
+      {/* No price where there is nobody to pay it to. The knock would fail
+          before the transaction — `keyForPeer` runs first — so this offers
+          nothing it cannot do rather than charging for the discovery. */}
+      {!waiting && reachable !== false && (
         <Button size="sm" onClick={onKnock} className="h-8 shrink-0 rounded-lg">
           {cost === 0 ? "Knock" : `Knock — ${formatNim(cost)} NIM`}
         </Button>
