@@ -471,21 +471,33 @@ export function GroupSheet({
             {/* Last, and only for the person who can. Not beside the settings it
                 sits under — those change a room, and this ends one. */}
             {mine && (
-              <section className="border-t pt-5">
-                <Button
-                  variant="ghost"
+              <section className="border-t pt-4">
+                {/* The shape every row in the compose menu has: a tinted glyph,
+                    what it does, and a line saying what that means. Borrowed
+                    rather than invented, because a button with a caption under
+                    it is two things that have to be aligned by hand, and this
+                    is one thing that cannot come apart. Red where that one is
+                    blue — the only difference, which is the point. */}
+                <button
+                  type="button"
                   onClick={() => {
                     setTyped("")
                     setDisbanding(true)
                   }}
-                  className="text-destructive h-11 w-full justify-start rounded-2xl px-3"
+                  className="active:bg-muted flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors"
                 >
-                  <Trash2 className="size-4" />
-                  Disband group
-                </Button>
-                <p className="text-muted-foreground mt-1 px-3 text-[13px] leading-snug">
-                  Ends the room for everyone.
-                </p>
+                  <span className="bg-destructive/10 text-destructive flex size-11 shrink-0 items-center justify-center rounded-2xl">
+                    <Trash2 className="size-5" strokeWidth={1.75} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="text-destructive block text-[15px] font-semibold">
+                      Disband group
+                    </span>
+                    <span className="text-muted-foreground block text-[13px] leading-snug">
+                      Ends the room for everyone.
+                    </span>
+                  </span>
+                </button>
               </section>
             )}
           </div>
