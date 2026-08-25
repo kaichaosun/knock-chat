@@ -104,7 +104,7 @@ export function Inbox({
       <AttachMenu
         open={holding !== null}
         onOpenChange={(open) => !open && setHolding(null)}
-        title={holding ? threadLabel(holding, rooms, names) : ""}
+        title={holding ? threadTitle(holding, rooms, names) : ""}
         actions={
           holding
             ? [
@@ -124,14 +124,26 @@ export function Inbox({
   )
 }
 
-/** What to call a thread in a menu title: the room's name, or whoever it is with. */
-function threadLabel(
+/**
+ * The title over the menu a held row opens.
+ *
+ * Says what kind of thread it is as well as which one, because the menu covers
+ * both and the actions in it will not always mean the same for each. A bare
+ * name would also read as the thing you are about to act on, when what you are
+ * acting on is the thread.
+ */
+function threadTitle(
   conversation: Conversation,
   rooms: Map<string, Group>,
   names: Directory,
 ): string {
-  if (conversation.group) return rooms.get(conversation.group)?.name ?? "Group"
-  return conversation.peer ? labelIn(names, conversation.peer) : "Chat"
+  if (conversation.group) {
+    return `Group chat: ${rooms.get(conversation.group)?.name ?? "Group"}`
+  }
+  // Nothing to be "with" if the peer is missing, which is a thread that should
+  // not exist — say the half that is still true rather than inventing a name.
+  if (!conversation.peer) return "Direct message"
+  return `Direct message with ${labelIn(names, conversation.peer)}`
 }
 
 function ConversationRow({

@@ -34,8 +34,15 @@ export function AttachMenu({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
-        <SheetHeader className="px-0">
+      {/* Tighter than a sheet's default. That default assumes a title with a
+          description under it and content below that; this is a title and then
+          the answer to it, and 16px of header padding plus a 16px column gap
+          puts them a thumb apart. */}
+      <SheetContent
+        side="bottom"
+        className="mx-auto w-full max-w-[30rem] gap-2 rounded-t-3xl px-5 pb-safe"
+      >
+        <SheetHeader className="px-0 pb-0">
           <SheetTitle>{title}</SheetTitle>
         </SheetHeader>
 
