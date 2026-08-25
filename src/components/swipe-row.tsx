@@ -1,13 +1,19 @@
-import { useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-/** How far the row slides to reveal Delete, how far a swipe must go to stick, and
- *  how much travel separates a swipe from a tap. */
+/** How far the row slides to reveal Delete, and how far a swipe must go to stick. */
 const REVEAL_PX = 92
 const COMMIT_PX = 45
-const SLOP_PX = 8
+/**
+ * How far a finger travels before the gesture has to declare itself.
+ *
+ * Lower than the slop above, and deliberately: the scroller commits within a
+ * frame or two of the first movement, so an answer that arrives at 8px arrives
+ * after the decision it was meant to influence.
+ */
+const AXIS_PX = 5
 /** How long a finger has to stay put before it counts as a press rather than
  *  the start of a swipe. */
 const HOLD_MS = 450
@@ -60,12 +66,69 @@ export function SwipeRow({
   // Set once a gesture has travelled far enough to be a swipe. The browser fires a
   // click after touchend, and without this that click would open the row too.
   const swiped = useRef(false)
+  /**
+   * Which way this gesture turned out to be going, decided once.
+   *
+   * Asking per move instead is what makes a list feel loose: a finger on its
+   * way down wanders sideways by a pixel or two, and for that one frame the
+   * horizontal distance is the larger of the two, so the row shifts and then
+   * goes back. Android never showed it because Chrome settles on a scroll axis
+   * itself and stops delivering the moves; WebKit hands over every one.
+   */
+  const axis = useRef<"x" | "y" | null>(null)
+  const row = useRef<HTMLButtonElement>(null)
   // The pending press, and whether one already fired. The second exists for the
   // same reason `swiped` does: a click still arrives after the finger lifts, and
   // opening the thread behind the menu that just opened would be a surprise.
   const holding = useRef<ReturnType<typeof setTimeout> | null>(null)
   const held = useRef(false)
   const [drag, setDrag] = useState(0)
+
+  /**
+   * Touchmove, bound by hand.
+   *
+   * React registers this event passively, so `preventDefault` inside an
+   * `onTouchMove` prop is a no-op — the browser has already been promised it
+   * can scroll. A fast swipe is never purely sideways, WebKit sees the vertical
+   * part of it and starts panning, and nothing in a passive handler can take
+   * that back. Bound here instead, non-passive, so the row can say the gesture
+   * is spoken for.
+   *
+   * Mounted once. Everything it reads is a ref or a setter, both of which
+   * outlive a render.
+   */
+  useEffect(() => {
+    const element = row.current
+    if (!element) return
+
+    const onMove = (event: TouchEvent) => {
+      if (!start.current) return
+      const touch = event.touches[0]
+      const dx = start.current.x - touch.clientX
+      const dy = touch.clientY - start.current.y
+
+      // Settled on the first movement worth reading, and kept for the rest of
+      // the gesture. Below that this is neither yet, and nothing moves.
+      if (axis.current === null) {
+        if (Math.abs(dx) < AXIS_PX && Math.abs(dy) < AXIS_PX) return
+        axis.current = Math.abs(dx) > Math.abs(dy) ? "x" : "y"
+        // Whichever way it went, it went somewhere, so it is not a press.
+        stopHolding()
+      }
+      // A scroll stays a scroll, however the finger wanders on the way down.
+      if (axis.current === "y") return
+
+      // Spoken for. Without this the list scrolls under a sideways swipe,
+      // which is the whole reason this listener is not the React one.
+      if (event.cancelable) event.preventDefault()
+
+      swiped.current = true
+      setDrag(Math.max(0, Math.min(dx, REVEAL_PX)))
+    }
+
+    element.addEventListener("touchmove", onMove, { passive: false })
+    return () => element.removeEventListener("touchmove", onMove)
+  }, [])
 
   const stopHolding = () => {
     if (holding.current === null) return
@@ -120,11 +183,13 @@ export function SwipeRow({
 
       <button
         type="button"
+        ref={row}
         style={{ transform: `translateX(${-distance}px)` }}
         onTouchStart={(event) => {
           const touch = event.touches[0]
           start.current = { x: touch.clientX, y: touch.clientY }
           swiped.current = false
+          axis.current = null
           held.current = false
           if (!onLongPress) return
           holding.current = setTimeout(() => {
@@ -132,18 +197,6 @@ export function SwipeRow({
             held.current = true
             onLongPress()
           }, HOLD_MS)
-        }}
-        onTouchMove={(event) => {
-          if (!start.current) return
-          const touch = event.touches[0]
-          const dx = start.current.x - touch.clientX
-          // Any real movement means this is a swipe or a scroll, not a press.
-          const dy = touch.clientY - start.current.y
-          if (Math.abs(dx) > SLOP_PX || Math.abs(dy) > SLOP_PX) stopHolding()
-          // Ignore mostly-vertical gestures so the list still scrolls.
-          if (Math.abs(touch.clientY - start.current.y) > Math.abs(dx)) return
-          if (Math.abs(dx) > SLOP_PX) swiped.current = true
-          setDrag(Math.max(0, Math.min(dx, REVEAL_PX)))
         }}
         onTouchCancel={stopHolding}
         onTouchEnd={() => {
@@ -167,13 +220,14 @@ export function SwipeRow({
           else onClick()
         }}
         className={cn(
+          // The browser owns the vertical, this owns the horizontal. Unless it
+          // is told, WebKit keeps both live at once and they fight over every
+          // diagonal.
+          "touch-pan-y",
           "relative flex w-full items-center gap-3.5 px-3 py-3.5 text-left transition-colors",
           // Opaque, always: a translucent row would let the Delete panel wash
           // through it while the finger is down.
           surface ?? "bg-background active:bg-muted",
-          // Otherwise iOS answers a held finger with its own text-selection
-          // callout, on top of whatever the press opened.
-          onLongPress && "[-webkit-touch-callout:none] select-none",
           drag === 0 && "transition-transform",
         )}
       >
