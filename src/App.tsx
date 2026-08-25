@@ -815,7 +815,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         <div
           className={cn(
             "flex items-end justify-between gap-3 px-4 transition-[padding] duration-200",
-            scrolled ? "py-2.5" : "pt-1 pb-3",
+            // Top padding is the same either way, so only the bottom and the
+            // font size animate — the avatar holds still while the title shrinks.
+            scrolled ? "py-2.5" : "pt-2.5 pb-3",
           )}
         >
           <div className="flex items-baseline gap-2">
@@ -834,14 +836,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               <span className="text-destructive text-[11px] font-semibold">offline</span>
             )}
           </div>
+          {/* The button is 44px, the smallest target a thumb hits reliably;
+              the identicon inside is smaller, so the target is generous without
+              the mark being loud. Its own transparent bands take off another
+              tenth top and bottom, which is why 36 does not look like 36. */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setProfileOpen(true)}
             aria-label="Your profile"
-            className="size-10 shrink-0 rounded-full"
+            className="size-11 shrink-0 rounded-full"
           >
-            <AddressAvatar address={address} size="sm" />
+            <AddressAvatar address={address} size="sm" className="size-9" />
           </Button>
         </div>
       </header>
