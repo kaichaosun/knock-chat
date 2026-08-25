@@ -78,35 +78,42 @@ export function GroupAvatar({
       className={cn(
         // The ground behind the faces, seen through the quarters a room with
         // fewer than four members leaves empty. Same reasoning as above.
-        "bg-foreground/10 grid shrink-0 overflow-hidden",
-        // The inset and the gap do the same job from opposite sides — an
-        // identicon is a hexagon running nearly the full width of its box, so
-        // without them the faces collide with each other and with the tile's
-        // own edge, and four separate people read as one smear.
+        "bg-foreground/10 shrink-0 overflow-hidden",
+        // The inset keeps the faces off the tile's own edge — an identicon is a
+        // hexagon running nearly the full width of its box, and without it the
+        // outer faces are clipped by the rounding. Fixed pixels because two of
+        // them read the same at all three sizes; the radius stays proportional
+        // because border-radius percentages are not in dispute anywhere.
+        "rounded-[22%] p-[2px]",
         //
-        // Fixed pixels rather than percentages, deliberately. A percentage gap
-        // resolves against the grid's own content box, which is the kind of
-        // circular measurement WebKit and Blink have historically disagreed
-        // about — and this is drawn inside Nimiq Pay's web view, where losing
-        // that argument means the rows collapse and the faces disappear
-        // entirely. Three and two pixels read the same at all three sizes
-        // anyway; the radius stays proportional because border-radius
-        // percentages are not in dispute anywhere.
-        "rounded-[22%] p-[3px] gap-[2px]",
-        // Always four slots, filled from the top left. A grid that changed
-        // shape with the number of faces would give two rooms two different
-        // marks for no reason a reader could see — the quarters are what makes
-        // it recognisable as a room at all. Rows and columns are both stated,
-        // never left to auto: an auto row sizes to its content, and the content
-        // is an image asking for 100% of that row, which resolves to nothing.
-        "grid-cols-2 grid-rows-2",
+        // Four cells at half the width and half the height, wrapped — not a
+        // grid with two stated rows. That is what this was, and on WebKit the
+        // rows collapsed anyway: two faces landed side by side in one row and
+        // stretched to the full height of the tile, which is a pair of stripes
+        // rather than a mark. A row template is a request. A cell that is
+        // itself half as tall as its parent is a measurement, and there is
+        // nothing left to interpret.
+        //
+        // `content-start` because a single wrapped line would otherwise be
+        // stretched to fill, which puts one face in the middle of the tile
+        // instead of in its corner.
+        "flex flex-wrap content-start",
         SIZES[size],
         className,
       )}
     >
-      {faces.map((address) => (
-        <img key={address} src={avatarUri(address)} alt="" className="size-full object-cover" />
-      ))}
+      {/* Four slots, always — the empty ones drawn as nothing rather than left
+          out, so a room of two and a room of four are the same shape. */}
+      {Array.from({ length: MOST }, (_, slot) => {
+        const address = faces[slot]
+        return (
+          <div key={address ?? `empty-${slot}`} className="h-1/2 w-1/2 p-[1px]">
+            {address && (
+              <img src={avatarUri(address)} alt="" className="size-full object-cover" />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
