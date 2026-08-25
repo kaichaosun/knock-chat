@@ -42,7 +42,14 @@ export function sameMinute(a: string, b: string): boolean {
   return Math.floor(first / MINUTE) === Math.floor(second / MINUTE)
 }
 
-/** Day separator label inside a thread. */
+/**
+ * Day separator label inside a thread.
+ *
+ * Only the two days that have names people use get them. A weekday on its own
+ * — "Monday", "Sunday" — reads as a name but works like a puzzle: it still has
+ * to be counted back to a date, and past a few days it stops being countable at
+ * all. Everything older is simply dated.
+ */
 export function dayLabel(iso: string, now = Date.now()): string {
   const then = new Date(iso)
   if (Number.isNaN(then.getTime())) return ""
@@ -52,7 +59,6 @@ export function dayLabel(iso: string, now = Date.now()): string {
 
   if (days === 0) return "Today"
   if (days === 1) return "Yesterday"
-  if (days < 7) return then.toLocaleDateString(undefined, { weekday: "long" })
   return then.toLocaleDateString(undefined, {
     day: "numeric",
     month: "long",
