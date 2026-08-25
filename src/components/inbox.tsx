@@ -20,6 +20,7 @@ export function Inbox({
   onOpen,
   onCompose,
   onDelete,
+  floating,
 }: {
   conversations: Conversation[]
   /** The rooms you are in, so a room's thread can be labelled with its name. */
@@ -27,6 +28,8 @@ export function Inbox({
   onOpen: (thread: string) => void
   onCompose: () => void
   onDelete: (thread: string) => void
+  /** Whether the compose button belongs here. Off, it lives in the header. */
+  floating: boolean
 }) {
   // Only one row open at a time, so a stray Delete is never left lurking under
   // a row the user has moved on from.
@@ -44,7 +47,8 @@ export function Inbox({
     // button would come unstuck a screenful down and scroll away with the rest.
     // A minimum lets the box grow with the list it contains.
     <div className="relative min-h-full">
-      <ul className="px-2 pb-28">
+      {/* Room for the button when there is one to clear. */}
+      <ul className={cn("px-2", floating ? "pb-28" : "pb-24")}>
         {conversations.map((conversation) => (
           <ConversationRow
             key={conversation.key}
@@ -59,24 +63,26 @@ export function Inbox({
         ))}
       </ul>
 
-      <div className="pointer-events-none sticky bottom-0 flex justify-end px-5 pb-safe">
-        <Button
-          size="icon"
-          onClick={onCompose}
-          aria-label="New chat"
-          className="bg-primary/85 pointer-events-auto mb-5 size-12 rounded-full shadow-md shadow-primary/20 backdrop-blur-sm"
-        >
-          {/* A plus, not a pen: this opens a menu of three unrelated things —
-              a message, a room of your own, a room of somebody else's — and a
-              pen claims the first of them. The one glyph that means "add
-              something" without saying which is the honest one here.
+      {floating && (
+        <div className="pointer-events-none sticky bottom-0 flex justify-end px-5 pb-safe">
+          <Button
+            size="icon"
+            onClick={onCompose}
+            aria-label="New chat"
+            className="bg-primary/85 pointer-events-auto mb-5 size-12 rounded-full shadow-md shadow-primary/20 backdrop-blur-sm"
+          >
+            {/* A plus, not a pen: this opens a menu of three unrelated things —
+                a message, a room of your own, a room of somebody else's — and a
+                pen claims the first of them. The one glyph that means "add
+                something" without saying which is the honest one here.
 
-              Small, and not quite opaque. A plus is the densest glyph in the
-              app — two full-length strokes crossing, no counters — so at the
-              size a drawn icon needs it reads twice as loud as one. */}
-          <Plus className="size-5" />
-        </Button>
-      </div>
+                Small, and not quite opaque. A plus is the densest glyph in the
+                app — two full-length strokes crossing, no counters — so at the
+                size a drawn icon needs it reads twice as loud as one. */}
+            <Plus className="size-5" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

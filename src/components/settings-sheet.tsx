@@ -1,8 +1,10 @@
-import { Moon, Smartphone, Sun } from "lucide-react"
+import { CirclePlus, Moon, PanelTop, Smartphone, Sun } from "lucide-react"
 
 import { BrandMark } from "@/components/brand-mark"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { usePrefs } from "@/hooks/use-prefs"
 import { useTheme } from "@/hooks/use-theme"
+import { update, type ComposeSpot } from "@/lib/prefs"
 import { choose, type Theme } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 
@@ -15,6 +17,17 @@ const THEMES: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "System", icon: Smartphone },
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
+]
+
+/**
+ * Where the button that starts a new chat can sit.
+ *
+ * Floating first, because it is the default and because it is what the tab
+ * looks like before anybody comes here.
+ */
+const SPOTS: { value: ComposeSpot; label: string; icon: typeof Sun }[] = [
+  { value: "floating", label: "Floating", icon: CirclePlus },
+  { value: "header", label: "In the header", icon: PanelTop },
 ]
 
 /**
@@ -33,6 +46,7 @@ export function SettingsSheet({
   onOpenChange: (open: boolean) => void
 }) {
   const { theme, palette } = useTheme()
+  const { compose } = usePrefs()
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -86,6 +100,42 @@ export function SettingsSheet({
                 Your phone is set to {palette} right now.
               </p>
             )}
+          </section>
+
+          <section>
+            <h3 className="text-sm font-semibold">New chat button</h3>
+            <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
+              Floating puts it under your thumb but over the last rows of the list.
+              In the header it covers nothing, and matches the other tabs.
+            </p>
+
+            <div
+              role="radiogroup"
+              aria-label="New chat button"
+              className="bg-muted mt-3 grid grid-cols-2 gap-1 rounded-2xl p-1"
+            >
+              {SPOTS.map(({ value, label, icon: Icon }) => {
+                const picked = compose === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={picked}
+                    onClick={() => update({ compose: value })}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-xl py-3 text-[13px] font-semibold transition-colors",
+                      picked
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground active:bg-background/50",
+                    )}
+                  >
+                    <Icon className="size-4.5" />
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
           </section>
 
           {/* Where the mark gets to be a mark. Centred and given a line of its

@@ -21,6 +21,7 @@ import { JoinGroupSheet } from "@/components/join-group-sheet"
 import { SendGiftSheet } from "@/components/send-gift-sheet"
 import { useGroups } from "@/hooks/use-groups"
 import { useKnocks } from "@/hooks/use-knocks"
+import { usePrefs } from "@/hooks/use-prefs"
 import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
@@ -146,6 +147,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [groupDetail, setGroupDetail] = useState<GroupDetail | null>(null)
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [composing, setComposing] = useState(false)
+  const { compose } = usePrefs()
   /** The two ways into a room, offered from the Groups tab's own plus. */
   const [addingGroup, setAddingGroup] = useState(false)
   /** A room a link pointed at, waiting to be joined. */
@@ -836,13 +838,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   /**
    * What the plus beside the title does here.
    *
-   * Chats has none: its own compose button floats over the list, and a second
-   * way to do the same thing in the same view is a thing to wonder about
-   * rather than a shortcut. The other two tabs had nothing at all — everything
-   * you could add from them lived behind the Chats button, a tab away.
+   * Chats has one only when its own button is not floating over the list —
+   * two ways to do the same thing in one view is something to wonder about
+   * rather than a shortcut. Which of the two it is, is [`prefs.compose`]:
+   * floating is under your thumb and over the last rows, up here is out of
+   * the way and matches the other tabs, and neither is right for everyone.
    */
   const add =
-    tab === "contacts"
+    tab === "chats"
+      ? compose === "header"
+        ? { label: "New chat or group", onSelect: () => setComposing(true) }
+        : null
+      : tab === "contacts"
       ? {
           label: "New message",
           onSelect: () => {
@@ -935,6 +942,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               conversations={threads}
               groups={groups}
               onOpen={openAnyThread}
+              floating={compose === "floating"}
               onCompose={() => setComposing(true)}
               onDelete={(thread) => {
                 deleteThread(thread)
