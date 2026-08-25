@@ -15,8 +15,13 @@
       name="description"
       content="Messages between Nimiq wallets, with spam priced out instead of guessed at."
     />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Nimiq Pay has no icon API of its own, so the app icon it pins comes
+         from here — without a manifest it falls back to whatever favicon it
+         cached, which is how the old envelope outlived being replaced. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

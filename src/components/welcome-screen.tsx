@@ -53,7 +53,7 @@ export function WelcomeScreen({
   if (status === "resuming") {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 px-6 pt-safe pb-safe">
-        <BrandMark className="size-20" />
+        <BrandMark className="size-24" />
         {/*<Loader2 className="text-muted-foreground size-5 animate-spin" />*/}
       </div>
     )
@@ -62,7 +62,7 @@ export function WelcomeScreen({
   return (
     <div className="flex h-full flex-col justify-between px-6 pt-safe pb-safe">
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <BrandMark className="size-20" />
+        <BrandMark className="size-24" />
 
         <h1 className="mt-7 text-3xl font-extrabold tracking-tight">Knock</h1>
         <p className="text-muted-foreground mt-2 max-w-xs text-balance">
