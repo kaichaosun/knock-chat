@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { DoorOpen, Link as LinkIcon, Loader2, Users } from "lucide-react"
+import { Link as LinkIcon, Loader2, Users } from "lucide-react"
 import { toast } from "sonner"
 
 import { GroupAvatar } from "@/components/group-avatar"
@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dialog"
 import { formatNim } from "@/lib/postage"
 import { removeGroupMember, type Group } from "@/lib/relay"
-import { relativeTime } from "@/lib/time"
 
 /**
  * Every room you are in.
@@ -107,13 +106,19 @@ export function Groups({
               <GroupAvatar />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold">{group.name}</p>
-                <p className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[12px]">
-                  <DoorOpen className="size-3.5 shrink-0" />
-                  <span className="truncate">
-                    {mine ? "Yours" : "Joined"} {relativeTime(group.created_at)}
-                    {group.join_price_luna > 0 &&
-                      ` · ${formatNim(group.join_price_luna)} NIM to join`}
-                  </span>
+                {/* The door, not the calendar. How old a room is tells nobody
+                    anything; what it costs to get in is the thing you check
+                    before sending someone the link. */}
+                <p className="text-muted-foreground mt-0.5 truncate text-[12px]">
+                  {[
+                    mine ? "Yours" : null,
+                    group.join_price_luna > 0
+                      ? `${formatNim(group.join_price_luna)} NIM to join`
+                      : "Free to join",
+                    group.requires_approval ? "approval needed" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               </div>
             </SwipeRow>
