@@ -174,8 +174,15 @@ function KnockNote({ note, onOpen }: { note: string | null | undefined; onOpen: 
       onClick={onOpen}
       aria-label="Read the whole message"
       className={cn(
-        "bg-muted mt-2.5 block w-full rounded-xl px-3 py-2 text-left text-[13px] leading-snug",
-        "line-clamp-3 whitespace-pre-wrap wrap-anywhere active:brightness-95",
+        "bg-muted mt-2.5 w-full rounded-xl px-3 py-2 text-left text-[13px] leading-snug",
+        // No `whitespace-pre-wrap` and no `block` here, both deliberately.
+        // `line-clamp` works by making the element a `-webkit-box`, so a
+        // `display` of its own cancels it; and with preserved newlines WebKit
+        // measures the box against lines that are not there, which is what
+        // leaves half a fourth line showing under the clamp. A preview is
+        // three lines of what was said, not its shape — the sheet keeps the
+        // line breaks.
+        "line-clamp-3 wrap-anywhere active:brightness-95",
       )}
     >
       {note}
