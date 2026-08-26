@@ -120,17 +120,21 @@ export function WelcomeScreen({
           </>
         ) : (
           <>
+            {/* Unchanged by tapping it. The wallet's sheet covers the screen
+                the moment it opens, so a spinner here is never seen doing its
+                job — the only time it is on screen is after the sheet has gone,
+                which is the one moment it is not true. On iOS a sheet dismissed
+                by tapping outside settles nothing at all (the host calls
+                neither `sendResponse` nor `sendError`, and no event reaches the
+                page — see the dismissal probe), so a button that changed on tap
+                would change back only for somebody who signed. */}
             <Button
               size="lg"
-              disabled={status !== "ready" && status !== "error"}
+              disabled={status === "detecting"}
               onClick={onSignIn}
               className="h-13 w-full rounded-2xl text-base"
             >
-              {status === "detecting" || status === "signing" ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <KeyRound />
-              )}
+              {status === "detecting" ? <Loader2 className="animate-spin" /> : <KeyRound />}
               {label(status)}
             </Button>
             <p className="text-muted-foreground flex items-center justify-center gap-1.5 text-[12px]">
@@ -179,10 +183,6 @@ function label(status: WelcomeStatus): string {
     case "detecting":
     case "resuming":
       return "Looking for your wallet"
-    case "signing":
-      return "Waiting for your wallet"
-    case "error":
-      return "Try again"
     default:
       return "Sign in with your wallet"
   }

@@ -287,8 +287,7 @@ function EmptyInbox({ onCompose }: { onCompose: () => void }) {
       </div>
       <h2 className="mt-6 text-xl font-bold tracking-tight">No messages yet</h2>
       <p className="text-muted-foreground mt-2 max-w-[18rem] text-balance">
-        Start a conversation with anyone who has opened Knock. Messages are encrypted
-        to their device.
+        Start a conversation with anyone who has opened Knock.
       </p>
       <Button onClick={onCompose} size="lg" className="mt-7 h-12 rounded-2xl px-6">
         <PenLine />
