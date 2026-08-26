@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info } from "lucide-react"
+import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { MemberSheet } from "@/components/member-sheet"
+import { RemoveMemberDialog } from "@/components/remove-member-dialog"
 import { AttachMenu } from "@/components/attach-menu"
 import { Composer } from "@/components/composer"
 import { GroupAvatar } from "@/components/group-avatar"
@@ -9,9 +12,10 @@ import { GroupSheet } from "@/components/group-sheet"
 import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
+import { copyText } from "@/lib/clipboard"
 import { labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
-import type { Group, GroupDetail } from "@/lib/relay"
+import { removeGroupMember, type Group, type GroupDetail } from "@/lib/relay"
 import { dayLabel } from "@/lib/time"
 
 /**
@@ -64,6 +68,30 @@ export function GroupRoom({
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const [details, setDetails] = useState(false)
+  /** Whose details are open. A name over a message says who somebody is; it
+   *  does not start a conversation, which in a room is never free. */
+  const [showing, setShowing] = useState<string | null>(null)
+  /** Who the owner has asked to show out, before they confirm it. */
+  const [removing, setRemoving] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  // The owner's half of a name over a message. A room is where you notice
+  // somebody misbehaving, so it is also where showing them out belongs.
+  const mine = group.owner === owner && !gone
+
+  const remove = async (address: string) => {
+    setBusy(true)
+    try {
+      await removeGroupMember(group.id, address)
+      setRemoving(null)
+      onRefreshDetail()
+      toast.success("Removed")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't remove them")
+    } finally {
+      setBusy(false)
+    }
+  }
   const [attaching, setAttaching] = useState(false)
 
   useEffect(() => {
@@ -172,8 +200,8 @@ export function GroupRoom({
                       {opens && (
                         <button
                           type="button"
-                          onClick={() => onOpenChat(message.peer)}
-                          aria-label={`Chat with ${who}`}
+                          onClick={() => setShowing(message.peer)}
+                          aria-label={`About ${who}`}
                           className="block active:opacity-60"
                         >
                           <AddressAvatar address={message.peer} size="sm" />
@@ -187,7 +215,7 @@ export function GroupRoom({
                       {opens && (
                         <button
                           type="button"
-                          onClick={() => onOpenChat(message.peer)}
+                          onClick={() => setShowing(message.peer)}
                           className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[11px] font-semibold"
                         >
                           {who}
@@ -246,6 +274,35 @@ export function GroupRoom({
           ]}
         />
       )}
+
+      <MemberSheet
+        address={showing}
+        onOpenChange={(next) => !next && setShowing(null)}
+        you={owner}
+        roomOwner={group.owner}
+        mine={mine}
+        onCopy={(address) => {
+          void copyText(address).then((ok) =>
+            ok ? toast.success("Address copied") : toast.error("Couldn't copy that"),
+          )
+        }}
+        onOpenChat={(address) => {
+          setShowing(null)
+          onOpenChat(address)
+        }}
+        onRemove={(address) => {
+          setShowing(null)
+          setRemoving(address)
+        }}
+      />
+
+      <RemoveMemberDialog
+        address={removing}
+        group={group}
+        busy={busy}
+        onOpenChange={(open) => !open && setRemoving(null)}
+        onConfirm={(address) => void remove(address)}
+      />
 
       <GroupSheet
         open={details}

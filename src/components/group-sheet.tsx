@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { MemberSheet } from "@/components/member-sheet"
 import { MembersSheet } from "@/components/members-sheet"
 import { PickContactSheet } from "@/components/pick-contact-sheet"
 import { RemoveMemberDialog } from "@/components/remove-member-dialog"
@@ -170,6 +171,8 @@ export function GroupSheet({
   const [adding, setAdding] = useState(false)
   /** Open once somebody wants past the handful the details carry. */
   const [listing, setListing] = useState(false)
+  /** Whose details are open. Tapping a member says who they are, not hello. */
+  const [showing, setShowing] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -556,23 +559,22 @@ export function GroupSheet({
               <ul className="mt-2 space-y-1">
                 {members.map((address) => (
                   <li key={address} className="flex items-center gap-3 rounded-2xl py-1.5">
-                    <AddressAvatar address={address} size="sm" />
+                    {/* Face and name are one target — they are one person. */}
                     <button
                       type="button"
-                      disabled={address === owner}
-                      onClick={() => {
-                        onOpenChat(address)
-                        onOpenChange(false)
-                      }}
-                      className="min-w-0 flex-1 text-left"
+                      onClick={() => setShowing(address)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     >
-                      <p className="truncate text-[13px] font-semibold">
-                        {address === owner ? "You" : labelIn(names, address)}
-                      </p>
-                      <p className="text-muted-foreground truncate font-mono text-[11px]">
-                        {shortenAddress(address)}
-                        {address === group.owner && " · owner"}
-                      </p>
+                      <AddressAvatar address={address} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-semibold">
+                          {address === owner ? "You" : labelIn(names, address)}
+                        </p>
+                        <p className="text-muted-foreground truncate font-mono text-[11px]">
+                          {shortenAddress(address)}
+                          {address === group.owner && " · owner"}
+                        </p>
+                      </div>
                     </button>
                     {mine && address !== group.owner && (
                       <Button
@@ -646,6 +648,28 @@ export function GroupSheet({
         )}
       </SheetContent>
 
+      <MemberSheet
+        address={showing}
+        onOpenChange={(next) => !next && setShowing(null)}
+        you={owner}
+        roomOwner={group.owner}
+        mine={mine}
+        onCopy={(address) => {
+          void copyText(address).then((ok) =>
+            ok ? toast.success("Address copied") : toast.error("Couldn't copy that"),
+          )
+        }}
+        onOpenChat={(address) => {
+          setShowing(null)
+          onOpenChange(false)
+          onOpenChat(address)
+        }}
+        onRemove={(address) => {
+          setShowing(null)
+          setRemoving(address)
+        }}
+      />
+
       <MembersSheet
         open={listing}
         onOpenChange={setListing}
@@ -653,6 +677,11 @@ export function GroupSheet({
         total={memberCount}
         owner={owner}
         mine={mine}
+        onCopy={(address) => {
+          void copyText(address).then((ok) =>
+            ok ? toast.success("Address copied") : toast.error("Couldn't copy that"),
+          )
+        }}
         onOpenChat={(address) => {
           onOpenChange(false)
           onOpenChat(address)

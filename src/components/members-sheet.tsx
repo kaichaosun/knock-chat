@@ -3,6 +3,7 @@ import { Loader2, Search, UserMinus } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { MemberSheet } from "@/components/member-sheet"
 import { RemoveMemberDialog } from "@/components/remove-member-dialog"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -34,6 +35,7 @@ export function MembersSheet({
   owner,
   mine,
   onOpenChat,
+  onCopy,
   onRemoved,
 }: {
   open: boolean
@@ -47,6 +49,7 @@ export function MembersSheet({
   /** Whether you own the room, which is who may show somebody out. */
   mine: boolean
   onOpenChat: (address: string) => void
+  onCopy: (address: string) => void
   /** Told when somebody has gone, so the count outside can catch up. */
   onRemoved: () => void
 }) {
@@ -61,6 +64,8 @@ export function MembersSheet({
   /** Who is being shown out, once the owner has asked and before they confirm. */
   const [removing, setRemoving] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /** Whose details are open. Tapping a member says who they are, not hello. */
+  const [showing, setShowing] = useState<string | null>(null)
 
   const remove = async (address: string) => {
     if (!group) return
@@ -183,23 +188,24 @@ export function MembersSheet({
           >
             {members.map((address) => (
               <li key={address} className="flex items-center gap-3 rounded-2xl py-1.5">
-                <AddressAvatar address={address} size="sm" />
+                {/* Face and name are one target. They are one person, and half
+                    of them being tappable is a guess about where somebody
+                    aimed. */}
                 <button
                   type="button"
-                  disabled={address === owner}
-                  onClick={() => {
-                    onOpenChat(address)
-                    onOpenChange(false)
-                  }}
-                  className="min-w-0 flex-1 text-left"
+                  onClick={() => setShowing(address)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  <p className="truncate text-[13px] font-semibold">
-                    {address === owner ? "You" : labelIn(names, address)}
-                  </p>
-                  <p className="text-muted-foreground truncate font-mono text-[11px]">
-                    {shortenAddress(address)}
-                    {group && address === group.owner && " · owner"}
-                  </p>
+                  <AddressAvatar address={address} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-semibold">
+                      {address === owner ? "You" : labelIn(names, address)}
+                    </p>
+                    <p className="text-muted-foreground truncate font-mono text-[11px]">
+                      {shortenAddress(address)}
+                      {group && address === group.owner && " · owner"}
+                    </p>
+                  </div>
                 </button>
 
                 {/* The owner's own row has no way out of the room, which is why
@@ -226,6 +232,24 @@ export function MembersSheet({
           </ul>
         </div>
       </SheetContent>
+
+      <MemberSheet
+        address={showing}
+        onOpenChange={(next) => !next && setShowing(null)}
+        you={owner}
+        roomOwner={group?.owner ?? ""}
+        mine={mine}
+        onCopy={onCopy}
+        onOpenChat={(address) => {
+          setShowing(null)
+          onOpenChat(address)
+          onOpenChange(false)
+        }}
+        onRemove={(address) => {
+          setShowing(null)
+          setRemoving(address)
+        }}
+      />
 
       {group && (
         <RemoveMemberDialog
