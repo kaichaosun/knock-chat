@@ -252,6 +252,8 @@ export type GroupDetail = {
   group: Group
   members: string[]
   names: Names
+  /** Whether the room is at the relay's member limit, so nobody else fits. */
+  full?: boolean
 }
 
 export type JoinRequest = {

@@ -212,6 +212,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [addingGroup, setAddingGroup] = useState(false)
   /** A room a link pointed at, waiting to be joined. */
   const [invited, setInvited] = useState<Group | null>(null)
+  /** Whether that room has room. Kept beside it, since only the door view says. */
+  const [invitedFull, setInvitedFull] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [pasting, setPasting] = useState(false)
@@ -349,8 +351,12 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       setPasting(false)
       setInviteOpen(true)
       setInviteLoading(true)
+      setInvitedFull(false)
       inspect(id)
-        .then((detail) => setInvited(detail.group))
+        .then((detail) => {
+          setInvited(detail.group)
+          setInvitedFull(detail.full ?? false)
+        })
         .catch(() => {
           setInviteOpen(false)
           toast.error("That group link doesn't lead anywhere.")
@@ -837,6 +843,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         group={invited}
+        full={invitedFull}
         loading={inviteLoading}
         onJoin={async (group) => {
           const result = await join(group)

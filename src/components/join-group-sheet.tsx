@@ -24,6 +24,7 @@ export function JoinGroupSheet({
   open,
   onOpenChange,
   group,
+  full,
   loading,
   onJoin,
 }: {
@@ -31,6 +32,8 @@ export function JoinGroupSheet({
   onOpenChange: (open: boolean) => void
   /** Null while the link is still being looked up. */
   group: Group | null
+  /** The room is at its limit. Said here because here is before the money. */
+  full: boolean
   loading: boolean
   onJoin: (group: Group) => Promise<void>
 }) {
@@ -96,10 +99,20 @@ export function JoinGroupSheet({
                 Group messages aren't encrypted.
               </p>
 
+              {/* Before the wallet, not after. The relay refuses a join into a
+                  full room, but a refusal cannot call back a transfer that has
+                  already left — so the only useful place to say this is on the
+                  screen where the decision is still being made. */}
+              {full && (
+                <p className="text-destructive px-1 text-[13px] leading-snug">
+                  This group is full. Nobody else can join it for now.
+                </p>
+              )}
+
               {error && <p className="text-destructive px-1 text-[13px]">{error}</p>}
 
               <Button
-                disabled={joining}
+                disabled={joining || full}
                 onClick={() => void submit()}
                 className="brand-gradient h-13 w-full rounded-2xl text-base"
               >
