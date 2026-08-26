@@ -29,6 +29,8 @@ import { labelIn, nameIn, remember } from "@/lib/names"
 import { parseNim } from "@/lib/payments"
 import { formatNim } from "@/lib/postage"
 import {
+  MAX_AMOUNT_LUNA,
+  MAX_AMOUNT_NIM,
   answerJoinRequest,
   disbandGroup,
   listJoinRequests,
@@ -260,7 +262,12 @@ export function GroupSheet({
   }
 
   /** Blank means free, which is a price rather than an empty field. */
-  const luna = price.trim() === "" ? 0 : parseNim(price)
+  // Empty means free. Anything above the ceiling is treated as unreadable
+  // rather than clamped: silently charging somebody a different price from the
+  // one they typed is worse than refusing the number.
+  const entered = price.trim() === "" ? 0 : parseNim(price)
+  const overMax = entered !== null && entered > MAX_AMOUNT_LUNA
+  const luna = overMax ? null : entered
 
   const savePrice = async (value: number) => {
     setSaving("price")
@@ -417,6 +424,12 @@ export function GroupSheet({
                     Save
                   </Button>
                 </div>
+
+                {overMax && (
+                  <p className="text-destructive mt-2 px-1 text-[12px] leading-snug">
+                    {MAX_AMOUNT_NIM.toLocaleString()} NIM is the most that can be asked.
+                  </p>
+                )}
               </section>
             )}
 

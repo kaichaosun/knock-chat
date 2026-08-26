@@ -17,7 +17,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import type { RelayStatus } from "@/hooks/use-messages"
 import { formatAddress } from "@/lib/address"
 import { rememberOne } from "@/lib/names"
-import { LUNA_PER_NIM, MAX_NAME_LEN, getReachability, setPolicy, setProfile } from "@/lib/relay"
+import {
+  LUNA_PER_NIM,
+  MAX_AMOUNT_NIM,
+  MAX_NAME_LEN,
+  getReachability,
+  setPolicy,
+  setProfile,
+} from "@/lib/relay"
 import { cn } from "@/lib/utils"
 import type { WalletMode } from "@/lib/wallet"
 
@@ -85,7 +92,9 @@ export function ProfileSheet({
   }, [open, address])
 
   const parsed = Number(nim)
-  const valid = nim.trim() !== "" && Number.isFinite(parsed) && parsed >= 0
+  const valid =
+    nim.trim() !== "" && Number.isFinite(parsed) && parsed >= 0 && parsed <= MAX_AMOUNT_NIM
+  const overMax = Number.isFinite(parsed) && parsed > MAX_AMOUNT_NIM
 
   // Counted in characters rather than `length`, which counts UTF-16 units and
   // would call a name of emoji twice as long as it looks.
@@ -236,6 +245,12 @@ export function ProfileSheet({
                 Save
               </Button>
             </div>
+
+            {overMax && (
+              <p className="text-destructive mt-2 px-1 text-[12px] leading-snug">
+                {MAX_AMOUNT_NIM.toLocaleString()} NIM is the most that can be asked.
+              </p>
+            )}
 
             <div className="mt-2.5 flex flex-wrap gap-2">
               {PRESETS_NIM.map((preset) => (

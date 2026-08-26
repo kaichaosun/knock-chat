@@ -13,6 +13,7 @@ import { AlreadyPaidError } from "@/lib/gift-funding"
 import { parseNim } from "@/lib/payments"
 import { reason } from "@/lib/reason"
 import { formatNim } from "@/lib/postage"
+import { MAX_AMOUNT_LUNA, MAX_AMOUNT_NIM } from "@/lib/relay"
 import { cn } from "@/lib/utils"
 
 /** Offered as taps, since a share count is a small number and typing is a chore. */
@@ -74,9 +75,13 @@ export function SendGiftSheet({
   const shares = Number.parseInt(shareText, 10)
   const sharesValid = Number.isInteger(shares) && shares >= 1 && shares <= maxShares
 
+  const overMax = luna !== null && luna > MAX_AMOUNT_LUNA
+
   // Every share needs a luna of its own, or somebody would get nothing — which
-  // the relay refuses, so there is no sense offering it here.
-  const enough = luna !== null && sharesValid && luna >= shares
+  // the relay refuses, so there is no sense offering it here. And a ceiling at
+  // the other end, which the relay also refuses — better met before a wallet
+  // opens than after.
+  const enough = luna !== null && sharesValid && luna >= shares && !overMax
   const each = enough && luna !== null ? Math.floor(luna / shares) : 0
 
   const submit = async () => {
@@ -127,6 +132,12 @@ export function SendGiftSheet({
               NIM
             </span>
           </div>
+
+          {overMax && (
+            <p className="text-destructive px-1 text-[12px] leading-snug">
+              {MAX_AMOUNT_NIM.toLocaleString()} NIM is the most a gift can hold.
+            </p>
+          )}
 
           <div>
             <h3 className="px-1 text-sm font-semibold">How many can take a share</h3>

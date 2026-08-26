@@ -114,6 +114,17 @@ export function ackMessages(to: string, cursor: string) {
 /** Luna per NIM. Amounts travel as integer luna and are shown as NIM. */
 export const LUNA_PER_NIM = 100_000
 
+/**
+ * The most any amount may be, in NIM. Mirrors the relay's own ceiling.
+ *
+ * Kept here so the three places a sum can be entered — what you charge to be
+ * reached, what a room charges to enter, what a gift holds — all refuse the
+ * same thing. The relay refuses it too, and its answer is the one that counts;
+ * this is so nobody meets that answer *after* a wallet has opened.
+ */
+export const MAX_AMOUNT_NIM = 1_000_000
+export const MAX_AMOUNT_LUNA = MAX_AMOUNT_NIM * LUNA_PER_NIM
+
 export type Policy = { amount_luna: number }
 
 /** Everything a sender needs to decide between writing, knocking, or waiting. */
