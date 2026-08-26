@@ -250,10 +250,45 @@ export type Group = {
 /** A room and who is in it. `members` is empty unless you are one. */
 export type GroupDetail = {
   group: Group
+  /** The first few, in join order — not the room. See [`listGroupMembers`]. */
   members: string[]
+  /** How many are in the room, which `members` no longer tells you. */
+  member_count?: number
   names: Names
   /** Whether the room is at the relay's member limit, so nobody else fits. */
   full?: boolean
+}
+
+/** One page of a room's membership. */
+export type MemberPage = {
+  members: string[]
+  names: Names
+  /** Where the next page starts, or null at the end of the list. */
+  next: number | null
+}
+
+/** How many members one page holds. The relay refuses to serve more. */
+export const MEMBER_PAGE = 100
+
+/**
+ * Everybody in a room, a page at a time.
+ *
+ * `after` is the `next` from the page before it, and nothing else — it is the
+ * relay's own bookmark, not a row number. `q` narrows by any part of a name,
+ * or by a whole address; half an address matches nothing, because what the
+ * relay holds is bytes rather than the text somebody types.
+ */
+export function listGroupMembers(
+  id: string,
+  options: { after?: number | null; q?: string } = {},
+): Promise<MemberPage> {
+  const params = new URLSearchParams()
+  if (options.after) params.set("after", String(options.after))
+  if (options.q?.trim()) params.set("q", options.q.trim())
+  const query = params.toString()
+  return request<MemberPage>(
+    `/v1/groups/${encodeURIComponent(id)}/members${query ? `?${query}` : ""}`,
+  )
 }
 
 export type JoinRequest = {

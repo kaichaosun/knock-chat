@@ -79,7 +79,9 @@ export function GroupRoom({
   }, [])
 
   const groups = useMemo(() => groupByDay(messages), [messages])
-  const memberCount = detail?.members.length ?? 0
+  // The room, not the handful of members the details carry — those are capped
+  // at ten and would have a room of thousands calling itself ten.
+  const memberCount = detail?.member_count ?? detail?.members.length ?? 0
 
   return (
     <div className="flex h-full flex-col">

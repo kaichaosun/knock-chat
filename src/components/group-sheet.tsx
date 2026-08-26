@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from "react"
-import { Check, Copy, Loader2, ShieldOff, Trash2, UserMinus, UserPlus, X } from "lucide-react"
+import {
+  Check,
+  ChevronRight,
+  Copy,
+  Loader2,
+  ShieldOff,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  X,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -11,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { MembersSheet } from "@/components/members-sheet"
 import { PickContactSheet } from "@/components/pick-contact-sheet"
 import { QrCode } from "@/components/qr-code"
 import { Button } from "@/components/ui/button"
@@ -156,6 +167,8 @@ export function GroupSheet({
   // somebody back in can cost them money — or be up to the owner entirely.
   const [removing, setRemoving] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  /** Open once somebody wants past the handful the details carry. */
+  const [listing, setListing] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -285,7 +298,10 @@ export function GroupSheet({
     }
   }
 
+  // The first few, which is all the relay sends now. The whole room is its own
+  // screen — see [`MembersSheet`].
   const members = detail?.members ?? []
+  const memberCount = detail?.member_count ?? members.length
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -523,7 +539,7 @@ export function GroupSheet({
             <section>
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-sm font-semibold">
-                  {members.length > 1 ? `${members.length} in the room` : "In the room"}
+                  {memberCount > 1 ? `${memberCount} in the room` : "In the room"}
                 </h3>
                 {/* Anyone in the room can bring somebody in — an invite is only a
                     message, and the door decides who actually gets through. */}
@@ -576,6 +592,21 @@ export function GroupSheet({
                   </li>
                 ))}
               </ul>
+
+              {/* Only when there is more than what is shown. The details carry
+                  the first few; the room itself is a screen of its own, with a
+                  search, because at this room's limit a list is not something
+                  anybody scrolls. */}
+              {memberCount > members.length && (
+                <button
+                  type="button"
+                  onClick={() => setListing(true)}
+                  className="text-primary active:bg-muted mt-1 flex w-full items-center justify-center gap-1 rounded-2xl py-2.5 text-[13px] font-semibold transition-colors"
+                >
+                  Show all members
+                  <ChevronRight className="size-3.5" />
+                </button>
+              )}
             </section>
 
             {/* Last, and only for the person who can. Not beside the settings it
@@ -613,6 +644,18 @@ export function GroupSheet({
           </div>
         )}
       </SheetContent>
+
+      <MembersSheet
+        open={listing}
+        onOpenChange={setListing}
+        group={group}
+        total={memberCount}
+        owner={owner}
+        onOpenChat={(address) => {
+          onOpenChange(false)
+          onOpenChat(address)
+        }}
+      />
 
       <PickContactSheet
         open={adding}
