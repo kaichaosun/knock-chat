@@ -47,6 +47,40 @@ import { cn } from "@/lib/utils"
  * than behind a separate settings screen. A room has one person who can change
  * it, and hiding that makes it look like nobody can.
  */
+/**
+ * The two doors a room can have, in one place.
+ *
+ * The cards and the confirmation say the same words about the same thing —
+ * written twice they would drift, and a dialog that describes the choice in
+ * language the choice does not use is a dialog you have to read twice.
+ *
+ * Both are read against the price, because approval is the second latch and
+ * not the only one. A room that charges is never walked into: what approval
+ * decides is whether paying is the whole of getting in, or only what it takes
+ * to be asked about.
+ */
+function doorFor(requiresApproval: boolean, priceLuna: number) {
+  const price = priceLuna > 0 ? `${formatNim(priceLuna)} NIM` : null
+
+  if (requiresApproval) {
+    return {
+      label: "You approve",
+      hint: price ? "They pay, you answer" : "They ask, you answer",
+      means: price
+        ? `New people pay the ${price} and wait for your answer. Paying buys the asking, not the room — declining does not send it back. Everyone already in stays in.`
+        : "New people ask to join, and wait for your answer. Everyone already in stays in.",
+    }
+  }
+
+  return {
+    label: "Anyone with the link",
+    hint: price ? "They pay and are in" : "They walk straight in",
+    means: price
+      ? `Anyone with the link pays the ${price} and is in, without asking you. Anyone you remove can pay again and come back the same way.`
+      : "Anyone with the link walks straight in, without asking you. Anyone you remove can walk back in the same way.",
+  }
+}
+
 export function GroupSheet({
   open,
   onOpenChange,
@@ -113,7 +147,9 @@ export function GroupSheet({
   // value after the owner changed it on another device.
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
-  const [saving, setSaving] = useState<"name" | "price" | null>(null)
+  const [saving, setSaving] = useState<"name" | "price" | "door" | null>(null)
+  /** The door being changed to, while it is being confirmed. Null when nothing is. */
+  const [changing, setChanging] = useState<boolean | null>(null)
   // Held until confirmed. It is a small icon in a list of faces, and getting
   // somebody back in can cost them money — or be up to the owner entirely.
   const [removing, setRemoving] = useState<string | null>(null)
@@ -176,12 +212,38 @@ export function GroupSheet({
   }
 
   const setApproval = async (requires_approval: boolean) => {
+    setSaving("door")
     try {
       await updateGroup(group.id, { requires_approval })
+      setChanging(null)
       onChanged()
+      // Said out loud, because the two cards look alike and a change nobody
+      // meant to make used to happen in silence.
+      toast.success(
+        requires_approval
+          ? "New people will have to ask you first."
+          : "Door open — anyone with the link walks in.",
+      )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't save")
+    } finally {
+      setSaving(null)
     }
+  }
+
+  /**
+   * Answer a tap on one of the two cards.
+   *
+   * Neither direction takes effect on the tap. The cards sit side by side in a
+   * sheet people scroll past, the difference between them is a sentence of
+   * small type, and until now either one changed who could get into the room
+   * the moment a thumb brushed it.
+   */
+  const chooseApproval = (approval: boolean) => {
+    // A tap on the card that is already chosen is not a change of anything. It
+    // used to save the setting it already had.
+    if (approval === group.requires_approval) return
+    setChanging(approval)
   }
 
   const saveName = async () => {
@@ -366,24 +428,27 @@ export function GroupSheet({
                     <button
                       key={String(approval)}
                       type="button"
-                      onClick={() => void setApproval(approval)}
+                      onClick={() => chooseApproval(approval)}
+                      aria-pressed={group.requires_approval === approval}
                       className={cn(
                         "flex-1 rounded-2xl border px-3 py-2.5 text-left text-[13px] transition-colors",
                         group.requires_approval === approval && "border-primary text-primary",
                       )}
                     >
                       <span className="block font-semibold">
-                        {approval ? "You approve" : "Anyone with the link"}
+                        {doorFor(approval, group.join_price_luna).label}
                       </span>
                       <span className="text-muted-foreground block text-[11px] leading-snug">
-                        {approval ? "They ask, you answer" : "They walk straight in"}
+                        {doorFor(approval, group.join_price_luna).hint}
                       </span>
                     </button>
                   ))}
                 </div>
                 {!group.requires_approval && (
                   <p className="text-warning mt-2 text-[12px] leading-snug">
-                    With an open door, removing someone doesn't hold — they can walk back in.
+                    {group.join_price_luna > 0
+                      ? "With an open door, removing someone doesn't hold — they can pay again and come back."
+                      : "With an open door, removing someone doesn't hold — they can walk back in."}
                   </p>
                 )}
               </section>
@@ -604,6 +669,42 @@ export function GroupSheet({
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* The door you are moving to, named and explained in its own words —
+          the same ones the card uses, so the dialog is the choice restated
+          rather than a second thing to understand. */}
+      <Dialog open={changing !== null} onOpenChange={(open) => !open && setChanging(null)}>
+        <DialogContent className="max-w-[20rem] rounded-3xl">
+          <DialogHeader className="items-center">
+            <DialogTitle>
+              {changing !== null && doorFor(changing, group.join_price_luna).label}
+            </DialogTitle>
+            <DialogDescription className="text-balance">
+              {changing !== null && doorFor(changing, group.join_price_luna).means}
+              {changing === false && requests.length > 0 && (
+                <>
+                  {" "}
+                  The {requests.length === 1 ? "one person" : `${requests.length} people`}{" "}
+                  already waiting still need an answer.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setChanging(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={saving === "door"}
+              className="h-11 rounded-2xl"
+              onClick={() => changing !== null && void setApproval(changing)}
+            >
+              {saving === "door" && <Loader2 className="animate-spin" />}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
