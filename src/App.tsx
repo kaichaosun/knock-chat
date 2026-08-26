@@ -10,6 +10,7 @@ import { Contacts } from "@/components/contacts"
 import { Groups } from "@/components/groups"
 import { KnockRequests } from "@/components/knock-requests"
 import { KnockSheet } from "@/components/knock-sheet"
+import { PullIndicator } from "@/components/pull-indicator"
 import { ProfileSheet } from "@/components/profile-sheet"
 import { AttachMenu } from "@/components/attach-menu"
 import { TabBar, type Tab } from "@/components/tab-bar"
@@ -20,6 +21,7 @@ import { JoinByLinkSheet } from "@/components/join-by-link-sheet"
 import { JoinGroupSheet } from "@/components/join-group-sheet"
 import { SendGiftSheet } from "@/components/send-gift-sheet"
 import { useContacts } from "@/hooks/use-contacts"
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
 import { useGroups } from "@/hooks/use-groups"
 import { useKnocks } from "@/hooks/use-knocks"
 import { usePrefs } from "@/hooks/use-prefs"
@@ -103,6 +105,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     recordOutgoing,
     dismissed,
     relayStatus,
+    refresh: refreshMessages,
   } = useMessages(owner, deviceSecretKey, session.invalidate)
 
   /**
@@ -120,7 +123,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [recordOutgoing],
   )
 
-  const { knocks, reach, knock, accept, decline, held } = useKnocks(
+  const { knocks, reach, knock, accept, decline, held, refresh: refreshKnocks } = useKnocks(
     wallet,
     owner,
     onKnockRedeemed,
@@ -135,9 +138,19 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     say,
   } = useGroups(wallet, owner)
 
+  // Declared up here rather than with the rest of the screen's state, because
+  // the contacts below take it: which tab is showing decides when that list is
+  // worth asking about.
+  const [tab, setTab] = useState<Tab>("chats")
+
   // Above the tab switch, so leaving Contacts does not throw the list away and
   // make every return a cold start. The rooms above already worked this way.
-  const { contacts, setContacts, error: contactsError } = useContacts(Boolean(owner), owner)
+  const {
+    contacts,
+    setContacts,
+    error: contactsError,
+    refresh: refreshContacts,
+  } = useContacts(Boolean(owner), owner, tab === "contacts")
 
   /**
    * What this device knows about rooms, including ones the relay has stopped
@@ -152,16 +165,30 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // Set when knocking on a door we already know, so the sheet fixes the address
   // instead of asking for it. Null for the ordinary compose flow.
   const [knockPeer, setKnockPeer] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>("chats")
   const [profileOpen, setProfileOpen] = useState(false)
   /** Whether the list under the header has been scrolled off its top. */
   const [scrolled, setScrolled] = useState(false)
-  const listRef = useRef<HTMLDivElement>(null)
+  // The scrolling list, held as state rather than in a ref: it is mounted and
+  // unmounted as chats are opened and closed, and the pull gesture has to be
+  // bound to whichever element is on the page now.
+  const [list, setList] = useState<HTMLDivElement | null>(null)
+
+  // Pulling the list down reads whatever it is showing. Every tab has its own
+  // idea of what "again" means, and the one on screen is the only one being
+  // asked about.
+  const refreshTab = useCallback(async () => {
+    if (tab === "contacts") await refreshContacts()
+    else if (tab === "groups") await refreshGroups()
+    else await Promise.all([refreshMessages(), refreshKnocks()])
+  }, [tab, refreshContacts, refreshGroups, refreshMessages, refreshKnocks])
+
+  const pull = usePullToRefresh(list, refreshTab)
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: 0 })
+    list?.scrollTo({ top: 0 })
     setScrolled(false)
-  }, [tab])
+  }, [tab, list])
+
   // A room is a thread like any other, but nothing a direct chat does applies
   // to it — no reachability, no knocking — so it is opened separately rather
   // than threaded through logic that would have to keep asking which it is.
@@ -990,11 +1017,23 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         </div>
       </header>
 
+      {/* The gap a pull opens is padding on the scroller rather than a
+          transform on a wrapper around its contents: the list inside stands on
+          `min-h-full` to keep the compose button stuck to the bottom, and a
+          wrapper between the two is exactly what stops that resolving. */}
       <div
-        ref={listRef}
+        ref={setList}
         onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        style={{
+          paddingTop: pull.distance,
+          // Nothing while a finger is on it — the gap is the finger's to move.
+          // On release it settles rather than snapping: out fast, in slow.
+          transition: pull.dragging ? undefined : "padding-top 260ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        }}
       >
+        <PullIndicator pull={pull} />
+
         {tab === "chats" ? (
           <>
             <KnockRequests
@@ -1003,6 +1042,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               deviceSecretKey={deviceSecretKey}
               onAccept={async (id) => {
                 await accept(id)
+                // The channel this just opened is a contact now. The poll would
+                // find it within the minute; opening the door yourself is the
+                // one case where there is no reason to wait for that.
+                void refreshContacts()
                 toast.success("You're connected. Messages are free from here.")
               }}
               onDecline={decline}

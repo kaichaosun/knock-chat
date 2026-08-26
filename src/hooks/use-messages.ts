@@ -49,6 +49,10 @@ export function useMessages(
     setSnapshot(loaded)
   }, [owner])
 
+  // The live poll, so a pull-to-refresh can run the same read rather than a
+  // second one written to look like it. Null while there is nobody signed in.
+  const polling = useRef<(() => Promise<void>) | null>(null)
+
   // Poll while the document is visible; a hidden WebView should not keep asking.
   useEffect(() => {
     if (!owner) return
@@ -83,6 +87,7 @@ export function useMessages(
       }
     }
 
+    polling.current = poll
     void poll()
     const timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS)
     const onVisible = () => void poll()
@@ -90,10 +95,16 @@ export function useMessages(
 
     return () => {
       cancelled = true
+      polling.current = null
       window.clearInterval(timer)
       document.removeEventListener("visibilitychange", onVisible)
     }
   }, [owner, update, onUnauthorized, deviceSecretKey])
+
+  /** Read now, for a gesture that asks for it. */
+  const refresh = useCallback(async () => {
+    await polling.current?.()
+  }, [])
 
   const send = useCallback(
     async (peer: string, body: string) => {
@@ -189,6 +200,7 @@ export function useMessages(
     dismissed,
     recordOutgoing,
     relayStatus,
+    refresh,
   }
 }
 
