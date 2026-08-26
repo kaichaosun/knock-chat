@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react"
-import { Copy, Loader2, Settings, Wifi, WifiOff } from "lucide-react"
+import { Copy, Loader2, LogOut, Settings, Wifi, WifiOff } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { SettingsSheet } from "@/components/settings-sheet"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import type { RelayStatus } from "@/hooks/use-messages"
 import { formatAddress } from "@/lib/address"
@@ -30,6 +38,7 @@ export function ProfileSheet({
   mode,
   relayStatus,
   onCopy,
+  onSignOut,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -37,6 +46,8 @@ export function ProfileSheet({
   mode: WalletMode
   relayStatus: RelayStatus
   onCopy: (address: string) => void
+  /** End the relay session. Nothing on the device goes with it. */
+  onSignOut: () => void
 }) {
   const [nim, setNim] = useState("")
   const [name, setName] = useState("")
@@ -52,6 +63,7 @@ export function ProfileSheet({
   const [saving, setSaving] = useState(false)
   const [savingName, setSavingName] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [leaving, setLeaving] = useState(false)
 
   // Read the current values each time the sheet opens, so it never shows a
   // stale one after being changed on another device.
@@ -252,6 +264,20 @@ export function ProfileSheet({
             )}
           </section>
 
+          {/* Last of the things you can do here, and the only one that is
+              about the session rather than about you. Quiet on purpose: it is
+              not a way out of anything, and nothing in this app is behind it. */}
+          <section>
+            <Button
+              variant="outline"
+              onClick={() => setLeaving(true)}
+              className="text-muted-foreground h-11 w-full rounded-2xl"
+            >
+              <LogOut className="size-4" />
+              Sign out
+            </Button>
+          </section>
+
           <section className="text-muted-foreground flex items-center gap-4 border-t pt-5 text-xs">
             {/* Three states, not two: before the first poll lands the status is
                 simply unknown, and calling that "unreachable" is a lie the user
@@ -300,6 +326,35 @@ export function ProfileSheet({
           </section>
         </div>
       </SheetContent>
+
+      {/* Worth asking, not because anything is lost — nothing is — but because
+          getting back in costs a signature, and a wallet prompt nobody asked
+          for is the thing this app tries hardest never to cause. */}
+      <Dialog open={leaving} onOpenChange={(next) => !next && setLeaving(false)}>
+        <DialogContent className="max-w-[20rem] rounded-3xl">
+          <DialogHeader className="items-center">
+            <DialogTitle>Sign out?</DialogTitle>
+            <DialogDescription className="text-balance">
+              Your chats, contacts and the names you gave them stay on this device. You can
+              sign back in any time — your wallet is all it takes.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setLeaving(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="h-11 rounded-2xl"
+              onClick={() => {
+                setLeaving(false)
+                onSignOut()
+              }}
+            >
+              Sign out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Sheet>

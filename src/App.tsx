@@ -1147,6 +1147,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         mode={wallet?.mode ?? "nimiq-pay"}
         relayStatus={relayStatus}
         onCopy={copy}
+        onSignOut={() => {
+          setProfileOpen(false)
+          session.invalidate()
+        }}
       />
     </div>
   )

@@ -76,9 +76,20 @@ export function useSession(wallet: Wallet | null) {
     }
   }, [wallet])
 
-  /** Drop the session — used when the relay rejects the token as stale. */
+  /**
+   * Drop the session: the relay rejected the token, or the user asked to leave.
+   *
+   * The stored token goes and so does the one every request carries — those are
+   * two different places, and clearing only the first left the app signed out
+   * on screen and signed in on the wire until the next reload.
+   *
+   * Nothing else on the device is touched. History, the names you have given
+   * people, and this device's own keypair all outlive a sign-out, so signing
+   * back in is a signature rather than a fresh start.
+   */
   const invalidate = useCallback(() => {
     if (wallet) clearSession(wallet.scope)
+    setAuthToken(null)
     setState({ status: "needed" })
   }, [wallet])
 
