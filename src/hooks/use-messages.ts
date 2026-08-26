@@ -5,7 +5,7 @@ import { decryptBody, encryptBody } from "@/lib/crypto"
 import { forgetPeerKey, keyForPeer } from "@/lib/keys"
 import * as history from "@/lib/messages"
 import type { Message, OpenedEnvelope, Snapshot } from "@/lib/messages"
-import { RelayError, fetchMessages, sendMessage } from "@/lib/relay"
+import { RelayError, ackMessages, fetchMessages, sendMessage } from "@/lib/relay"
 import type { Envelope } from "@/lib/relay"
 
 /** How often to ask the relay for new mail while the app is in the foreground. */
@@ -57,15 +57,36 @@ export function useMessages(
   useEffect(() => {
     if (!owner) return
     let cancelled = false
+    // The furthest point this device has told the relay it can forget. Scoped
+    // to the effect, so switching identity starts the accounting over.
+    let acked: string | null = null
 
     const poll = async () => {
       if (document.hidden) return
       try {
+        // What is already written down here, the relay can let go of.
+        //
+        // Deliberately at the start of the *next* read rather than at the end
+        // of the one that fetched it: this cursor has been through `update`,
+        // and therefore through storage. Acking what has only just arrived
+        // would risk deleting it from the relay in the moment it exists
+        // nowhere else. A failed ack is not retried here — the next poll
+        // carries the same cursor, or a later one, and deleting through a
+        // point twice does nothing the first time did not.
+        const settled = snapshotRef.current.cursor
+        if (settled && settled !== acked) {
+          void ackMessages(owner, settled)
+            .then(() => {
+              acked = settled
+            })
+            .catch(() => {})
+        }
+
         // The cursor goes back exactly as it arrived. If it is stale — the
         // relay was rebuilt, or restored to an earlier point — the relay
         // notices and replays from the beginning, and the stable message ids
         // make the replay a no-op for anything already held.
-        const result = await fetchMessages(owner, snapshotRef.current.cursor)
+        const result = await fetchMessages(owner, settled)
         if (cancelled) return
         setRelayStatus("online")
 

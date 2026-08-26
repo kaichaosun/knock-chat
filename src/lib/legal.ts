@@ -150,7 +150,6 @@ export const PRIVACY: LegalDoc = {
       body: [
         "Group messages, in this version, are not encrypted. The relay stores and can read them. Treat a group as a room we can hear.",
         "Metadata, necessarily, even where the message is sealed: which address wrote to which, and when. Carrying a message means knowing where to take it.",
-        "Encrypted messages stay on the relay after they are delivered. This version of the app does not tell the relay to forget them.",
       ],
     },
     {
@@ -180,6 +179,7 @@ export const PRIVACY: LegalDoc = {
     {
       heading: "How long things are kept",
       body: [
+        "A message is held only until the recipient's phone has it. Once collected, your device tells the relay to delete it, and the relay does.",
         "Sessions expire after 30 days. A challenge that is never signed expires in minutes.",
         "A knock is held until it is answered; a declined knock is deleted. A disbanded group takes its messages, membership and requests with it.",
         "Gift records are kept so that claims and refunds can be accounted for.",
