@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { MessageSquarePlus, PenLine, Pin, PinOff, Plus } from "lucide-react"
+import { Clock, MessageSquarePlus, PenLine, Pin, PinOff, Plus } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { AttachMenu } from "@/components/attach-menu"
@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils"
 export function Inbox({
   conversations,
   groups,
+  knocked,
   onOpen,
   onCompose,
   onDelete,
@@ -29,6 +30,8 @@ export function Inbox({
   conversations: Conversation[]
   /** The rooms you are in, so a room's thread can be labelled with its name. */
   groups: Group[]
+  /** Addresses you have knocked on and are still waiting to hear from. */
+  knocked: Set<string>
   onOpen: (thread: string) => void
   onCompose: () => void
   onDelete: (thread: string) => void
@@ -79,6 +82,7 @@ export function Inbox({
             names={names}
             onOpen={onOpen}
             onDelete={onDelete}
+            waiting={conversation.peer !== null && knocked.has(conversation.peer)}
             pinned={index < pinnedCount}
             blockStart={index === 0}
             blockEnd={index === pinnedCount - 1}
@@ -163,6 +167,7 @@ function ConversationRow({
   conversation,
   room,
   names,
+  waiting,
   onOpen,
   onDelete,
   pinned,
@@ -176,6 +181,8 @@ function ConversationRow({
   /** Set when this thread is a room, and absent while its details load. */
   room: Group | undefined
   names: Directory
+  /** A knock of yours is at this door, unanswered. */
+  waiting: boolean
   onOpen: (thread: string) => void
   onDelete: (thread: string) => void
   pinned: boolean
@@ -250,10 +257,21 @@ function ConversationRow({
             )}
             {summary}
           </span>
-          {unread > 0 && (
+          {unread > 0 ? (
             <span className="bg-primary text-primary-foreground flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums">
               {unread}
             </span>
+          ) : (
+            waiting && (
+              /* Why this thread has gone quiet. The last thing in it is your
+                 own knock, which otherwise reads as a message they simply have
+                 not replied to — and a knock is not delivered until it is
+                 answered. */
+              <span className="bg-muted text-muted-foreground flex h-5 shrink-0 items-center gap-1 rounded-full px-2 text-[11px] font-medium">
+                <Clock className="size-3" />
+                Knock sent
+              </span>
+            )
           )}
         </div>
       </div>

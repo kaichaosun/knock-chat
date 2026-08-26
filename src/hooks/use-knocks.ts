@@ -57,6 +57,10 @@ export function useKnocks(
 ) {
   const signedIn = owner !== null
   const [knocks, setKnocks] = useState<Knock[]>([])
+  // Your own knocks, still unanswered. Nobody tells the sender when a door
+  // opens or stays shut, so without asking, a knock you paid for leaves no
+  // trace outside the thread it was sent from.
+  const [sent, setSent] = useState<Knock[]>([])
   // Held in a ref so a caller that re-creates the handler each render does not
   // restart the sweep effect on every render.
   const redeemed = useRef(onRedeemed)
@@ -66,9 +70,10 @@ export function useKnocks(
   const refresh = useCallback(async () => {
     if (!signedIn) return
     try {
-      const { knocks, names } = await listKnocks()
+      const { knocks, sent, names } = await listKnocks()
       remember(names)
       setKnocks(knocks)
+      setSent(sent ?? [])
     } catch {
       // A failed poll is not worth surfacing; the next one will try again.
     }
@@ -77,6 +82,7 @@ export function useKnocks(
   useEffect(() => {
     if (!signedIn) {
       setKnocks([])
+      setSent([])
       return
     }
     void refresh()
@@ -280,5 +286,5 @@ export function useKnocks(
     [owner],
   )
 
-  return { knocks, reach, knock, accept, decline, refresh, held }
+  return { knocks, sent, reach, knock, accept, decline, refresh, held }
 }

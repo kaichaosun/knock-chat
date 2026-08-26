@@ -126,7 +126,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [recordOutgoing],
   )
 
-  const { knocks, reach, knock, accept, decline, held, refresh: refreshKnocks } = useKnocks(
+  const { knocks, sent, reach, knock, accept, decline, held, refresh: refreshKnocks } = useKnocks(
     wallet,
     owner,
     onKnockRedeemed,
@@ -1064,6 +1064,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             <Inbox
               conversations={threads}
               groups={groups}
+              // Compact, because that is the form a thread is keyed by.
+              knocked={new Set(sent.map((knock) => compact(knock.to)))}
               onOpen={openAnyThread}
               floating={compose === "floating"}
               onCompose={() => setComposing(true)}

@@ -181,8 +181,14 @@ export function sendKnock(
   })
 }
 
-export function listKnocks(): Promise<{ knocks: Knock[]; names: Names }> {
-  return request<{ knocks: Knock[]; names: Names }>("/v1/knocks")
+/**
+ * Knocks waiting for your answer, and the ones you are waiting on.
+ *
+ * `sent` is your side of it: knocks you made that nobody has answered yet.
+ * Both come back together because a client that shows either shows both.
+ */
+export function listKnocks(): Promise<{ knocks: Knock[]; sent?: Knock[]; names: Names }> {
+  return request<{ knocks: Knock[]; sent?: Knock[]; names: Names }>("/v1/knocks")
 }
 
 export function acceptKnock(id: string) {
