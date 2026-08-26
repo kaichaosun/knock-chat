@@ -1024,7 +1024,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       <div
         ref={setList}
         onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}
-        className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="scrollbar-none relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
         style={{
           paddingTop: pull.distance,
           // Nothing while a finger is on it — the gap is the finger's to move.

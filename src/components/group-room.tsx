@@ -128,7 +128,10 @@ export function GroupRoom({
         </div>
       </header>
 
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+      <div
+        ref={scroller}
+        className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
+      >
         {messages.length === 0 && <RoomIntro group={group} members={detail?.members} />}
 
         {groups.map((day) => (
