@@ -1,7 +1,10 @@
+import { useState } from "react"
 import { ArrowUpRight, KeyRound, Loader2, RefreshCw, ShieldCheck, Zap } from "lucide-react"
 
 import { BrandMark } from "@/components/brand-mark"
+import { LegalSheet } from "@/components/legal-sheet"
 import { Button } from "@/components/ui/button"
+import { PRIVACY, TERMS, type LegalDoc } from "@/lib/legal"
 import { nimiqPayDeeplink } from "@/lib/wallet"
 
 /**
@@ -47,6 +50,9 @@ export function WelcomeScreen({
   onSignIn: () => void
   onRetry: () => void
 }) {
+  /** Whichever document is being read, if either. */
+  const [reading, setReading] = useState<LegalDoc | null>(null)
+
   // Somebody with a session is not being asked to do anything — they are
   // waiting. Showing them the pitch and a "sign in" control for the seconds it
   // takes to find the wallet says they are signed out, which they are not.
@@ -129,11 +135,41 @@ export function WelcomeScreen({
             </Button>
             <p className="text-muted-foreground flex items-center justify-center gap-1.5 text-[12px]">
               <ShieldCheck className="size-3.5" />
-              One signature. Nothing is spent, and you stay signed in for 30 days.
+              One signature. Nothing is spent.
+            </p>
+
+            {/* Where the agreement is made, so it is on the screen the
+                signature is given on rather than somewhere it could be said
+                nobody passed. Both open here rather than in a browser: a Mini
+                App has none to send anybody to. */}
+            <p className="text-muted-foreground px-2 text-center text-[12px] leading-snug text-balance">
+              By signing in you agree to our{" "}
+              <button
+                type="button"
+                onClick={() => setReading(TERMS)}
+                className="text-foreground font-semibold underline underline-offset-2"
+              >
+                Terms of Service
+              </button>{" "}
+              and{" "}
+              <button
+                type="button"
+                onClick={() => setReading(PRIVACY)}
+                className="text-foreground font-semibold underline underline-offset-2"
+              >
+                Privacy Policy
+              </button>
+              .
             </p>
           </>
         )}
       </div>
+
+      <LegalSheet
+        doc={reading}
+        open={reading !== null}
+        onOpenChange={(next) => !next && setReading(null)}
+      />
     </div>
   )
 }

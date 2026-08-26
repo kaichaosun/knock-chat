@@ -1,9 +1,12 @@
-import { CirclePlus, Moon, PanelTop, Smartphone, Sun } from "lucide-react"
+import { useState } from "react"
+import { ChevronRight, CirclePlus, Moon, PanelTop, Smartphone, Sun } from "lucide-react"
 
 import { BrandMark } from "@/components/brand-mark"
+import { LegalSheet } from "@/components/legal-sheet"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { usePrefs } from "@/hooks/use-prefs"
 import { useTheme } from "@/hooks/use-theme"
+import { PRIVACY, TERMS, type LegalDoc } from "@/lib/legal"
 import { update, type ComposeSpot } from "@/lib/prefs"
 import { choose, type Theme } from "@/lib/theme"
 import { cn } from "@/lib/utils"
@@ -47,6 +50,8 @@ export function SettingsSheet({
 }) {
   const { theme, palette } = useTheme()
   const { compose } = usePrefs()
+  /** Whichever document is being read, if either. */
+  const [reading, setReading] = useState<LegalDoc | null>(null)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -148,9 +153,35 @@ export function SettingsSheet({
             <p className="text-muted-foreground max-w-[17rem] text-[13px] leading-snug text-balance">
               Messages between Nimiq wallets, with spam priced out instead of guessed at.
             </p>
+
+            {/* Agreed to at sign-in, and readable ever after — which is the
+                half people actually need, since the screen that asked is one
+                they may never see again. */}
+            <div className="mt-3 w-full space-y-1">
+              {[
+                { label: "Terms of Service", doc: TERMS },
+                { label: "Privacy Policy", doc: PRIVACY },
+              ].map(({ label, doc }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setReading(doc)}
+                  className="active:bg-muted flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[13px] font-medium transition-colors"
+                >
+                  {label}
+                  <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+                </button>
+              ))}
+            </div>
           </section>
         </div>
       </SheetContent>
+
+      <LegalSheet
+        doc={reading}
+        open={reading !== null}
+        onOpenChange={(next) => !next && setReading(null)}
+      />
     </Sheet>
   )
 }
