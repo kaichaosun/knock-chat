@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Check, Loader2, LockKeyhole, X } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { KnockRequestSheet } from "@/components/knock-request-sheet"
 import { Button } from "@/components/ui/button"
 import { useKnockNotes } from "@/hooks/use-knock-notes"
 import { useNames } from "@/hooks/use-names"
@@ -35,6 +36,9 @@ export function KnockRequests({
   onDecline: (id: string) => Promise<void>
 }) {
   const [busy, setBusy] = useState<string | null>(null)
+  // The knock being read in full. Held by id rather than by value so it follows
+  // the poll — and disappears by itself if the knock is answered elsewhere.
+  const [readingId, setReadingId] = useState<string | null>(null)
   const names = useNames()
   const notes = useKnockNotes(knocks, owner, deviceSecretKey)
 
@@ -44,10 +48,14 @@ export function KnockRequests({
     setBusy(id)
     try {
       await action(id)
+      setReadingId(null)
     } finally {
       setBusy(null)
     }
   }
+
+  const reading =
+    readingId === null ? null : (knocks.find((knock) => knock.id === readingId) ?? null)
 
   return (
     // No rule under it. Every knock is already a bordered card under a heading,
@@ -67,8 +75,16 @@ export function KnockRequests({
               {/* A stranger's name is a stranger's claim. It goes above the
                   address rather than in place of it: this is the one screen where
                   the person shown is by definition someone you do not know, and
-                  deciding about them on a name alone is deciding on nothing. */}
-              <div className="min-w-0 flex-1">
+                  deciding about them on a name alone is deciding on nothing.
+
+                  Tapping it opens the knock in full, where the address is not
+                  shortened either. */}
+              <button
+                type="button"
+                onClick={() => setReadingId(knock.id)}
+                aria-label="Read this knock in full"
+                className="min-w-0 flex-1 text-left active:opacity-60"
+              >
                 {nameIn(names, knock.from) && (
                   <p className="truncate text-[15px] leading-tight font-semibold">
                     {nameIn(names, knock.from)}
@@ -80,7 +96,7 @@ export function KnockRequests({
                 <p className="text-muted-foreground text-[11px]">
                   knocked {relativeTime(knock.created_at)}
                 </p>
-              </div>
+              </button>
 
               <div className="flex shrink-0 gap-1.5">
                 <Button
@@ -112,21 +128,35 @@ export function KnockRequests({
             {/* Under the row rather than beside it: this is the one thing on
                 the card worth reading rather than scanning, and a line of it
                 squeezed between an address and two buttons would be neither. */}
-            <KnockNote note={notes[knock.id]} />
+            <KnockNote note={notes[knock.id]} onOpen={() => setReadingId(knock.id)} />
           </li>
         ))}
       </ul>
+
+      <KnockRequestSheet
+        knock={reading}
+        note={reading ? notes[reading.id] : undefined}
+        busy={reading !== null && busy === reading.id}
+        onOpenChange={(next) => !next && setReadingId(null)}
+        onAccept={() => reading && void act(reading.id, onAccept)}
+        onDecline={() => reading && void act(reading.id, onDecline)}
+      />
     </section>
   )
 }
 
 /**
- * What somebody wrote on their knock.
+ * The opening of what somebody wrote on their knock.
  *
  * Nothing at all until it has been opened — a card that says "no message" and
  * then fills in a second later has told you something untrue in between.
+ *
+ * Three lines, and the rest is a tap away. Nothing stops a stranger writing an
+ * essay, and several of these sit on top of the inbox: a card that grew to fit
+ * whatever it was sent would let anybody push the day's messages off the
+ * screen for the price of one knock.
  */
-function KnockNote({ note }: { note: string | null | undefined }) {
+function KnockNote({ note, onOpen }: { note: string | null | undefined; onOpen: () => void }) {
   if (note === undefined) return null
 
   if (note === null) {
@@ -139,15 +169,16 @@ function KnockNote({ note }: { note: string | null | undefined }) {
   }
 
   return (
-    <p
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="Read the whole message"
       className={cn(
-        "bg-muted mt-2.5 rounded-xl px-3 py-2 text-[13px] leading-snug whitespace-pre-wrap",
-        // Bounded, because nothing stops a stranger writing an essay and the
-        // inbox underneath is what this sits on top of.
-        "line-clamp-6 wrap-anywhere select-text",
+        "bg-muted mt-2.5 block w-full rounded-xl px-3 py-2 text-left text-[13px] leading-snug",
+        "line-clamp-3 whitespace-pre-wrap wrap-anywhere active:brightness-95",
       )}
     >
       {note}
-    </p>
+    </button>
   )
 }
