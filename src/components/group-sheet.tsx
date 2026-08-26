@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { MembersSheet } from "@/components/members-sheet"
 import { PickContactSheet } from "@/components/pick-contact-sheet"
+import { RemoveMemberDialog } from "@/components/remove-member-dialog"
 import { QrCode } from "@/components/qr-code"
 import { Button } from "@/components/ui/button"
 import {
@@ -651,10 +652,12 @@ export function GroupSheet({
         group={group}
         total={memberCount}
         owner={owner}
+        mine={mine}
         onOpenChat={(address) => {
           onOpenChange(false)
           onOpenChat(address)
         }}
+        onRemoved={onChanged}
       />
 
       <PickContactSheet
@@ -762,41 +765,13 @@ export function GroupSheet({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
-        <DialogContent className="max-w-[20rem] rounded-3xl">
-          <DialogHeader className="items-center">
-            {removing && <AddressAvatar address={removing} />}
-            <DialogTitle className="mt-2">Remove them?</DialogTitle>
-            {removing && nameIn(names, removing) && (
-              <p className="text-[15px] font-semibold">{nameIn(names, removing)}</p>
-            )}
-            <p className="font-mono text-[13px] font-semibold tracking-tight">
-              {removing ? shortenAddress(removing) : ""}
-            </p>
-            <DialogDescription className="text-balance">
-              {group.requires_approval
-                ? "They keep what they've already read and lose the room. Coming back means asking you again."
-                : group.join_price_luna > 0
-                  ? `They keep what they've already read and lose the room. Coming back would cost them ${formatNim(group.join_price_luna)} NIM again.`
-                  : "They keep what they've already read and lose the room — though with an open door they can walk straight back in."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setRemoving(null)}>
-              Keep
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={busy !== null}
-              className="h-11 rounded-2xl"
-              onClick={() => removing && void remove(removing)}
-            >
-              {busy === removing && <Loader2 className="animate-spin" />}
-              Remove
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RemoveMemberDialog
+        address={removing}
+        group={group}
+        busy={busy !== null && busy === removing}
+        onOpenChange={(open) => !open && setRemoving(null)}
+        onConfirm={(address) => void remove(address)}
+      />
     </Sheet>
   )
 }

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Search } from "lucide-react"
+import { Loader2, Search, UserMinus } from "lucide-react"
+import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { RemoveMemberDialog } from "@/components/remove-member-dialog"
+import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
 import { labelIn, remember } from "@/lib/names"
-import { listGroupMembers } from "@/lib/relay"
+import { listGroupMembers, removeGroupMember, type Group } from "@/lib/relay"
 import { cn } from "@/lib/utils"
 
 /** How long to wait after a keystroke before asking the relay. */
@@ -29,17 +32,23 @@ export function MembersSheet({
   group,
   total,
   owner,
+  mine,
   onOpenChat,
+  onRemoved,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** The room being listed, and its name for the title. */
-  group: { id: string; name: string; owner: string } | null
+  /** The room being listed. Null while there is none to list. */
+  group: Group | null
   /** How many are in it, which the list itself never learns. */
   total: number
   /** You, so the row for you says so. */
   owner: string
+  /** Whether you own the room, which is who may show somebody out. */
+  mine: boolean
   onOpenChat: (address: string) => void
+  /** Told when somebody has gone, so the count outside can catch up. */
+  onRemoved: () => void
 }) {
   const names = useNames()
   const [query, setQuery] = useState("")
@@ -49,6 +58,27 @@ export function MembersSheet({
   const [error, setError] = useState("")
   /** Which read is current, so a slow answer cannot land on a newer query. */
   const era = useRef(0)
+  /** Who is being shown out, once the owner has asked and before they confirm. */
+  const [removing, setRemoving] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const remove = async (address: string) => {
+    if (!group) return
+    setBusy(true)
+    try {
+      await removeGroupMember(group.id, address)
+      // Dropped here rather than by re-reading the list: a page fetched again
+      // from the top would lose however far somebody had scrolled to find them.
+      setMembers((held) => held.filter((one) => one !== address))
+      setRemoving(null)
+      onRemoved()
+      toast.success("Removed")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't remove them")
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // The first page, and a fresh one whenever the query settles. Held back for
   // a moment: a request per keystroke would spend four on a three-letter name
@@ -152,7 +182,8 @@ export function MembersSheet({
             className="scrollbar-none max-h-[50vh] min-h-0 space-y-1 overflow-y-auto overscroll-contain"
           >
             {members.map((address) => (
-              <li key={address}>
+              <li key={address} className="flex items-center gap-3 rounded-2xl py-1.5">
+                <AddressAvatar address={address} size="sm" />
                 <button
                   type="button"
                   disabled={address === owner}
@@ -160,19 +191,30 @@ export function MembersSheet({
                     onOpenChat(address)
                     onOpenChange(false)
                   }}
-                  className="flex w-full items-center gap-3 rounded-2xl py-1.5 text-left"
+                  className="min-w-0 flex-1 text-left"
                 >
-                  <AddressAvatar address={address} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold">
-                      {address === owner ? "You" : labelIn(names, address)}
-                    </p>
-                    <p className="text-muted-foreground truncate font-mono text-[11px]">
-                      {shortenAddress(address)}
-                      {group && address === group.owner && " · owner"}
-                    </p>
-                  </div>
+                  <p className="truncate text-[13px] font-semibold">
+                    {address === owner ? "You" : labelIn(names, address)}
+                  </p>
+                  <p className="text-muted-foreground truncate font-mono text-[11px]">
+                    {shortenAddress(address)}
+                    {group && address === group.owner && " · owner"}
+                  </p>
                 </button>
+
+                {/* The owner's own row has no way out of the room, which is why
+                    disbanding exists. */}
+                {mine && group && address !== group.owner && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label={`Remove ${labelIn(names, address)}`}
+                    onClick={() => setRemoving(address)}
+                    className="text-muted-foreground size-8 shrink-0 rounded-full"
+                  >
+                    <UserMinus className="size-4" />
+                  </Button>
+                )}
               </li>
             ))}
 
@@ -184,6 +226,16 @@ export function MembersSheet({
           </ul>
         </div>
       </SheetContent>
+
+      {group && (
+        <RemoveMemberDialog
+          address={removing}
+          group={group}
+          busy={busy}
+          onOpenChange={(open) => !open && setRemoving(null)}
+          onConfirm={(address) => void remove(address)}
+        />
+      )}
     </Sheet>
   )
 }
