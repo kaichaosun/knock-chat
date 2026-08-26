@@ -59,9 +59,13 @@ export function JoinQueueSheet({
 
         {group && (
           <div className="space-y-5 pb-8">
-            <section className="flex items-center gap-3">
+            {/* The mark beside its two lines, and the pair of them centred as
+                one block: which door this is, said the way a room is said
+                everywhere else, without starting at an edge the sheet has no
+                other content against. */}
+            <section className="flex items-center justify-center gap-3">
               <GroupAvatar members={group.members} />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <p className="truncate text-[15px] leading-tight font-semibold">{group.name}</p>
                 <p className="text-muted-foreground truncate text-[12px]">
                   {group.join_price_luna > 0
