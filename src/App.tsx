@@ -999,6 +999,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           <>
             <KnockRequests
               knocks={knocks}
+              owner={owner}
+              deviceSecretKey={deviceSecretKey}
               onAccept={async (id) => {
                 await accept(id)
                 toast.success("You're connected. Messages are free from here.")
