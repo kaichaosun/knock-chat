@@ -132,8 +132,10 @@ export function GroupRoom({
         {messages.length === 0 && <RoomIntro group={group} members={detail?.members} />}
 
         {groups.map((day) => (
-          <div key={day.label}>
-            <div className="flex justify-center py-2">
+          <section key={day.label} className="mb-1">
+            {/* Sized and spaced with the one-to-one thread's separator, and
+                scrolling away like it — see the note there. */}
+            <div className="my-3 flex justify-center">
               <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
                 {day.label}
               </span>
@@ -199,7 +201,7 @@ export function GroupRoom({
                 )
               })}
             </div>
-          </div>
+          </section>
         ))}
         <div ref={bottom} />
       </div>

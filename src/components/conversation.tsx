@@ -166,8 +166,12 @@ export function Conversation({
         ) : (
           groups.map((group) => (
             <section key={group.label} className="mb-1">
-              <div className="sticky top-1 z-[1] my-3 flex justify-center">
-                <span className="bg-muted/90 text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur">
+              {/* In the thread, not above it. A pinned pill keeps the date in
+                  reach on a long day, but it does it by crossing whatever is
+                  passing underneath — and a date is not worth reading over
+                  somebody's words. It scrolls away with the day it opens. */}
+              <div className="my-3 flex justify-center">
+                <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
                   {group.label}
                 </span>
               </div>
