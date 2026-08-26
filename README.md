@@ -174,3 +174,7 @@ that constraint is a no-op.
 
 Encryption and NIM postage both ship today. See [ROADMAP.md](./ROADMAP.md) for
 what is built and what is left.
+
+## License
+
+Copyright 2026 KEYRING Pte. Ltd. Apache-2.0 — see [LICENSE](./LICENSE).
