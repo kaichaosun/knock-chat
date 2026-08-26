@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Clock, MessageSquarePlus, PenLine, Pin, PinOff, Plus } from "lucide-react"
+import { Clock, MessageSquarePlus, Pin, PinOff, Plus } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { AttachMenu } from "@/components/attach-menu"
@@ -51,10 +51,6 @@ export function Inbox({
   // would lose its name at the moment there is nothing left to look it up with.
   const rooms = new Map<string, Group>(Object.entries(remembered))
   for (const group of groups) rooms.set(group.id, group)
-  if (conversations.length === 0) {
-    return <EmptyInbox onCompose={onCompose} />
-  }
-
   // Pinned first, in the order they were pinned; the rest keep the recency the
   // list arrived in. Done here rather than upstream because a pin is a fact
   // about this device, and the thread list is a fact about the relay.
@@ -71,48 +67,38 @@ export function Inbox({
     // flat 100% that block is one screen tall however long the list is, so the
     // button would come unstuck a screenful down and scroll away with the rest.
     // A minimum lets the box grow with the list it contains.
-    <div className="relative min-h-full">
-      {/* Room for the button when there is one to clear. */}
-      <ul className={cn("px-2", floating ? "pb-28" : "pb-24")}>
-        {ordered.map((conversation, index) => (
-          <ConversationRow
-            key={conversation.key}
-            conversation={conversation}
-            room={conversation.group ? rooms.get(conversation.group) : undefined}
-            names={names}
-            onOpen={onOpen}
-            onDelete={onDelete}
-            waiting={conversation.peer !== null && knocked.has(conversation.peer)}
-            pinned={index < pinnedCount}
-            blockStart={index === 0}
-            blockEnd={index === pinnedCount - 1}
-            onLongPress={() => setHolding(conversation)}
-            revealed={revealed === conversation.key}
-            onReveal={(open) => setRevealed(open ? conversation.key : null)}
-          />
-        ))}
-      </ul>
-
-      {floating && (
-        <div className="pointer-events-none sticky bottom-0 flex justify-end px-5 pb-safe">
-          <Button
-            size="icon"
-            onClick={onCompose}
-            aria-label="New chat"
-            className="bg-primary/85 pointer-events-auto mb-5 size-12 rounded-full shadow-md shadow-primary/20 backdrop-blur-sm"
-          >
-            {/* A plus, not a pen: this opens a menu of three unrelated things —
-                a message, a room of your own, a room of somebody else's — and a
-                pen claims the first of them. The one glyph that means "add
-                something" without saying which is the honest one here.
-
-                Small, and not quite opaque. A plus is the densest glyph in the
-                app — two full-length strokes crossing, no counters — so at the
-                size a drawn icon needs it reads twice as loud as one. */}
-            <Plus className="size-5" />
-          </Button>
-        </div>
+    //
+    // A column, so the button can be pushed to the bottom of it. Sticky only
+    // holds something *up* against the edge of the scrollport — it does not
+    // move it down — so after a short list the button's ordinary place is
+    // directly under the last row, halfway up the screen.
+    <div className="relative flex min-h-full flex-col">
+      {conversations.length === 0 ? (
+        <EmptyInbox />
+      ) : (
+        /* Room for the button when there is one to clear. */
+        <ul className={cn("px-2", floating ? "pb-28" : "pb-24")}>
+          {ordered.map((conversation, index) => (
+            <ConversationRow
+              key={conversation.key}
+              conversation={conversation}
+              room={conversation.group ? rooms.get(conversation.group) : undefined}
+              names={names}
+              onOpen={onOpen}
+              onDelete={onDelete}
+              waiting={conversation.peer !== null && knocked.has(conversation.peer)}
+              pinned={index < pinnedCount}
+              blockStart={index === 0}
+              blockEnd={index === pinnedCount - 1}
+              onLongPress={() => setHolding(conversation)}
+              revealed={revealed === conversation.key}
+              onReveal={(open) => setRevealed(open ? conversation.key : null)}
+            />
+          ))}
+        </ul>
       )}
+
+      {floating && <ComposeButton onCompose={onCompose} />}
 
       {/* What a held finger opens. One row today, and a menu rather than a
           straight toggle because the next thing anyone wants here — mute, mark
@@ -279,9 +265,36 @@ function ConversationRow({
   )
 }
 
-function EmptyInbox({ onCompose }: { onCompose: () => void }) {
+/**
+ * The one way to start something, wherever the list is at.
+ *
+ * A plus, not a pen: it opens a menu of three unrelated things — a message, a
+ * room of your own, a room of somebody else's — and a pen claims the first of
+ * them. The one glyph that means "add something" without saying which is the
+ * honest one here.
+ *
+ * Small, and not quite opaque. A plus is the densest glyph in the app — two
+ * full-length strokes crossing, no counters — so at the size a drawn icon
+ * needs it reads twice as loud as one.
+ */
+function ComposeButton({ onCompose }: { onCompose: () => void }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center px-10 pb-16 text-center">
+    <div className="pointer-events-none sticky bottom-0 mt-auto flex justify-end px-5 pb-safe">
+      <Button
+        size="icon"
+        onClick={onCompose}
+        aria-label="New chat"
+        className="bg-primary/85 pointer-events-auto mb-5 size-12 rounded-full shadow-md shadow-primary/20 backdrop-blur-sm"
+      >
+        <Plus className="size-5" />
+      </Button>
+    </div>
+  )
+}
+
+function EmptyInbox() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-10 pb-16 text-center">
       <div className="bg-accent text-accent-foreground flex size-20 items-center justify-center rounded-3xl">
         <MessageSquarePlus className="size-9" strokeWidth={1.5} />
       </div>
@@ -289,10 +302,6 @@ function EmptyInbox({ onCompose }: { onCompose: () => void }) {
       <p className="text-muted-foreground mt-2 max-w-[18rem] text-balance">
         Start a conversation with anyone who has opened Knock.
       </p>
-      <Button onClick={onCompose} size="lg" className="mt-7 h-12 rounded-2xl px-6">
-        <PenLine />
-        New message
-      </Button>
     </div>
   )
 }
