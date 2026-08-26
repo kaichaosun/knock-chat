@@ -9,6 +9,8 @@ import { Inbox } from "@/components/inbox"
 import { Contacts } from "@/components/contacts"
 import { Groups } from "@/components/groups"
 import { KnockRequests } from "@/components/knock-requests"
+import { GroupRequests } from "@/components/group-requests"
+import { JoinQueueSheet } from "@/components/join-queue-sheet"
 import { KnockSheet } from "@/components/knock-sheet"
 import { PullIndicator } from "@/components/pull-indicator"
 import { ProfileSheet } from "@/components/profile-sheet"
@@ -23,6 +25,7 @@ import { SendGiftSheet } from "@/components/send-gift-sheet"
 import { useContacts } from "@/hooks/use-contacts"
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
 import { useGroups } from "@/hooks/use-groups"
+import { useJoinRequests } from "@/hooks/use-join-requests"
 import { useKnocks } from "@/hooks/use-knocks"
 import { usePrefs } from "@/hooks/use-prefs"
 import { useRooms } from "@/hooks/use-rooms"
@@ -130,6 +133,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   )
   const {
     groups,
+    waiting,
     loading: groupsLoading,
     refresh: refreshGroups,
     inspect,
@@ -137,6 +141,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     join,
     say,
   } = useGroups(wallet, owner)
+
+  // Who is at the doors of the rooms you own, and answering them. Driven by the
+  // counts the room list carries, so it asks about a door only when somebody is
+  // at it.
+  const { queues, answer: answerJoin } = useJoinRequests(waiting)
+  /** The room whose queue is open, if any. */
+  const [queueFor, setQueueFor] = useState<string | null>(null)
 
   // Declared up here rather than with the rest of the screen's state, because
   // the contacts below take it: which tab is showing decides when that list is
@@ -1084,25 +1095,44 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             onRemoved={deleteThread}
           />
         ) : (
-          <Groups
-            groups={groups}
-            owner={address}
-            loading={groupsLoading}
-            onOpen={setOpenGroup}
-            onLeft={(id) => {
-              // The room goes, and its chat with it — the same shape as
-              // removing a contact, which also takes the conversation.
-              deleteThread(id)
-              void refreshGroups()
-            }}
-          />
+          <>
+            <GroupRequests groups={groups} queues={queues} onOpen={setQueueFor} />
+            <Groups
+              groups={groups}
+              owner={address}
+              loading={groupsLoading}
+              onOpen={setOpenGroup}
+              onLeft={(id) => {
+                // The room goes, and its chat with it — the same shape as
+                // removing a contact, which also takes the conversation.
+                deleteThread(id)
+                void refreshGroups()
+              }}
+            />
+          </>
         )}
       </div>
+
+      {/* Reachable from the card above the room list, and unchanged inside the
+          room's own details — the same queue, wherever you meet it. */}
+      <JoinQueueSheet
+        group={groups.find((group) => group.id === queueFor) ?? null}
+        requests={queueFor ? (queues[queueFor] ?? []) : []}
+        onOpenChange={(open) => !open && setQueueFor(null)}
+        onAnswer={async (request, admit) => {
+          await answerJoin(request.group_id, request.id, admit)
+          // The room list carries the counts this queue is driven by, so
+          // re-reading it is also what re-reads the queue — and admitting
+          // somebody changes who is in the room, which that list draws.
+          void refreshGroups()
+        }}
+      />
 
       <TabBar
         active={tab}
         onChange={setTab}
         unread={threads.reduce((total, c) => total + c.unread, 0) + knocks.length}
+        waiting={Object.values(waiting).reduce((total, at) => total + at, 0)}
       />
 
       {knockSheet}

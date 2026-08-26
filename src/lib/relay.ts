@@ -258,8 +258,16 @@ export function createGroup(input: {
   return request<Group>("/v1/groups", { method: "POST", body: JSON.stringify(input) })
 }
 
-export function listGroups(): Promise<{ groups: Group[] }> {
-  return request<{ groups: Group[] }>("/v1/groups")
+/**
+ * The rooms you are in.
+ *
+ * `waiting` counts who is at the door of each room **you own**, keyed by room
+ * id and holding only the rooms somebody is waiting at. It rides alongside the
+ * list the way names do: who is waiting is the owner's business, and the relay
+ * tells nobody else.
+ */
+export function listGroups(): Promise<{ groups: Group[]; waiting?: Record<string, number> }> {
+  return request<{ groups: Group[]; waiting?: Record<string, number> }>("/v1/groups")
 }
 
 export function getGroup(id: string): Promise<GroupDetail> {

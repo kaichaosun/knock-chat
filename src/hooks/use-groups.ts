@@ -28,6 +28,9 @@ const POLL_INTERVAL_MS = 30_000
 export function useGroups(wallet: Wallet | null, owner: string | null) {
   const signedIn = owner !== null
   const [groups, setGroups] = useState<Group[]>([])
+  // How many are waiting at the door of each room you own. Empty for everybody
+  // else, and empty is also what it means for a room nobody is waiting at.
+  const [waiting, setWaiting] = useState<Record<string, number>>({})
   // True until the first read lands, so an empty list can be told apart from
   // one that has not arrived — otherwise a slow start reads as "no groups".
   const [loading, setLoading] = useState(true)
@@ -35,7 +38,9 @@ export function useGroups(wallet: Wallet | null, owner: string | null) {
   const refresh = useCallback(async () => {
     if (!signedIn) return
     try {
-      setGroups((await listGroups()).groups)
+      const list = await listGroups()
+      setGroups(list.groups)
+      setWaiting(list.waiting ?? {})
     } catch {
       // A failed poll is not worth surfacing; the next one will try again.
     } finally {
@@ -46,6 +51,7 @@ export function useGroups(wallet: Wallet | null, owner: string | null) {
   useEffect(() => {
     if (!signedIn) {
       setGroups([])
+      setWaiting({})
       setLoading(true)
       return
     }
@@ -119,5 +125,5 @@ export function useGroups(wallet: Wallet | null, owner: string | null) {
 
   const say = useCallback((id: string, body: string) => sayInGroup(id, body), [])
 
-  return { groups, loading, refresh, inspect, create, join, say }
+  return { groups, waiting, loading, refresh, inspect, create, join, say }
 }
