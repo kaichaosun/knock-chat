@@ -10,7 +10,7 @@
 import { compact } from "./address"
 
 /** A link that knocks on this door. */
-export function personLink(address: string): string {
+export function peerLink(address: string): string {
   const url = new URL(window.location.href)
   url.search = `?knock=${compact(address)}`
   url.hash = ""

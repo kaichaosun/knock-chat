@@ -14,14 +14,14 @@ describe("readCode", () => {
     })
   })
 
-  it("reads a person, however the address arrived", () => {
-    expect(readCode(ALICE)).toEqual({ kind: "person", address: ALICE })
+  it("reads a peer, however the address arrived", () => {
+    expect(readCode(ALICE)).toEqual({ kind: "peer", address: ALICE })
     expect(readCode(ALICE.replace(/\s/g, "").toLowerCase())).toEqual({
-      kind: "person",
+      kind: "peer",
       address: ALICE,
     })
     expect(readCode(`http://192.168.1.101:5175/?knock=${ALICE.replace(/\s/g, "")}`)).toEqual({
-      kind: "person",
+      kind: "peer",
       address: ALICE,
     })
   })
@@ -34,6 +34,6 @@ describe("readCode", () => {
 
   it("does not confuse one kind for the other", () => {
     expect(readCode(ID)?.kind).toBe("group")
-    expect(readCode(ALICE)?.kind).toBe("person")
+    expect(readCode(ALICE)?.kind).toBe("peer")
   })
 })

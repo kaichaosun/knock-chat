@@ -19,7 +19,7 @@ import { groupIdFrom } from "./group-link"
 /** Where a code leads. */
 export type Code =
   | { kind: "group"; id: string }
-  | { kind: "person"; address: string }
+  | { kind: "peer"; address: string }
 
 /**
  * Read whatever was pasted, scanned or opened, or `null` if it says neither
@@ -33,7 +33,7 @@ export function readCode(text: string): Code | null {
   if (id) return { kind: "group", id }
 
   const address = addressFrom(text)
-  if (address) return { kind: "person", address }
+  if (address) return { kind: "peer", address }
 
   return null
 }

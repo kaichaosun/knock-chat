@@ -12,7 +12,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { copyText } from "@/lib/clipboard"
-import { personLink } from "@/lib/person-link"
+import { peerLink } from "@/lib/peer-link"
 
 /**
  * Your code, given the room a code needs.
@@ -43,7 +43,7 @@ export function MyCodeSheet({
         <div className="space-y-4 pb-8">
           <div className="flex justify-center">
             <QrCode
-              value={personLink(address)}
+              value={peerLink(address)}
               label="Scan to knock on this door"
               center={<AddressAvatar address={address} />}
               className="size-60 rounded-2xl"
@@ -54,7 +54,7 @@ export function MyCodeSheet({
             variant="secondary"
             className="h-11 w-full rounded-2xl"
             onClick={async () => {
-              const ok = await copyText(personLink(address))
+              const ok = await copyText(peerLink(address))
               toast[ok ? "success" : "info"](
                 ok ? "Invite link copied" : "Couldn't reach the clipboard",
               )
