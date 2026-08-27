@@ -11,7 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { canBeReached } from "@/lib/keys"
-import { compact, isValidAddress, normalizeInput, shortenAddress } from "@/lib/address"
+import { addressFrom, compact, isValidAddress, normalizeInput, shortenAddress } from "@/lib/address"
 import { rememberOne, sanitize } from "@/lib/names"
 import type { Receipt } from "@/lib/receipts"
 import { formatNim } from "@/lib/postage"
@@ -201,7 +201,13 @@ export function KnockSheet({
               placeholder="NQ.. .... .... .... ...."
               aria-label="Their address"
               aria-invalid={(typed.length === 36 && !valid) || isSelf}
-              onChange={(event) => setValue(normalizeInput(event.target.value))}
+              // A pasted invite link is an address wrapped in a URL, and
+              // regrouping one character by character turns it into nonsense.
+              // Typing is unaffected: nothing is found until 36 valid
+              // characters are there, which is when the two agree anyway.
+              onChange={(event) =>
+                setValue(addressFrom(event.target.value) ?? normalizeInput(event.target.value))
+              }
               className={cn(
                 "bg-muted w-full rounded-2xl py-3.5 pl-4 pr-11 font-mono text-[13px] tracking-tight outline-none",
                 "placeholder:text-muted-foreground/60 placeholder:font-sans placeholder:text-base",

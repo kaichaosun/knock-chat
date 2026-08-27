@@ -15,9 +15,9 @@ import { cn } from "@/lib/utils"
 /**
  * Get into a room from a link somebody sent.
  *
- * Opening the link directly works too, but only if whatever carried it hands
- * the query string through — and inside Nimiq Pay that is still unanswered.
- * Pasting is the route that cannot be taken away.
+ * Opening the link directly works — Nimiq Pay carries a query string through
+ * its deeplink — and scanning the code works too. Pasting is the route that
+ * needs neither a camera nor a link that survived being sent.
  */
 export function JoinByLinkSheet({
   open,

@@ -7,9 +7,9 @@
  * and refusing two of them would be pedantry standing between somebody and the
  * thing they were sent.
  *
- * Worth being forgiving for a second reason: whether Nimiq Pay preserves a
- * query string through `nimpay.app/miniapps/open/…` is still unanswered, so
- * pasting an id may be the only way in on a real device.
+ * Nimiq Pay does preserve a query string through its deeplink — tested on iOS
+ * against `knockchat.org` — so a link is a real way in and pasting is the
+ * fallback rather than the only route.
  */
 
 /** A room's id is a uuid, wherever it turns up. */
