@@ -99,7 +99,15 @@ export function KnockSheet({
   }, [open, valid, isSelf, typed, value, held])
 
   // Ask the relay what this address costs as soon as one is fully typed.
+  //
+  // Keyed on `open` as well as the address, because opening on the same door
+  // twice does not change the address: the answer is cleared on the way in, and
+  // without this nothing would ask for it again.
   useEffect(() => {
+    if (!open) return
+    // The reset above lands a render later, so on the way in the address here
+    // can still be the last one. Asking now would ask about the wrong door.
+    if (peer && value !== normalizeInput(peer)) return
     if (!valid || isSelf) {
       setReach(null)
       setReachable(null)
@@ -122,7 +130,7 @@ export function KnockSheet({
     return () => {
       cancelled = true
     }
-  }, [value, valid, isSelf, onReach])
+  }, [open, peer, value, valid, isSelf, onReach])
 
   const submit = async () => {
     if (!reach || !body.trim()) return
