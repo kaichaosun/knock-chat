@@ -5,7 +5,7 @@ import { BrandMark } from "@/components/brand-mark"
 import { LegalSheet } from "@/components/legal-sheet"
 import { Button } from "@/components/ui/button"
 import { PRIVACY, TERMS, type LegalDoc } from "@/lib/legal"
-import { nimiqPayDeeplink } from "@/lib/wallet"
+import { insideNimiqPay, nimiqPayDeeplink } from "@/lib/wallet"
 
 /**
  * Everything before the inbox, on one screen.
@@ -66,8 +66,13 @@ export function WelcomeScreen({
   }
 
   return (
-    <div className="flex h-full flex-col justify-between px-6 pt-safe pb-safe">
-      <div className="flex flex-1 flex-col items-center justify-center text-center">
+    // One column, centred as a whole, rather than content pushed up and
+    // actions pushed down: with a short bottom block all the slack collects
+    // between the two, and the button reads as having been left behind.
+    // Scrollable because a centred column that outgrows the screen would
+    // otherwise lose both ends of itself.
+    <div className="flex h-full flex-col justify-center overflow-y-auto px-6 pt-safe pb-safe">
+      <div className="flex flex-col items-center text-center">
         <BrandMark className="w-24" />
 
         <h1 className="mt-7 text-3xl font-extrabold tracking-tight">Knock</h1>
@@ -90,7 +95,7 @@ export function WelcomeScreen({
         </div>
       </div>
 
-      <div className="w-full space-y-3 pt-8 pb-4">
+      <div className="mt-10 w-full shrink-0 space-y-3">
         {message && (
           <p
             className={
@@ -113,10 +118,15 @@ export function WelcomeScreen({
               Open in Nimiq Pay
               <ArrowUpRight />
             </Button>
-            <Button size="lg" variant="ghost" className="h-11 w-full rounded-2xl" onClick={onRetry}>
-              <RefreshCw />
-              Try again
-            </Button>
+            {/* Only where it could work. Outside Nimiq Pay there is no provider
+                to find, however many times it is asked for — the offer to look
+                again belongs to the case where one is late, not absent. */}
+            {insideNimiqPay() && (
+              <Button size="lg" variant="ghost" className="h-11 w-full rounded-2xl" onClick={onRetry}>
+                <RefreshCw />
+                Try again
+              </Button>
+            )}
           </>
         ) : (
           <>

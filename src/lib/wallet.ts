@@ -17,10 +17,32 @@ import { signedMessageDigest } from "./signed-message"
 /** How long to wait for Nimiq Pay to inject the provider before giving up. */
 const PROVIDER_TIMEOUT_MS = 2500
 
-/** Deeplink that reopens this app inside Nimiq Pay. */
+/**
+ * Whether Nimiq Pay is the thing we are running in.
+ *
+ * The host context is seeded before the page script runs, unlike the provider,
+ * which arrives whenever it arrives. So this answers "is there a wallet coming"
+ * whether or not one has turned up yet.
+ */
+export function insideNimiqPay(): boolean {
+  return typeof window.nimiqPay !== "undefined"
+}
+
+/**
+ * Deeplink that reopens this app inside Nimiq Pay, on the page you are on.
+ *
+ * The query string comes along, which is what makes an invite survive the trip:
+ * someone who scanned a code with their phone's own camera lands here in a
+ * browser, and without it they would arrive inside Nimiq Pay at the front door
+ * with no idea who they were trying to reach.
+ *
+ * The custom scheme rather than `nimpay.app/miniapps/open/…`: both resolve to
+ * the same link, but this one opens the app directly instead of going through a
+ * web page first.
+ */
 export function nimiqPayDeeplink(): string {
-  const host = window.location.host + window.location.pathname
-  return `https://nimpay.app/miniapps/open/${host}`
+  const here = window.location.host + window.location.pathname + window.location.search
+  return `nimiqpay://miniapp?url=${encodeURIComponent(here)}`
 }
 
 /**
@@ -125,7 +147,7 @@ export async function connect(): Promise<ConnectResult> {
     return {
       ok: false,
       reason: "no-host",
-      message: "Open this Mini App inside Nimiq Pay to use your wallet.",
+      message: "Knock runs inside Nimiq Pay.",
     }
   }
 
