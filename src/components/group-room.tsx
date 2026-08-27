@@ -177,16 +177,46 @@ export function GroupRoom({
               {day.messages.map((message, index) => {
                 const stamped = carriesTime(message, day.messages[index + 1])
                 if (message.direction !== "in") {
+                  // The same row the incoming messages get: face in the left
+                  // gutter, name above, only the bubble sitting on its own
+                  // side. A room is read down its faces, and a turn of yours
+                  // was the one break in that column.
+                  const opens = opensTurn(day.messages[index - 1], message)
                   return (
-                    <MessageBubble
-                      key={message.id}
-                      message={message}
-                      onRetry={() => {}}
-                      onOpenInvite={onOpenInvite}
-                      channelOpen
-                      owner={owner}
-                      stamped={stamped}
-                    />
+                    <div key={message.id} className="flex items-start gap-2">
+                      <div className="w-8 shrink-0">
+                        {opens && (
+                          <button
+                            type="button"
+                            onClick={() => setShowing(owner)}
+                            aria-label="About you"
+                            className="block active:opacity-60"
+                          >
+                            <AddressAvatar address={owner} size="sm" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {opens && (
+                          <button
+                            type="button"
+                            onClick={() => setShowing(owner)}
+                            className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold"
+                          >
+                            You
+                          </button>
+                        )}
+                        <MessageBubble
+                          message={message}
+                          onRetry={() => {}}
+                          onOpenInvite={onOpenInvite}
+                          channelOpen
+                          owner={owner}
+                          stamped={stamped}
+                          inRoom
+                        />
+                      </div>
+                    </div>
                   )
                 }
                 const opens = opensTurn(day.messages[index - 1], message)
@@ -216,7 +246,7 @@ export function GroupRoom({
                         <button
                           type="button"
                           onClick={() => setShowing(message.peer)}
-                          className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[11px] font-semibold"
+                          className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold"
                         >
                           {who}
                         </button>
@@ -228,6 +258,7 @@ export function GroupRoom({
                         channelOpen
                         owner={owner}
                         stamped={stamped}
+                        inRoom
                       />
                     </div>
                   </div>
