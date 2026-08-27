@@ -67,14 +67,14 @@ export function TabBar({
             )}
           >
             <span className="relative">
-              <Icon className="size-5" />
+              <Icon className="size-6" />
               {badge > 0 && (
                 <span className="bg-primary text-primary-foreground absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums">
                   {badge}
                 </span>
               )}
             </span>
-            <span className={cn("text-[11px]", active === id ? "font-bold" : "font-medium")}>
+            <span className={cn("text-[12px]", active === id ? "font-bold" : "font-medium")}>
               {label}
             </span>
           </button>
