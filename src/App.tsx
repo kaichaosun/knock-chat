@@ -32,6 +32,7 @@ import { useRooms } from "@/hooks/use-rooms"
 import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
+import type { Code } from "@/lib/knock-code"
 import { copyText } from "@/lib/clipboard"
 import { haveStoredSession } from "@/lib/auth"
 import { toHex } from "@/lib/crypto"
@@ -366,6 +367,26 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [inspect],
   )
 
+  /**
+   * The one place a code turns into something happening.
+   *
+   * A room and a person are different doors, but a link, a paste and a scan
+   * are not different ways of opening them — so they all arrive here, and
+   * nothing that carries a code has to know what to do with one.
+   */
+  const openCode = useCallback(
+    (code: Code) => {
+      if (code.kind === "group") {
+        openInvite(code.id)
+        return
+      }
+      setPasting(false)
+      setKnockPeer(code.address)
+      setKnocking(true)
+    },
+    [openInvite],
+  )
+
   useEffect(() => {
     if (!owner) return
     const id = new URLSearchParams(window.location.search).get("group")
@@ -375,8 +396,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     url.searchParams.delete("group")
     window.history.replaceState({}, "", url)
 
-    openInvite(id)
-  }, [owner, openInvite])
+    openCode({ kind: "group", id })
+  }, [owner, openCode])
 
   // How the open thread stands with its peer. A channel can be closed from the
   // other side at any time, so this is asked on open rather than assumed from

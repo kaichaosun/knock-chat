@@ -40,6 +40,19 @@ function ibanChecksum(iban: string): number | null {
   return checksum
 }
 
+/**
+ * The one spelling of an address, whatever check digits it came with.
+ *
+ * The digits are recomputed from the body, so an address that arrived in a
+ * second valid form — mod-97 admits `NQ00…` for the body that `NQ97…` names —
+ * comes back as the form the rest of the app writes.
+ */
+function canonical(address: string): string {
+  const body = compact(address).slice(4)
+  const checksum = 98 - (ibanChecksum(`${CCODE}00${body}`) ?? 0)
+  return formatAddress(`${CCODE}${String(checksum).padStart(2, "0")}${body}`)
+}
+
 /** Whether `address` is a well-formed Nimiq address, checksum included. */
 export function isValidAddress(address: string): boolean {
   const value = compact(address)
@@ -73,6 +86,33 @@ export function normalizeInput(input: string): string {
   return value.match(/.{1,4}/g)?.join(" ") ?? value
 }
 
+/** An address wherever it turns up: `NQ`, two check digits, 32 base32 characters. */
+const ADDRESS = new RegExp(`${CCODE}[0-9]{2}[${ALPHABET}]{32}`)
+
+/**
+ * Pull an address out of whatever was pasted or scanned, or `null` if there
+ * isn't one.
+ *
+ * The twin of `groupIdFrom`, and forgiving for the same reasons: an address
+ * arrives inside a link, wrapped across two lines by a chat app, spaced into
+ * blocks or not spaced at all, lowercased by something that took it for prose.
+ * Whitespace goes first, so the match runs against the 36 characters that
+ * carry the meaning.
+ *
+ * The checksum is what makes looking anywhere in the text safe rather than a
+ * guess: base32 runs long enough to pass for an address do turn up in ids and
+ * hashes, and the mod-97 check turns away 96 of every 97 that would.
+ */
+export function addressFrom(text: string): string | null {
+  const found = compact(text).toUpperCase().match(ADDRESS)
+  if (!found) return null
+  // Canonical rather than as-matched: mod-97 leaves two spellings of the same
+  // address valid — `NQ00…` alongside the `NQ97…` everything else shows —
+  // and the app keys names, pins and threads by the string. One address
+  // arriving under two keys would be one person appearing as two.
+  return isValidAddress(found[0]) ? canonical(found[0]) : null
+}
+
 /** Encode bytes with Nimiq's base32 alphabet. 20 bytes fills exactly 32 characters. */
 function encodeBase32(bytes: Uint8Array): string {
   let bits = 0
@@ -98,9 +138,7 @@ function encodeBase32(bytes: Uint8Array): string {
  * the same vectors, so client and relay agree on who a public key belongs to.
  */
 export function addressFromPublicKey(publicKey: Uint8Array): string {
-  const base32 = encodeBase32(blake2b(publicKey, { dkLen: 32 }).slice(0, 20))
-  const checksum = 98 - (ibanChecksum(`${CCODE}00${base32}`) ?? 0)
-  return formatAddress(`${CCODE}${String(checksum).padStart(2, "0")}${base32}`)
+  return canonical(`${CCODE}00${encodeBase32(blake2b(publicKey, { dkLen: 32 }).slice(0, 20))}`)
 }
 
 /** Decode the user-friendly form back to its 20 raw bytes. */
