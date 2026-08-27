@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { Copy, Loader2, LogOut, Settings, Wifi, WifiOff } from "lucide-react"
+import { Copy, Loader2, LogOut, QrCode as QrCodeIcon, Settings, Wifi, WifiOff } from "lucide-react"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { MyCodeSheet } from "@/components/my-code-sheet"
 import { SettingsSheet } from "@/components/settings-sheet"
 import { Button } from "@/components/ui/button"
 import {
@@ -70,6 +71,7 @@ export function ProfileSheet({
   const [saving, setSaving] = useState(false)
   const [savingName, setSavingName] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [codeOpen, setCodeOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
   // Read the current values each time the sheet opens, so it never shows a
@@ -150,15 +152,27 @@ export function ProfileSheet({
               <p className="select-value font-mono text-[13px] leading-relaxed font-semibold wrap-anywhere">
                 {formatAddress(address)}
               </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => onCopy(formatAddress(address))}
-                className="mt-2 h-8 rounded-lg"
-              >
-                <Copy className="size-3.5" />
-                Copy
-              </Button>
+              <div className="mt-2 flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  aria-label="Copy your address"
+                  onClick={() => onCopy(formatAddress(address))}
+                  className="size-9 rounded-lg"
+                >
+                  <Copy className="size-4" />
+                </Button>
+                {/* For the case a link cannot reach: two phones on a table. */}
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  aria-label="Your invite link"
+                  onClick={() => setCodeOpen(true)}
+                  className="size-9 rounded-lg"
+                >
+                  <QrCodeIcon className="size-4" />
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -371,6 +385,7 @@ export function ProfileSheet({
         </DialogContent>
       </Dialog>
 
+      <MyCodeSheet open={codeOpen} onOpenChange={setCodeOpen} address={address} />
       <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Sheet>
   )

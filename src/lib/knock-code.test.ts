@@ -20,6 +20,10 @@ describe("readCode", () => {
       kind: "person",
       address: ALICE,
     })
+    expect(readCode(`http://192.168.1.101:5175/?knock=${ALICE.replace(/\s/g, "")}`)).toEqual({
+      kind: "person",
+      address: ALICE,
+    })
   })
 
   it("is null when the text leads nowhere", () => {

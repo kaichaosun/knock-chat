@@ -32,7 +32,7 @@ import { useRooms } from "@/hooks/use-rooms"
 import { useMessages } from "@/hooks/use-messages"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
-import type { Code } from "@/lib/knock-code"
+import { readCode, type Code } from "@/lib/knock-code"
 import { copyText } from "@/lib/clipboard"
 import { haveStoredSession } from "@/lib/auth"
 import { toHex } from "@/lib/crypto"
@@ -389,14 +389,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
   useEffect(() => {
     if (!owner) return
-    const id = new URLSearchParams(window.location.search).get("group")
-    if (!id) return
+    const params = new URLSearchParams(window.location.search)
+    const asked = params.get("group") ?? params.get("knock")
+    if (!asked) return
     // Cleared straight away so a reload does not reopen the same door.
     const url = new URL(window.location.href)
     url.searchParams.delete("group")
+    url.searchParams.delete("knock")
     window.history.replaceState({}, "", url)
 
-    openCode({ kind: "group", id })
+    const code = readCode(asked)
+    if (code) openCode(code)
+    else toast.error("That link doesn't lead anywhere.")
   }, [owner, openCode])
 
   // How the open thread stands with its peer. A channel can be closed from the

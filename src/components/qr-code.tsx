@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, type ReactNode } from "react"
 import qrcode from "qrcode-generator"
 
 import { cn } from "@/lib/utils"
@@ -10,19 +10,27 @@ import { cn } from "@/lib/utils"
  * colour from CSS — a code with a baked-in black stays black on a dark
  * background, where it is unreadable to a camera and looks broken to a person.
  *
- * Error correction is set to M: a phone screen held up to another phone is not
- * a damaged surface, and the higher levels only make the pattern denser and
- * harder to read across a table.
+ * Error correction is M when nothing sits on the code: a phone screen held up
+ * to another phone is not a damaged surface, and the higher levels only make
+ * the pattern denser and harder to read across a table. A code with something
+ * in the middle of it goes to Q, because covered modules are damage whether or
+ * not they were covered on purpose.
  */
 export function QrCode({
   value,
+  label,
+  center,
   className,
 }: {
   value: string
+  /** What scanning it does, for anyone who cannot see the code. */
+  label: string
+  /** Whose code this is, sat in the middle of it. */
+  center?: ReactNode
   className?: string
 }) {
   const { path, size } = useMemo(() => {
-    const code = qrcode(0, "M")
+    const code = qrcode(0, center ? "Q" : "M")
     code.addData(value)
     code.make()
 
@@ -36,20 +44,29 @@ export function QrCode({
       }
     }
     return { path, size }
-  }, [value])
+  }, [value, center])
 
   return (
-    <svg
-      viewBox={`0 0 ${size} ${size}`}
-      role="img"
-      aria-label="Scan to join this group"
-      // A quiet zone is required for a scanner to find the code at all, and the
-      // white ground has to be explicit: on a dark background the page colour
-      // would show through the gaps between modules.
-      className={cn("bg-white p-3 text-black", className)}
-      shapeRendering="crispEdges"
-    >
-      <path d={path} fill="currentColor" />
-    </svg>
+    // A quiet zone is required for a scanner to find the code at all, and the
+    // white ground has to be explicit: on a dark background the page colour
+    // would show through the gaps between modules.
+    <div className={cn("relative bg-white p-3 text-black", className)}>
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        role="img"
+        aria-label={label}
+        className="size-full"
+        shapeRendering="crispEdges"
+      >
+        <path d={path} fill="currentColor" />
+      </svg>
+      {/* On its own white ground rather than straight on the modules: it has to
+          read as covering the code, not as part of the pattern. */}
+      {center && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="rounded-lg bg-white p-1">{center}</span>
+        </span>
+      )}
+    </div>
   )
 }

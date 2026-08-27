@@ -359,7 +359,11 @@ export function GroupSheet({
             <section className="space-y-2">
               {/* For the case a link cannot reach: two phones on a table. */}
               <div className="flex justify-center pb-1">
-                <QrCode value={groupLink(group.id)} className="size-44 rounded-2xl" />
+                <QrCode
+                  value={groupLink(group.id)}
+                  label="Scan to join this group"
+                  className="size-44 rounded-2xl"
+                />
               </div>
               <Button
                 variant="secondary"
