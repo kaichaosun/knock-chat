@@ -170,6 +170,18 @@ Details that matter inside a WebView, and are easy to miss:
 On a desktop browser the app is held in a phone-width column; inside Nimiq Pay
 that constraint is a no-op.
 
+## Deploying
+
+The app is static files behind Caddy, talking to a relay. A push builds it on the server and swaps the web root:
+
+```sh
+git remote add server root@YOUR_SERVER:/opt/knock/chat/repo.git
+git push server main:production
+```
+
+`VITE_RELAY_URL` is compiled in at build time, and the relay has to name this
+app's origin in `KNOCK_ALLOWED_ORIGINS` or the browser blocks every request.
+
 ## Roadmap
 
 Encryption and NIM postage both ship today. See [ROADMAP.md](./ROADMAP.md) for
