@@ -307,17 +307,17 @@ export function ProfileSheet({
             </Button>
           </section>
 
-          <section className="text-muted-foreground flex items-center gap-4 border-t pt-5 text-xs">
+          <section className="text-muted-foreground flex items-center gap-4 border-t pt-3 text-[13px]">
             {/* Three states, not two: before the first poll lands the status is
                 simply unknown, and calling that "unreachable" is a lie the user
                 has no way to check. */}
             <span className="flex items-center gap-1.5">
               {relayStatus === "offline" ? (
-                <WifiOff className="text-destructive size-3.5" />
+                <WifiOff className="text-destructive size-4" />
               ) : relayStatus === "online" ? (
-                <Wifi className="text-success size-3.5" />
+                <Wifi className="text-success size-4" />
               ) : (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               )}
               {relayStatus === "offline"
                 ? "Relay unreachable"
@@ -325,7 +325,7 @@ export function ProfileSheet({
                   ? "Relay connected"
                   : "Checking relay"}
             </span>
-            <span className="bg-border h-3 w-px" />
+            <span className="bg-border h-3.5 w-px" />
             {/* The app's own name, not the host's — inside Nimiq Pay the host
                 is the one thing nobody needs telling. Set in words rather than
                 with the mark, which belongs at the size it can be read at, in
@@ -348,9 +348,9 @@ export function ProfileSheet({
               size="icon"
               aria-label="Settings"
               onClick={() => setSettingsOpen(true)}
-              className="text-muted-foreground -my-2 ml-auto shrink-0 rounded-full"
+              className="-my-2 ml-auto shrink-0 rounded-full"
             >
-              <Settings className="size-4" />
+              <Settings className="size-5" />
             </Button>
           </section>
         </div>

@@ -279,7 +279,7 @@ function ConversationRow({
  */
 function ComposeButton({ onCompose }: { onCompose: () => void }) {
   return (
-    <div className="pointer-events-none sticky bottom-0 mt-auto flex justify-end px-5 pb-safe">
+    <div className="pointer-events-none sticky bottom-0 mt-auto flex justify-end px-5 pb-float">
       <Button
         size="icon"
         onClick={onCompose}

@@ -243,3 +243,10 @@
 @utility pb-safe {
   padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom));
 }
+/* For something that floats above the tabs rather than sitting at the edge of
+   the screen. The tabs already hold the safe area open, so the inset alone is
+   an iPhone's home indicator standing in for a gap — and on a phone without
+   one there is no gap at all. */
+@utility pb-float {
+  padding-bottom: max(var(--safe-bottom, env(safe-area-inset-bottom)), 2rem);
+}
