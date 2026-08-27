@@ -8,6 +8,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { readCode, type Code } from "@/lib/knock-code"
+import { cn } from "@/lib/utils"
 
 /** What a frame is decoded with where the platform brings its own reader. */
 type Detector = { detect: (source: CanvasImageSource) => Promise<Array<{ rawValue: string }>> }
@@ -51,6 +52,8 @@ export function ScanSheet({
   const [error, setError] = useState<string | null>(null)
   /** Something was read and it was not a Knock code. Shown without stopping. */
   const [foreign, setForeign] = useState(false)
+  /** Whether there are frames yet. Until there are, the element is hidden. */
+  const [live, setLive] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -64,6 +67,7 @@ export function ScanSheet({
 
     setError(null)
     setForeign(false)
+    setLive(false)
 
     const stop = () => {
       stopped = true
@@ -157,6 +161,8 @@ export function ScanSheet({
 
       videoRef.current.srcObject = stream
       await videoRef.current.play().catch(() => {})
+      if (stopped) return
+      setLive(true)
       frame = requestAnimationFrame((time) => void tick(time))
     }
 
@@ -189,13 +195,29 @@ export function ScanSheet({
                 ref={videoRef}
                 playsInline
                 muted
-                // Filled rather than fitted: a letterboxed picture reads as a
-                // broken camera, and the code is held in the middle either way.
-                className="size-full object-cover"
+                autoPlay
+                disablePictureInPicture
+                // Hidden until it has frames. A media element with no source
+                // yet draws the platform's own placeholder — on Android a play
+                // triangle — and the wait here is however long the permission
+                // prompt takes.
+                className={cn(
+                  // Filled rather than fitted: a letterboxed picture reads as a
+                  // broken camera, and the code is held in the middle either way.
+                  "size-full object-cover transition-opacity duration-200",
+                  live ? "opacity-100" : "opacity-0",
+                )}
               />
+              {!live && (
+                <p className="absolute inset-0 flex items-center justify-center text-[13px] text-white/70">
+                  Starting the camera…
+                </p>
+              )}
               {/* Where to hold it. Nothing is cropped to this — the whole frame
                   is decoded — so it is a suggestion rather than a boundary. */}
-              <span className="pointer-events-none absolute inset-8 rounded-2xl border-2 border-white/70" />
+              {live && (
+                <span className="pointer-events-none absolute inset-8 rounded-2xl border-2 border-white/70" />
+              )}
             </div>
           )}
         </div>

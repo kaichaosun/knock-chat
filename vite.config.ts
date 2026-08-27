@@ -11,6 +11,10 @@ export default defineConfig({
     // Bind all interfaces so Nimiq Pay on a phone can reach the dev server.
     host: true,
     port: 5175,
+    // A phone can only use its camera over https, and a LAN address is not
+    // https — so scanning has to be tested through a tunnel, and Vite refuses
+    // hosts it was not told about. Development only.
+    allowedHosts: [".trycloudflare.com"],
     proxy: {
       // One origin for the app and the relay, so the same URL works from a
       // phone on the LAN as it does on the desktop.
