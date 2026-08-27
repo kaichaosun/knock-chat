@@ -958,6 +958,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       <>
         <Conversation
           peer={openPeer}
+          owner={address}
           messages={openMessages}
           reach={openReach}
           onBack={closeThreadView}

@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
 import { canBeReached } from "@/lib/keys"
-import { carriesTime, type Message } from "@/lib/messages"
-import { nameIn } from "@/lib/names"
+import { carriesTime, opensTurn, type Message } from "@/lib/messages"
+import { labelIn, nameIn } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { dayLabel } from "@/lib/time"
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 
 export function Conversation({
   peer,
+  owner,
   messages,
   reach,
   onBack,
@@ -31,6 +32,8 @@ export function Conversation({
   onOpenInvite,
 }: {
   peer: string
+  /** Your address, for the face over your own messages. */
+  owner: string
   messages: Message[]
   /** Null while it is still being fetched; assume the channel is open until told otherwise. */
   reach: Reachability | null
@@ -47,7 +50,8 @@ export function Conversation({
 }) {
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
-  const name = nameIn(useNames(), peer)
+  const names = useNames()
+  const name = nameIn(names, peer)
   const [attaching, setAttaching] = useState(false)
   const [paying, setPaying] = useState(false)
   const [showing, setShowing] = useState(false)
@@ -176,16 +180,49 @@ export function Conversation({
                 </span>
               </div>
               <div className="space-y-2">
-                {group.messages.map((message, index) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    onRetry={onRetry}
-                    onOpenInvite={onOpenInvite}
-                    channelOpen={!shut}
-                    stamped={carriesTime(message, group.messages[index + 1])}
-                  />
-                ))}
+                {group.messages.map((message, index) => {
+                  const outgoing = message.direction === "out"
+                  const opens = opensTurn(group.messages[index - 1], message)
+                  return (
+                    <div key={message.id} className="flex items-start gap-2">
+                      {/* A gutter held open for the whole run, so the rest of
+                          what somebody says does not step out from under the
+                          face that opened it. */}
+                      <div className="w-8 shrink-0">
+                        {opens &&
+                          (outgoing ? (
+                            // Nothing to open about yourself here: a thread has
+                            // one other person in it, and they are who the
+                            // sheet is about.
+                            <AddressAvatar address={owner} size="sm" />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setShowing(true)}
+                              aria-label={`About ${labelIn(names, peer)}`}
+                              className="block active:opacity-60"
+                            >
+                              <AddressAvatar address={peer} size="sm" />
+                            </button>
+                          ))}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {opens && (
+                          <p className="text-muted-foreground mb-0.5 ml-1 max-w-full truncate text-[13px] font-semibold">
+                            {outgoing ? "You" : labelIn(names, peer)}
+                          </p>
+                        )}
+                        <MessageBubble
+                          message={message}
+                          onRetry={onRetry}
+                          onOpenInvite={onOpenInvite}
+                          channelOpen={!shut}
+                          stamped={carriesTime(message, group.messages[index + 1])}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </section>
           ))

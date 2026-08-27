@@ -24,7 +24,6 @@ export function MessageBubble({
   channelOpen,
   owner = null,
   stamped = true,
-  inRoom = false,
 }: {
   message: Message
   onRetry: (message: Message) => void
@@ -40,19 +39,8 @@ export function MessageBubble({
    * [`carriesTime`].
    */
   stamped?: boolean
-  /**
-   * Whether this is a room rather than a thread with one other person.
-   *
-   * A room draws every message the same way: on the left, whichever way it
-   * went, because the face beside it already says who spoke — a side would be
-   * a second answer to a question already answered, and one that breaks the
-   * column those faces are read down.
-   */
-  inRoom?: boolean
 }) {
   const outgoing = message.direction === "out"
-  /** Which side it sits on, which is not always which way it went. */
-  const onLeft = inRoom || !outgoing
   const failed = message.status === "failed" || message.status === "blocked"
   // A message still on its way, or one that never went, keeps its line whatever
   // the run says: a retry nobody can see is a message nobody sends again.
@@ -74,11 +62,12 @@ export function MessageBubble({
   const payload = decode(message.body)
 
   return (
-    <div className={cn("flex w-full", onLeft ? "justify-start" : "justify-end")}>
-      {/* Four fifths is what leaves room for the other side of the thread. In
-          a room there is no other side to leave room for, and the fifth held
-          back is a margin nothing ever goes in. */}
-      <div className={cn(inRoom ? "max-w-[92%]" : "max-w-[80%]", !onLeft && "flex flex-col items-end")}>
+    // Always the left, whichever way it went: the face beside a message says
+    // who spoke, so a side would be a second answer to a question already
+    // answered. Four fifths used to leave room for the other side of the
+    // thread; with nothing on that side it was a margin nothing went in.
+    <div className="flex w-full justify-start">
+      <div className="max-w-[92%]">
         {payload.kind === "payment" ? (
           <PaymentCard payment={payload.payment} outgoing={outgoing} faded={failed} />
         ) : payload.kind === "gift" ? (

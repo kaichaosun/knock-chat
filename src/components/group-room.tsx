@@ -213,7 +213,6 @@ export function GroupRoom({
                           channelOpen
                           owner={owner}
                           stamped={stamped}
-                          inRoom
                         />
                       </div>
                     </div>
@@ -258,7 +257,6 @@ export function GroupRoom({
                         channelOpen
                         owner={owner}
                         stamped={stamped}
-                        inRoom
                       />
                     </div>
                   </div>
