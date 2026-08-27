@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Link as LinkIcon, PenLine, Plus, Users } from "lucide-react"
+import { Link as LinkIcon, PenLine, Plus, ScanLine, Users } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 
@@ -13,6 +13,7 @@ import { GroupRequests } from "@/components/group-requests"
 import { JoinQueueSheet } from "@/components/join-queue-sheet"
 import { KnockSheet } from "@/components/knock-sheet"
 import { PullIndicator } from "@/components/pull-indicator"
+import { ScanSheet } from "@/components/scan-sheet"
 import { ProfileSheet } from "@/components/profile-sheet"
 import { AttachMenu } from "@/components/attach-menu"
 import { TabBar, type Tab } from "@/components/tab-bar"
@@ -218,6 +219,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [pasting, setPasting] = useState(false)
+  const [scanning, setScanning] = useState(false)
   const [gifting, setGifting] = useState(false)
   /**
    * The relay's terms for holding a gift, or null on a relay that holds none.
@@ -381,6 +383,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         return
       }
       setPasting(false)
+      setScanning(false)
       setKnockPeer(code.address)
       setKnocking(true)
     },
@@ -802,6 +805,12 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       title="New chat"
       actions={[
         {
+          icon: ScanLine,
+          label: "Scan a code",
+          description: "Someone's invite link, or a group's.",
+          onSelect: () => setScanning(true),
+        },
+        {
           icon: PenLine,
           label: "Direct message",
           description: "Knock on someone's door with their address.",
@@ -813,7 +822,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         {
           icon: Users,
           label: "New group",
-          description: "A room you share by link. Not encrypted.",
+          description: "A room you own and invite people to.",
           onSelect: () => setCreatingGroup(true),
         },
         {
@@ -838,7 +847,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         {
           icon: Users,
           label: "New group",
-          description: "A room you share by link. Not encrypted.",
+          description: "A room you own and invite people to.",
           onSelect: () => setCreatingGroup(true),
         },
         {
@@ -864,6 +873,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         }}
       />
       <JoinByLinkSheet open={pasting} onOpenChange={setPasting} onFound={openInvite} />
+      <ScanSheet open={scanning} onOpenChange={setScanning} onFound={openCode} />
       <JoinGroupSheet
         open={inviteOpen}
         onOpenChange={setInviteOpen}
