@@ -52,6 +52,15 @@ export function SendNimSheet({
 
   const luna = parseNim(value)
   const typed = value.trim() !== ""
+  /**
+   * Whether they have stopped typing at it.
+   *
+   * "0" and "0." are on the way to every amount anyone enters, so complaining
+   * about them complains about typing. The field waits until the caret has
+   * left, and goes quiet again on the next keystroke.
+   */
+  const [settled, setSettled] = useState(false)
+  const wrong = settled && typed && luna === null
   const name = nameIn(names, peer)
 
   const submit = async () => {
@@ -99,13 +108,17 @@ export function SendNimSheet({
               disabled={sending}
               placeholder="0"
               aria-label={t("sendNim.amountLabel")}
-              aria-invalid={typed && luna === null}
-              onChange={(event) => setValue(event.target.value.replace(/[^\d.]/g, ""))}
+              aria-invalid={wrong}
+              onBlur={() => setSettled(true)}
+              onChange={(event) => {
+                setSettled(false)
+                setValue(event.target.value.replace(/[^\d.]/g, ""))
+              }}
               className={cn(
                 "bg-muted w-full rounded-2xl py-4 pr-16 pl-4 text-2xl font-bold tabular-nums outline-none",
                 "placeholder:text-muted-foreground/50",
                 "focus-visible:ring-ring/60 focus-visible:ring-2",
-                typed && luna === null && "ring-destructive ring-2",
+                wrong && "ring-destructive ring-2",
               )}
             />
             <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 font-semibold">
@@ -113,7 +126,7 @@ export function SendNimSheet({
             </span>
           </div>
 
-          {typed && luna === null && (
+          {wrong && (
             <p className="text-destructive px-1 text-[13px]">
               {t("sendNim.invalid", { decimals: NIM_DECIMALS })}
             </p>

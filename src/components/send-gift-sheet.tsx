@@ -73,6 +73,8 @@ export function SendGiftSheet({
 
   const luna = parseNim(amount)
   const typed = amount.trim() !== ""
+  /** As in the transfer sheet: "0" and "0." are on the way to every amount. */
+  const [settled, setSettled] = useState(false)
 
   const shares = Number.parseInt(shareText, 10)
   const sharesValid = Number.isInteger(shares) && shares >= 1 && shares <= maxShares
@@ -84,6 +86,7 @@ export function SendGiftSheet({
   // the other end, which the relay also refuses — better met before a wallet
   // opens than after.
   const enough = luna !== null && sharesValid && luna >= shares && !overMax
+  const wrong = settled && typed && !enough
   const each = enough && luna !== null ? Math.floor(luna / shares) : 0
 
   const submit = async () => {
@@ -120,13 +123,14 @@ export function SendGiftSheet({
               disabled={sending || paid}
               placeholder="0"
               aria-label={t("gift.totalLabel")}
-              aria-invalid={typed && !enough}
+              aria-invalid={wrong}
+              onBlur={() => setSettled(true)}
               onChange={(event) => setAmount(event.target.value.replace(/[^\d.]/g, ""))}
               className={cn(
                 "bg-muted w-full rounded-2xl py-4 pr-16 pl-4 text-2xl font-bold tabular-nums outline-none",
                 "placeholder:text-muted-foreground/50",
                 "focus-visible:ring-ring/60 focus-visible:ring-2",
-                typed && !enough && "ring-destructive ring-2",
+                wrong && "ring-destructive ring-2",
               )}
             />
             <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 font-semibold">
@@ -231,7 +235,7 @@ export function SendGiftSheet({
             )}
           />
 
-          {typed && !enough && sharesValid && (
+          {wrong && sharesValid && (
             <p className="text-destructive px-1 text-[13px]">
               {luna === null
                 ? t("gift.aboveZero")
