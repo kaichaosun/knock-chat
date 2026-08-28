@@ -365,9 +365,9 @@ export const en = {
     signOutBody:
       "Your chats, contacts and the names you gave them stay on this device. You can sign back in any time — your wallet is all it takes.",
     cancel: "Cancel",
-    relayOffline: "Relay unreachable",
-    relayOnline: "Relay connected",
-    relayChecking: "Checking relay",
+    relayOffline: "Unreachable",
+    relayOnline: "Connected",
+    relayChecking: "Checking network",
     devIdentity: " · dev identity",
     settings: "Settings",
   },
