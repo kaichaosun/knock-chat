@@ -1293,7 +1293,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 /** Collapse the wallet and session state machines into one screen's status. */
 function welcomeStatus(
   wallet: "connecting" | "connected" | "unavailable",
-  session: "restoring" | "needed" | "signing" | "error",
+  session: "restoring" | "needed" | "preparing" | "signing" | "error",
 ): WelcomeStatus {
   if (wallet === "unavailable") return "no-host"
   if (wallet === "connecting" || session === "restoring") {
@@ -1304,6 +1304,7 @@ function welcomeStatus(
     // invitation to sign in and a splash.
     return haveStoredSession() ? "resuming" : "detecting"
   }
+  if (session === "preparing") return "preparing"
   if (session === "signing") return "signing"
   if (session === "error") return "error"
   return "ready"

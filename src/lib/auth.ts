@@ -90,7 +90,16 @@ export function clearSession(scope: string): void {
  * The address comes back from the relay, derived from the public key that
  * signed — so this call is what establishes identity, not just what proves it.
  */
-export async function signIn(scope: string, sign: Signer): Promise<Session> {
+export async function signIn(
+  scope: string,
+  sign: Signer,
+  /**
+   * Called when the wallet is about to be asked — everything before this is a
+   * round trip to the relay, which happens with nothing on screen to show for
+   * it. It is the only part of signing in the caller can usefully report on.
+   */
+  onPrompt?: () => void,
+): Promise<Session> {
   // The challenge carries this device's encryption key, so the one signature
   // that proves identity also publishes the key. Two prompts for what is really
   // one act — registering this device — would be one prompt too many.
@@ -99,6 +108,7 @@ export async function signIn(scope: string, sign: Signer): Promise<Session> {
     method: "POST",
     body: JSON.stringify({ encryption_key: toHex(device.publicKey) }),
   })
+  onPrompt?.()
   const { publicKey, signature } = await sign(challenge.message)
 
   const verified = await request<VerifyResponse>("/v1/auth/verify", {

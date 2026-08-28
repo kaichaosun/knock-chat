@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { haveStoredSession } from "./auth"
+import { haveStoredSession, signIn } from "./auth"
 
 /** A localStorage that can be enumerated, which is what the scan needs. */
 function stubStorage(seed: Record<string, string> = {}) {
@@ -64,5 +64,49 @@ describe("haveStoredSession", () => {
       },
     })
     expect(haveStoredSession()).toBe(false)
+  })
+})
+
+describe("signIn", () => {
+  /** A relay that answers the challenge and then the verification, in that order. */
+  function stubRelay() {
+    const bodies = [
+      { nonce: "n", message: "sign me", expires_at: "2099-01-01T00:00:00Z" },
+      { token: "t", address: "NQ07 0000 0000 0000 0000 0000 0000 0000 0000", expires_at: "2099-01-01T00:00:00Z" },
+    ]
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(bodies.shift()) })),
+    )
+  }
+
+  /**
+   * The whole point of the callback: the tap is answered on screen before the
+   * wallet is asked, not after. Between the two sits a round trip nobody can
+   * see, and a button that waits it out unchanged gets tapped again.
+   */
+  it("announces the prompt after the challenge and before the wallet is asked", async () => {
+    stubRelay()
+    const order: string[] = []
+    await signIn(
+      "wallet",
+      (message) => {
+        expect(message).toBe("sign me")
+        order.push("sign")
+        return Promise.resolve({ publicKey: "pk", signature: "sig" })
+      },
+      () => void order.push("prompt"),
+    )
+    expect(order).toEqual(["prompt", "sign"])
+  })
+
+  it("does not announce a prompt the relay never got far enough to need", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new Error("offline"))),
+    )
+    const onPrompt = vi.fn()
+    await expect(signIn("wallet", () => Promise.reject(new Error("unreachable")), onPrompt)).rejects.toThrow()
+    expect(onPrompt).not.toHaveBeenCalled()
   })
 })

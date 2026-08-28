@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { clearSession, loadSession, signIn, type Session } from "@/lib/auth"
 import { checkRegisteredKey, deviceKeyPair } from "@/lib/keys"
@@ -9,6 +9,8 @@ export type SessionState =
   | { status: "restoring" }
   /** No usable token. The user must tap to sign in, so the wallet prompt is expected. */
   | { status: "needed" }
+  /** Fetching the challenge. The wallet has not been asked yet, so nothing covers the screen. */
+  | { status: "preparing" }
   | { status: "signing" }
   | { status: "active"; session: Session }
   | { status: "error"; message: string }
@@ -63,16 +65,40 @@ export function useSession(wallet: Wallet | null) {
     }
   }, [wallet])
 
+  /**
+   * Whether a tap is still waiting on the relay rather than on the wallet.
+   *
+   * A ref rather than the state above because the guard has to hold within a
+   * single tick: two taps in quick succession both read the state React last
+   * rendered, and both would pass.
+   */
+  const awaitingChallenge = useRef(false)
+
   const authenticate = useCallback(async () => {
-    if (!wallet) return
-    setState({ status: "signing" })
+    // Between the tap and the wallet's sheet sits a round trip to the relay,
+    // and for that second nothing about the screen has changed. Tapping again
+    // there would fetch a second challenge and ask the wallet twice.
+    //
+    // The latch lifts when the wallet is asked, not when signing ends: on iOS a
+    // sheet dismissed by tapping outside settles nothing at all — see the note
+    // on the button — and a latch held to the end would never lift for somebody
+    // who changed their mind.
+    if (!wallet || awaitingChallenge.current) return
+    awaitingChallenge.current = true
+    setState({ status: "preparing" })
     try {
-      setState({ status: "active", session: await signIn(wallet.scope, wallet.sign) })
+      const session = await signIn(wallet.scope, wallet.sign, () => {
+        awaitingChallenge.current = false
+        setState({ status: "signing" })
+      })
+      setState({ status: "active", session })
     } catch (error) {
       setState({
         status: "error",
         message: error instanceof Error ? error.message : "Sign-in failed.",
       })
+    } finally {
+      awaitingChallenge.current = false
     }
   }, [wallet])
 
@@ -88,6 +114,7 @@ export function useSession(wallet: Wallet | null) {
    * back in is a signature rather than a fresh start.
    */
   const invalidate = useCallback(() => {
+    awaitingChallenge.current = false
     if (wallet) clearSession(wallet.scope)
     setAuthToken(null)
     setState({ status: "needed" })

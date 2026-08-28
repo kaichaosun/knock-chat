@@ -22,6 +22,8 @@ export type WelcomeStatus =
   | "resuming"
   /** Provider ready, waiting for the user to start. */
   | "ready"
+  /** Tapped, and waiting on the relay's challenge — the wallet is not up yet. */
+  | "preparing"
   | "signing"
   /** Not running inside Nimiq Pay. */
   | "no-host"
@@ -46,6 +48,9 @@ export function WelcomeScreen({
   const { t } = useTranslation()
   /** Whichever document is being read, if either. */
   const [reading, setReading] = useState<LegalDoc | null>(null)
+
+  /** The two waits with nothing else on screen: finding the wallet, and asking the relay. */
+  const waiting = status === "detecting" || status === "preparing"
 
   // Somebody with a session is not being asked to do anything — they are
   // waiting. Showing them the pitch and a "sign in" control for the seconds it
@@ -126,24 +131,41 @@ export function WelcomeScreen({
           </>
         ) : (
           <>
-            {/* Unchanged by tapping it. The wallet's sheet covers the screen
-                the moment it opens, so a spinner here is never seen doing its
-                job — the only time it is on screen is after the sheet has gone,
-                which is the one moment it is not true. On iOS a sheet dismissed
-                by tapping outside settles nothing at all (the host calls
-                neither `sendResponse` nor `sendError`, and no event reaches the
-                page — see the dismissal probe), so a button that changed on tap
-                would change back only for somebody who signed. */}
+            {/* Two waits follow a tap, and only the first is ours to show. The
+                relay has to hand out a challenge before the wallet can be asked
+                to sign it, and that round trip passes with the sheet not yet up
+                and this button unchanged and still live — which reads as a tap
+                that missed, and gets tapped again. So it spins and goes dead
+                for exactly that stretch.
+
+                Then it comes back to itself, because from the moment the wallet
+                is asked the sheet covers the screen and a spinner underneath is
+                never seen doing its job. The one time it would be on screen is
+                after the sheet has gone — and on iOS a sheet dismissed by
+                tapping outside settles nothing at all (the host calls neither
+                `sendResponse` nor `sendError`, and no event reaches the page —
+                see the dismissal probe), so a button still spinning there would
+                never come back for somebody who changed their mind.
+
+                `active:` because the app turns the native tap highlight off
+                globally: without it the first thing to acknowledge a finger is
+                whatever React does next, which is the whole complaint. */}
             <Button
               size="lg"
-              disabled={status === "detecting"}
+              disabled={waiting}
               onClick={onSignIn}
-              className="h-13 w-full rounded-2xl text-base"
+              className="h-13 w-full rounded-2xl text-base active:scale-[0.98]"
             >
-              {status === "detecting" ? <Loader2 className="animate-spin" /> : <KeyRound />}
+              {waiting ? <Loader2 className="animate-spin" /> : <KeyRound />}
               {/* "resuming" never reaches here — it returns its own screen above
-                  — so the spinner's condition is the whole of it. */}
-              {t(status === "detecting" ? "welcome.looking" : "welcome.signIn")}
+                  — so these three are the whole of it. */}
+              {t(
+                status === "detecting"
+                  ? "welcome.looking"
+                  : status === "preparing"
+                    ? "welcome.opening"
+                    : "welcome.signIn",
+              )}
             </Button>
             <p className="text-muted-foreground flex items-center justify-center gap-1.5 text-[12px]">
               <ShieldCheck className="size-3.5" />
