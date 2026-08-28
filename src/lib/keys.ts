@@ -71,8 +71,8 @@ export function deviceKeyPair(scope: string): { secretKey: Uint8Array; publicKey
   return pair
 }
 
-/** The line in a signed statement that carries the key. */
-const KEY_PREFIX = "Encryption key: "
+/** The line in a signed statement that carries the public key. */
+const KEY_PREFIX = "Device public key: "
 
 /**
  * Read the encryption key out of a signed statement.

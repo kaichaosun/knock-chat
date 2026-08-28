@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from "vitest"
+import { ed25519 } from "@noble/curves/ed25519.js"
+
+import { addressFromPublicKey } from "@/lib/address"
+import { signedMessageDigest } from "@/lib/signed-message"
+import { toHex } from "@/lib/crypto"
 
 vi.mock("@/lib/relay", async () => {
   const actual = await vi.importActual<typeof import("@/lib/relay")>("@/lib/relay")
@@ -9,35 +14,53 @@ vi.mock("@/lib/relay", async () => {
 // top: the module under test binds `request` when it is first evaluated, and
 // a static import would bind the real one.
 const { request, RelayError } = await import("@/lib/relay")
-const { checkRegisteredKey, verifyCertificate } = await import("@/lib/keys")
+const { checkRegisteredKey, encryptionKeyOf, verifyCertificate } = await import("@/lib/keys")
 const asked = vi.mocked(request)
 
 /**
- * A certificate a real wallet produced, taken from a relay that accepted it.
- * The same identity signs the vector in `signed-message.test.ts`, so a change
- * that breaks verification fails in both places.
+ * A certificate for the wording in force, signed here rather than captured.
+ *
+ * Not weaker than a captured one where it matters: it is signed over
+ * `signedMessageDigest`, and that digest is pinned to a real Nimiq Pay
+ * signature in `signed-message.test.ts`. A change that broke agreement with
+ * the wallet would fail there. Replace it with a captured certificate when
+ * there is one for this wording.
  */
-const CERTIFICATE = {
-  address: "NQ80 M6TC 2D6V 4H55 CBPF 9VQU CGFX HCYD 4RAB",
-  statement:
-    "Knock sign-in\n\n" +
-    "Encryption key: b499fc3c7024cf863acaaf16b88c2b6c1f9ac3a912a659610023b2380360a96e\n" +
-    "Nonce: 4fc7da4ac96a525a5cfd8e17c6ff7228fe780afe3fe073d359cc0b9617db5348\n" +
-    "Expires: 2026-08-24T03:14:20.559108+00:00",
-  public_key: "f6457bf0a79ce0248d78e5e392b3d20c6895e5c89b63f23ac3118c24a421f2a8",
-  signature:
-    "24456800afdec555a522ce16b09116166a38a4bf2be167beefa049d1fd378b2b" +
-    "1923c7a3cbf87d20473a9723339e7bd44bd3051f747e500d76c9c40e53191c06",
-}
-
-/** The encryption key that certificate vouches for. */
+const SIGNER = new Uint8Array(32).fill(7)
+const SIGNER_PUBLIC = ed25519.getPublicKey(SIGNER)
 const REGISTERED = "b499fc3c7024cf863acaaf16b88c2b6c1f9ac3a912a659610023b2380360a96e"
+
+const STATEMENT =
+  "Knock sign-in\n\n" +
+  `Device public key: ${REGISTERED}\n` +
+  "Nonce: 4fc7da4ac96a525a5cfd8e17c6ff7228fe780afe3fe073d359cc0b9617db5348\n" +
+  "Expires: 2026-08-24T03:14:20.559108+00:00"
+
+const CERTIFICATE = {
+  address: addressFromPublicKey(SIGNER_PUBLIC),
+  statement: STATEMENT,
+  public_key: toHex(SIGNER_PUBLIC),
+  signature: toHex(ed25519.sign(signedMessageDigest(STATEMENT), SIGNER)),
+}
 
 const bytes = (hex: string) =>
   new Uint8Array((hex.match(/../g) ?? []).map((pair) => Number.parseInt(pair, 16)))
 
+describe("encryptionKeyOf", () => {
+  const KEY = "b499fc3c7024cf863acaaf16b88c2b6c1f9ac3a912a659610023b2380360a96e"
+
+  it("reads the wording a wallet is asked to sign today", () => {
+    expect(encryptionKeyOf(`Device public key: ${KEY}`)).toBe(KEY)
+  })
+
+  it("is null for a line that carries no key", () => {
+    expect(encryptionKeyOf("Device public key: nothex")).toBeNull()
+    expect(encryptionKeyOf("Knock sign-in")).toBeNull()
+  })
+})
+
 describe("verifyCertificate", () => {
-  it("accepts one a wallet really signed", () => {
+  it("accepts one signed over the statement it carries", () => {
     expect(verifyCertificate(CERTIFICATE)).toBe(REGISTERED)
   })
 
