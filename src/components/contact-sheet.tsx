@@ -71,7 +71,7 @@ export function ContactSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Contact</SheetTitle>
+          <SheetTitle>{t("contacts.sheetTitle")}</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-7 pb-8">
@@ -83,7 +83,7 @@ export function ContactSheet({
           <section className="flex items-center gap-3.5">
             <AddressAvatar address={address} size="lg" />
             <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground text-[11px]">Address</p>
+              <p className="text-muted-foreground text-[12px]">{t("contacts.address")}</p>
               <p className="select-value font-mono text-[13px] leading-relaxed font-semibold wrap-anywhere">
                 {formatAddress(address)}
               </p>
@@ -94,22 +94,22 @@ export function ContactSheet({
                 className="mt-2 h-8 rounded-lg"
               >
                 <Copy className="size-3.5" />
-                Copy
+                {t("contacts.copy")}
               </Button>
             </div>
           </section>
 
           <section>
-            <h3 className="text-sm font-semibold">Original name</h3>
+            <h3 className="text-sm font-semibold">{t("contacts.originalName")}</h3>
             {theirs ? (
               <p className="mt-1.5 text-[15px] font-semibold text-muted-foreground">{theirs}</p>
             ) : (
-              <p className="text-muted-foreground mt-1.5 text-[15px]">Not set</p>
+              <p className="text-muted-foreground mt-1.5 text-[15px]">{t("contacts.notSet")}</p>
             )}
           </section>
 
           <section>
-            <h3 className="text-sm font-semibold">Your name for them</h3>
+            <h3 className="text-sm font-semibold">{t("contacts.yourNameFor")}</h3>
             <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
               {t("contacts.yourNameNote")}
             </p>
@@ -147,7 +147,7 @@ export function ContactSheet({
                 onClick={save}
                 className="h-12 rounded-2xl px-5"
               >
-                Save
+                {t("contacts.save")}
               </Button>
             </div>
 

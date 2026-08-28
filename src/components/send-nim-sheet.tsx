@@ -127,7 +127,7 @@ export function SendNimSheet({
             className="brand-gradient h-13 w-full rounded-2xl text-base"
           >
             {sending ? <Loader2 className="animate-spin" /> : null}
-            {luna === null ? "Send" : `Send ${formatNim(luna)} NIM`}
+            {luna === null ? t("sendNim.send") : t("sendNim.sendFor", { amount: formatNim(luna) })}
           </Button>
 
           <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">

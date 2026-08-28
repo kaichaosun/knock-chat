@@ -74,14 +74,16 @@ export function GiftDetailSheet({
       ? inOrder.reduce((best, claim) => (claim.amount_luna > best.amount_luna ? claim : best))
       : null
 
-  const sender = gift.sender === owner ? "You" : labelIn(names, gift.sender)
+  /** Asked of the address, not of the label: the label is translated. */
+  const fromYou = gift.sender === owner
+  const sender = fromYou ? t("members.you") : labelIn(names, gift.sender)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
           <SheetTitle>
-            {sender === "You" ? t("gift.yours") : t("gift.theirs", { name: sender })}
+            {fromYou ? t("gift.yours") : t("gift.theirs", { name: sender })}
           </SheetTitle>
           <SheetDescription>
             {t(gift.split === "random" ? "gift.randomShares" : "gift.evenShares")}
@@ -127,7 +129,7 @@ export function GiftDetailSheet({
                     <AddressAvatar address={claim.address} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 truncate text-[14px] font-semibold">
-                        {yours ? "You" : labelIn(names, claim.address)}
+                        {yours ? t("members.you") : labelIn(names, claim.address)}
                         {won && (
                           <span className="text-warning flex shrink-0 items-center gap-0.5 text-[11px] font-bold">
                             <Crown className="size-3.5" />
@@ -137,7 +139,7 @@ export function GiftDetailSheet({
                       </p>
                       <p className="text-muted-foreground text-[11px] tabular-nums">
                         {sinceOpened(gift.created_at, claim.claimed_at)}
-                        {!claim.payout_tx && " · sending"}
+                        {!claim.payout_tx && t("gift.sending")}
                       </p>
                     </div>
                     <span className="shrink-0 text-[15px] font-bold tabular-nums">

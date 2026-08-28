@@ -580,11 +580,11 @@ export function GroupSheet({
                       <AddressAvatar address={address} size="sm" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-semibold">
-                          {address === owner ? "You" : labelIn(names, address)}
+                          {address === owner ? t("members.you") : labelIn(names, address)}
                         </p>
                         <p className="text-muted-foreground truncate font-mono text-[11px]">
                           {shortenAddress(address)}
-                          {address === group.owner && " · owner"}
+                          {address === group.owner && t("members.ownerSuffix")}
                         </p>
                       </div>
                     </button>

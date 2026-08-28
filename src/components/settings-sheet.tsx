@@ -52,7 +52,7 @@ export function SettingsSheet({
   onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation()
-  const { theme, palette } = useTheme()
+  const { theme } = useTheme()
   const { compose, language } = usePrefs()
   /** Whichever document is being read, if either. */
   const [reading, setReading] = useState<LegalDoc | null>(null)
@@ -66,6 +66,23 @@ export function SettingsSheet({
         </SheetHeader>
 
         <div className="space-y-7 pb-8">
+          <section>
+            {/* One line, because there are only two things to say: what it is,
+                and what it is set to. A heading with a row under it would spend
+                three lines saying them. */}
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              className="active:bg-muted -mx-3 flex w-[calc(100%+1.5rem)] items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors"
+            >
+              <span className="text-sm font-semibold">{t("settings.language.title")}</span>
+              <span className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
+                {language === "host" ? t("settings.language.host") : LANGUAGE_NAMES[language]}
+                <ChevronRight className="size-4 shrink-0" />
+              </span>
+            </button>
+          </section>
+
           <section>
             <h3 className="text-sm font-semibold">{t("settingsMore.appearance")}</h3>
             <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
@@ -101,38 +118,16 @@ export function SettingsSheet({
                 )
               })}
             </div>
-
-            {/* Only under System, and only ever as an answer: it says which way
-                the phone is currently pointing, which is the one thing the row
-                above cannot show. */}
-            {theme === "system" && (
-              <p className="text-muted-foreground mt-2.5 text-[12px]">
-                {t("settingsMore.phoneIs", { palette })}
-              </p>
-            )}
-          </section>
-
-          <section>
-            {/* One line, because there are only two things to say: what it is,
-                and what it is set to. A heading with a row under it would spend
-                three lines saying them. */}
-            <button
-              type="button"
-              onClick={() => setPicking(true)}
-              className="active:bg-muted -mx-3 flex w-[calc(100%+1.5rem)] items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors"
-            >
-              <span className="text-sm font-semibold">{t("settings.language.title")}</span>
-              <span className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
-                {language === "host" ? t("settings.language.host") : LANGUAGE_NAMES[language]}
-                <ChevronRight className="size-4 shrink-0" />
-              </span>
-            </button>
           </section>
 
           <section>
             <h3 className="text-sm font-semibold">{t("settingsMore.composeTitle")}</h3>
             <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
-              {t("settingsMore.composeNote")}
+              {t(
+                compose === "floating"
+                  ? "settingsMore.composeFloatingNote"
+                  : "settingsMore.composeHeaderNote",
+              )}
             </p>
 
             <div
