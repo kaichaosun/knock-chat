@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info } from "lucide-react"
+import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info, UserRound } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { MemberSheet } from "@/components/member-sheet"
+import { PickContactSheet } from "@/components/pick-contact-sheet"
 import { RemoveMemberDialog } from "@/components/remove-member-dialog"
 import { AttachMenu } from "@/components/attach-menu"
 import { Composer } from "@/components/composer"
@@ -39,6 +40,8 @@ export function GroupRoom({
   onRefreshDetail,
   onOpenChat,
   onOpenInvite,
+  onOpenContact,
+  onShareContact,
   onInvite,
   onGift,
 }: {
@@ -60,6 +63,10 @@ export function GroupRoom({
   onOpenChat: (address: string) => void
   /** Open the door an invite card points at. */
   onOpenInvite: (group: string) => void
+  /** Open the door a shared contact points at. */
+  onOpenContact: (address: string) => void
+  /** Post somebody's contact into this room. */
+  onShareContact: (address: string) => void
   /** Send this room's invite into your chat with somebody. */
   onInvite: (address: string) => void
   /** Leave a pot in the room. Absent on a relay that doesn't hold gifts. */
@@ -95,6 +102,7 @@ export function GroupRoom({
     }
   }
   const [attaching, setAttaching] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" })
@@ -212,6 +220,7 @@ export function GroupRoom({
                           message={message}
                           onRetry={() => {}}
                           onOpenInvite={onOpenInvite}
+                          onOpenContact={onOpenContact}
                           channelOpen
                           owner={owner}
                           stamped={stamped}
@@ -256,6 +265,7 @@ export function GroupRoom({
                         message={message}
                         onRetry={() => {}}
                         onOpenInvite={onOpenInvite}
+                        onOpenContact={onOpenContact}
                         channelOpen
                         owner={owner}
                         stamped={stamped}
@@ -302,9 +312,24 @@ export function GroupRoom({
               description: t("room.leaveGiftNote"),
               onSelect: onGift,
             },
+            {
+              icon: UserRound,
+              label: t("shareContact.action"),
+              description: t("shareContact.actionNote"),
+              onSelect: () => setSharing(true),
+            },
           ]}
         />
       )}
+
+      <PickContactSheet
+        open={sharing}
+        onOpenChange={setSharing}
+        title={t("shareContact.title")}
+        note={t("shareContact.note")}
+        repeatable={false}
+        onPick={onShareContact}
+      />
 
       <MemberSheet
         address={showing}

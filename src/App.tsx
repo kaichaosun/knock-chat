@@ -13,6 +13,7 @@ import { KnockRequests } from "@/components/knock-requests"
 import { GroupRequests } from "@/components/group-requests"
 import { JoinQueueSheet } from "@/components/join-queue-sheet"
 import { KnockSheet } from "@/components/knock-sheet"
+import { MemberSheet } from "@/components/member-sheet"
 import { PullIndicator } from "@/components/pull-indicator"
 import { ScanSheet } from "@/components/scan-sheet"
 import { ProfileSheet } from "@/components/profile-sheet"
@@ -32,6 +33,7 @@ import { useKnocks } from "@/hooks/use-knocks"
 import { usePrefs } from "@/hooks/use-prefs"
 import { useRooms } from "@/hooks/use-rooms"
 import { useMessages } from "@/hooks/use-messages"
+import { useNames } from "@/hooks/use-names"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { readCode, type Code } from "@/lib/knock-code"
@@ -43,7 +45,7 @@ import { cn } from "@/lib/utils"
 import { AlreadyPaidError, fundGift } from "@/lib/gift-funding"
 import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftReceipt } from "@/lib/gift-receipts"
 import { messageId, withRooms, type Message } from "@/lib/messages"
-import { adopt as adoptNames, rememberOne } from "@/lib/names"
+import { adopt as adoptNames, givenNameIn, rememberOne } from "@/lib/names"
 import { adopt as adoptPins, unpin } from "@/lib/pins"
 import {
   adopt as adoptRooms,
@@ -53,7 +55,7 @@ import {
   roomIn,
 } from "@/lib/rooms"
 import type { Receipt } from "@/lib/receipts"
-import { encode as encodePayload, giftNote, invite, payment } from "@/lib/payload"
+import { contactNote, encode as encodePayload, giftNote, invite, payment } from "@/lib/payload"
 import { sendNim, unwrapTransaction } from "@/lib/payments"
 import { commitment, formatNim, newNonce } from "@/lib/postage"
 import { forgetPeerKey, NoKeyError } from "@/lib/keys"
@@ -88,6 +90,7 @@ const REACH_BACKOFF_MS = [10_000, 20_000, 40_000, 80_000]
 
 function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const { t } = useTranslation()
+  const names = useNames()
   const revealProbes = useSecretTap(onRevealProbes)
   const { state, retry } = useWallet()
   const wallet = state.status === "connected" ? state.wallet : null
@@ -180,6 +183,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // Set when knocking on a door we already know, so the sheet fixes the address
   // instead of asking for it. Null for the ordinary compose flow.
   const [knockPeer, setKnockPeer] = useState<string | null>(null)
+  /** Whether the sheet was opened to reopen a chat, rather than to start one. */
+  const [reopening, setReopening] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   /** Whether the list under the header has been scrolled off its top. */
   const [scrolled, setScrolled] = useState(false)
@@ -267,7 +272,17 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   useEffect(() => adoptPins(owner), [owner])
   useEffect(() => adoptRooms(owner), [owner])
 
-  const openThread = useCallback((peer: string) => setOpenPeer(peer), [])
+  /**
+   * Open a direct thread, leaving whatever room was open.
+   *
+   * A room is drawn in preference to a thread, so setting the peer without
+   * closing the room changes nothing anyone can see — the thread waits behind
+   * it until the room is backed out of.
+   */
+  const openThread = useCallback((peer: string) => {
+    setOpenGroup(null)
+    setOpenPeer(peer)
+  }, [])
 
   // Opening a chat is the moment worth re-checking who you are writing to.
   // A cached key stays right until the peer signs in on another device, and
@@ -386,10 +401,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       }
       setPasting(false)
       setScanning(false)
+      // Somebody you already have a thread with opens as a thread. The knock
+      // sheet is for doors you have not been through — offering it for a chat
+      // that is sitting right there asks you to pay for what you already have.
+      if (threadWith(code.address).length > 0) {
+        openThread(code.address)
+        return
+      }
       setKnockPeer(code.address)
+      setReopening(false)
       setKnocking(true)
     },
-    [openInvite],
+    [openInvite, openThread, threadWith],
   )
 
   useEffect(() => {
@@ -713,9 +736,37 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     [owner, openGroup, giftTerms, wallet, placeGift],
   )
 
+  /**
+   * Hand somebody's address on, into whichever chat is open.
+   *
+   * The name that travels is the one they publish, never the one you gave
+   * them: `contact-sheet` promises that stays on this phone, and a card is a
+   * message like any other — it would end up in front of the person it named.
+   */
+  const shareContact = useCallback(
+    (into: (body: string) => Promise<void> | void, address: string) => {
+      const published = givenNameIn(names, address) ?? ""
+      void Promise.resolve(into(encodePayload(contactNote(address, published)))).catch(
+        (error: unknown) =>
+          toast.error(error instanceof Error ? error.message : t("app.sendThatFailed")),
+      )
+    },
+    [names, t],
+  )
+
+  /**
+   * Who a shared contact card is about.
+   *
+   * The card opens this rather than a chat or a knock: it is somebody you have
+   * been handed, and the first thing to do with a stranger is look at them.
+   * What happens next is a decision, and this is where it is offered.
+   */
+  const [showingContact, setShowingContact] = useState<string | null>(null)
+
   /** Knock on a door we already know, reusing the sheet the compose flow uses. */
   const knockOnOpenPeer = useCallback(() => {
     setKnockPeer(openPeer)
+    setReopening(true)
     setKnocking(true)
   }, [openPeer])
 
@@ -770,12 +821,38 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
   const address = session.state.session.address
 
+  const contactSheet = (
+    <MemberSheet
+      address={showingContact}
+      onOpenChange={(next) => !next && setShowingContact(null)}
+      you={address}
+      // Three answers, because there are three people it can be. "Contact"
+      // means one thing here — somebody whose channel is open — so a stranger
+      // handed to you is not one, whatever the card that carried them said.
+      // And a card can carry you: your own is the one nobody knocks on.
+      title={t(
+        showingContact && compact(showingContact) === compact(address)
+          ? "members.you"
+          : showingContact &&
+              (contacts ?? []).some((one) => compact(one.address) === compact(showingContact))
+            ? "shareContact.card"
+            : "shareContact.stranger",
+      )}
+      onCopy={copy}
+      onOpenChat={(peer) => {
+        setShowingContact(null)
+        openCode({ kind: "peer", address: peer })
+      }}
+    />
+  )
+
   const knockSheet = (
     <KnockSheet
       open={knocking}
       onOpenChange={setKnocking}
       myAddress={address}
       peer={knockPeer ?? undefined}
+      reopening={reopening}
       onReach={reach}
       held={held}
       onKnock={async (peer, body, policyLuna) => {
@@ -818,6 +895,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           description: t("app.directMessageNote"),
           onSelect: () => {
             setKnockPeer(null)
+            setReopening(false)
             setKnocking(true)
           },
         },
@@ -929,14 +1007,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             toast.success(t("app.chatDeleted"))
           }}
           onSay={onSay}
+          onOpenContact={setShowingContact}
+          onShareContact={(address) => shareContact((body) => onSay(body), address)}
           onRefreshDetail={() => {
             void refreshGroupDetail()
             void refreshGroups()
           }}
-          onOpenChat={(peer) => {
-            setOpenGroup(null)
-            openThread(peer)
-          }}
+          onOpenChat={openThread}
           onOpenInvite={openInvite}
           onInvite={onInviteToRoom}
           onGift={giftTerms ? () => setGifting(true) : undefined}
@@ -951,6 +1028,11 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           />
         )}
         {groupSheets}
+        {/* A shared contact opens a knock, and a room is one of the places a
+            card like that is read — without this the sheet has nowhere to
+            appear until the room is closed. */}
+        {knockSheet}
+        {contactSheet}
       </>
     )
   }
@@ -970,8 +1052,11 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onCopyAddress={copy}
           onPay={onPay}
           onOpenInvite={openInvite}
+          onOpenContact={setShowingContact}
+          onShareContact={(address) => shareContact((body) => onSend(body), address)}
         />
         {knockSheet}
+        {contactSheet}
         {composeMenu}
         {groupSheets}
       </>
@@ -997,6 +1082,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           label: t("app.newMessage"),
           onSelect: () => {
             setKnockPeer(null)
+            setReopening(false)
             setKnocking(true)
           },
         }
@@ -1183,6 +1269,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       />
 
       {knockSheet}
+      {contactSheet}
       {composeMenu}
       {groupMenu}
       {groupSheets}

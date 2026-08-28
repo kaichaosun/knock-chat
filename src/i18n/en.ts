@@ -37,6 +37,7 @@ export const en = {
     received: "Received {{amount}}",
     youShared: "You shared {{room}}",
     invitedYou: "Invited you to {{room}}",
+    sharedWithYou: "Shared {{name}} with you",
     aGroup: "a group",
     youLeft: "You left {{amount}}",
     leftForRoom: "Left {{amount}} for the room",
@@ -82,7 +83,6 @@ export const en = {
     locked: "Can't be opened on this device",
     sent: "Sent",
     received: "Received",
-    sharedGroup: "You shared a group",
     groupInvite: "Group invite",
     aGroup: "A group",
     sending: "Sending",
@@ -269,7 +269,10 @@ export const en = {
     remove: "Remove",
   },
   pickContact: {
-    note: "An invite is an ordinary message, so it can only go to someone you can already write to.",
+    note: "An invite is an ordinary message, so it can only go to someone you can already write to. Knock on them first.",
+    title: "Add someone",
+    description:
+      "They'll get an invite in your chat with them, and can see what the group is before joining.",
     inGroup: "In the group",
     invited: "Invited",
   },
@@ -503,6 +506,15 @@ export const en = {
     freeAskingWarning:
       "Asking is free, so anyone can fill your list with requests. A cost to join is what keeps that in check.",
     threadStart: "This is the start of your conversation. Say hello.",
+  },
+  shareContact: {
+    action: "Share a contact",
+    actionNote: "Send someone's name and address.",
+    title: "Share a contact",
+    note: "The card carries their address and the name they publish, never the name you gave them.",
+    card: "Contact",
+    /** Somebody handed to you whom you have no channel with — not a contact. */
+    stranger: "Someone new",
   },
   settings: {
     title: "Settings",

@@ -29,12 +29,20 @@ export function PickContactSheet({
   onOpenChange,
   /** Already in the room. Shown as such rather than hidden, so their absence
    *  from the list is never mistaken for them not being a contact. */
-  members,
+  members = [],
+  title,
+  note,
+  /** Whether picking somebody leaves the sheet open to pick another. */
+  repeatable = true,
   onPick,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  members: string[]
+  members?: string[]
+  /** What this list is for, when it is not bringing somebody into a room. */
+  title?: string
+  note?: string
+  repeatable?: boolean
   onPick: (address: string) => void
 }) {
   const { t } = useTranslation()
@@ -64,11 +72,8 @@ export function PickContactSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Add someone</SheetTitle>
-          <SheetDescription>
-            They'll get an invite in your chat with them, and can see what the group is
-            before joining.
-          </SheetDescription>
+          <SheetTitle>{title ?? t("pickContact.title")}</SheetTitle>
+          <SheetDescription>{note ?? t("pickContact.description")}</SheetDescription>
         </SheetHeader>
 
         <div className="pb-8">
@@ -83,7 +88,6 @@ export function PickContactSheet({
               </div>
               <p className="text-muted-foreground mt-4 text-sm text-balance">
                 {t("pickContact.note")}
-                already write to. Knock on them first.
               </p>
             </div>
           ) : (
@@ -97,8 +101,9 @@ export function PickContactSheet({
                       type="button"
                       disabled={already || done}
                       onClick={() => {
-                        setSent((current) => [...current, contact.address])
+                        if (repeatable) setSent((current) => [...current, contact.address])
                         onPick(contact.address)
+                        if (!repeatable) onOpenChange(false)
                       }}
                       className={cn(
                         "flex w-full items-center gap-3.5 rounded-2xl p-2.5 text-left transition-colors",

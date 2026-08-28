@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { decode, encode, giftNote, invite, payment, preview, text } from "./payload"
+import { contactNote, decode, encode, giftNote, invite, payment, preview, text } from "./payload"
 
 /** The frame marker, spelled out here so a test can forge one by hand. */
 const FRAME = "\u001fknock1\n"
@@ -66,6 +66,50 @@ describe("an unrecognised frame", () => {
 
   it("cannot be re-encoded, since this build never understood it", () => {
     expect(() => encode({ kind: "unknown" })).toThrow()
+  })
+})
+
+describe("contact notes", () => {
+  const ALICE = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
+
+  it("survives the round trip", () => {
+    const shared = encode(contactNote(ALICE, "Alice"))
+    expect(decode(shared)).toEqual({
+      kind: "contact",
+      contact: { address: ALICE, name: "Alice" },
+    })
+  })
+
+  it("keeps a nameless one, because the address is the whole of it", () => {
+    expect(decode(encode(contactNote(ALICE, "")))).toEqual({
+      kind: "contact",
+      contact: { address: ALICE, name: "" },
+    })
+  })
+
+  it("refuses one whose address is not an address", () => {
+    const bogus = `${FRAME}${JSON.stringify({ kind: "contact", address: "NQ00 nope", name: "x" })}`
+    expect(decode(bogus).kind).toBe("unknown")
+  })
+
+  it("reads an address however it was written", () => {
+    const spaced = `${FRAME}${JSON.stringify({
+      kind: "contact",
+      address: ALICE.replace(/\s/g, "").toLowerCase(),
+      name: "",
+    })}`
+    expect(decode(spaced)).toEqual({ kind: "contact", contact: { address: ALICE, name: "" } })
+  })
+
+  it("says who was shared, from each end", () => {
+    const shared = encode(contactNote(ALICE, "Alice"))
+    expect(preview(shared, "out")).toBe("You shared Alice")
+    expect(preview(shared, "in")).toBe("Shared Alice with you")
+  })
+
+  it("falls back to the address when no name travelled", () => {
+    const shared = encode(contactNote(ALICE, ""))
+    expect(preview(shared, "in")).toBe("Shared NQ97 V68G … JLKY with you")
   })
 })
 

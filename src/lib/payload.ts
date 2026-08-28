@@ -30,6 +30,7 @@
 
 import { t } from "i18next"
 
+import { addressFrom, shortenAddress } from "./address"
 import { groupIdFrom } from "./group-link"
 import { formatNim } from "./postage"
 
@@ -82,11 +83,29 @@ export type GiftNote = {
   note: string
 }
 
+/**
+ * Somebody worth knowing, handed on.
+ *
+ * The address is the whole of it; the name travels only so the card reads as a
+ * person before anything is fetched. It is the name they publish, never the one
+ * you gave them — that one is promised to stay on your phone.
+ *
+ * Handing on an address gives nobody a way in. The door is still shut behind
+ * it: reaching them means knocking and paying their postage, exactly as it
+ * would if the address had been read out loud.
+ */
+export type ContactNote = {
+  address: string
+  /** What they call themselves, as the sender's app last heard it. A label. */
+  name: string
+}
+
 export type Payload =
   | { kind: "text"; text: string }
   | { kind: "payment"; payment: Payment }
   | { kind: "invite"; invite: Invite }
   | { kind: "gift"; giftNote: GiftNote }
+  | { kind: "contact"; contact: ContactNote }
   /** A frame this build does not understand — a newer client, or damage. */
   | { kind: "unknown" }
 
@@ -106,6 +125,10 @@ export function giftNote(gift: string, total_luna: number, shares: number, note:
   return { kind: "gift", giftNote: { gift, total_luna, shares, note } }
 }
 
+export function contactNote(address: string, name: string): Payload {
+  return { kind: "contact", contact: { address, name } }
+}
+
 /** Turn a payload into the plaintext that gets encrypted. */
 export function encode(payload: Payload): string {
   if (payload.kind === "text") return payload.text
@@ -117,6 +140,9 @@ export function encode(payload: Payload): string {
   }
   if (payload.kind === "gift") {
     return FRAME + JSON.stringify({ kind: "gift", ...payload.giftNote })
+  }
+  if (payload.kind === "contact") {
+    return FRAME + JSON.stringify({ kind: "contact", ...payload.contact })
   }
   // `unknown` is something this build received and could not read. Re-encoding
   // it would mean claiming to have understood it.
@@ -163,6 +189,15 @@ export function decode(plain: string): Payload {
       return { kind: "gift", giftNote: { gift, total_luna: total, shares, note } }
     }
 
+    if (value.kind === "contact") {
+      // An address that is not an address points at nobody, and a card for it
+      // would be a button that cannot work.
+      const address = typeof value.address === "string" ? addressFrom(value.address) : null
+      if (!address) return { kind: "unknown" }
+      const name = typeof value.name === "string" ? value.name.trim() : ""
+      return { kind: "contact", contact: { address, name } }
+    }
+
     if (value.kind === "invite") {
       // A room id that is not a room id points at nothing openable, and a card
       // for it would be a button that cannot work.
@@ -204,6 +239,12 @@ export function preview(plain: string, direction: "in" | "out"): string {
     case "gift": {
       const amount = `${formatNim(payload.giftNote.total_luna)} NIM`
       return t(direction === "out" ? "preview.youLeft" : "preview.leftForRoom", { amount })
+    }
+    case "contact": {
+      const who = payload.contact.name || shortenAddress(payload.contact.address)
+      return direction === "out"
+        ? t("preview.youShared", { room: who })
+        : t("preview.sharedWithYou", { name: who })
     }
     case "unknown":
       return t("preview.unsupported")

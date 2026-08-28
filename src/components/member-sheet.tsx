@@ -22,8 +22,9 @@ export function MemberSheet({
   address,
   onOpenChange,
   you,
-  roomOwner,
-  mine,
+  roomOwner = "",
+  mine = false,
+  title,
   onCopy,
   onOpenChat,
   onRemove,
@@ -33,10 +34,12 @@ export function MemberSheet({
   onOpenChange: (open: boolean) => void
   /** Your own address, so your row offers nothing to do to yourself. */
   you: string
-  /** Whoever owns the room, who cannot be shown out of it. */
-  roomOwner: string
+  /** Whoever owns the room, who cannot be shown out of it. Absent outside one. */
+  roomOwner?: string
   /** Whether you own the room, which is who may show anybody out. */
-  mine: boolean
+  mine?: boolean
+  /** What this person is here — a member, unless they are somebody handed on. */
+  title?: string
   onCopy: (address: string) => void
   onOpenChat: (address: string) => void
   /** Absent where removing is not on offer — a room you do not own. */
@@ -68,7 +71,7 @@ export function MemberSheet({
           {/* What they are here, said once. A room has one owner and everybody
               else, so the title carries it rather than a line underneath
               repeating what the title could have said. */}
-          <SheetTitle>{t(isOwner ? "member.owner" : "member.member")}</SheetTitle>
+          <SheetTitle>{title ?? t(isOwner ? "member.owner" : "member.member")}</SheetTitle>
         </SheetHeader>
 
         {address && (

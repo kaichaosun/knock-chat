@@ -11,9 +11,11 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import { AddressAvatar } from "@/components/address-avatar"
 import { GiftCard } from "@/components/gift-card"
 import type { Message } from "@/lib/messages"
-import { decode, type Invite, type Payment } from "@/lib/payload"
+import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
+import { shortenAddress } from "@/lib/address"
 import { formatNim } from "@/lib/postage"
 import { clockTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
@@ -22,6 +24,7 @@ export function MessageBubble({
   message,
   onRetry,
   onOpenInvite,
+  onOpenContact,
   channelOpen,
   owner = null,
   stamped = true,
@@ -30,6 +33,8 @@ export function MessageBubble({
   onRetry: (message: Message) => void
   /** Open the door an invite points at. */
   onOpenInvite: (group: string) => void
+  /** Open the door a shared contact points at. */
+  onOpenContact: (address: string) => void
   /** Whether messages can get through at all right now. */
   channelOpen: boolean
   /** Your address. Only a gift card needs it, and gifts live in rooms. */
@@ -74,10 +79,16 @@ export function MessageBubble({
           <PaymentCard payment={payload.payment} outgoing={outgoing} faded={failed} />
         ) : payload.kind === "gift" ? (
           <GiftCard note={payload.giftNote} outgoing={outgoing} faded={failed} owner={owner} />
+        ) : payload.kind === "contact" ? (
+          <ContactCard
+            contact={payload.contact}
+            outgoing={outgoing}
+            faded={failed}
+            onOpen={() => onOpenContact(payload.contact.address)}
+          />
         ) : payload.kind === "invite" ? (
           <InviteCard
             invite={payload.invite}
-            outgoing={outgoing}
             faded={failed}
             onOpen={() => onOpenInvite(payload.invite.group)}
           />
@@ -193,11 +204,54 @@ function PaymentCard({
  */
 function InviteCard({
   invite,
-  outgoing,
   faded,
   onOpen,
 }: {
   invite: Invite
+  faded: boolean
+  onOpen: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        "bg-card flex w-64 max-w-full items-center gap-3 rounded-2xl border px-3.5 py-3.5 text-left shadow-sm",
+        "active:bg-muted transition-colors",
+        faded && "opacity-60",
+      )}
+    >
+      <span className="bg-accent text-accent-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
+        <Users className="size-5" strokeWidth={2} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-muted-foreground text-[12px] font-semibold">
+          {t("bubble.groupInvite")}
+        </p>
+        <p className="mt-0.5 truncate text-[15px] leading-tight font-bold">
+          {invite.name || t("bubble.aGroup")}
+        </p>
+      </div>
+      <ChevronRight className="text-muted-foreground ml-auto size-4 shrink-0" />
+    </button>
+  )
+}
+
+/**
+ * Somebody, handed on.
+ *
+ * The face and the address are drawn from the address itself, so the card is
+ * true even if the name that travelled with it is stale — a name is what
+ * someone calls themselves today, and the address is who they are.
+ */
+function ContactCard({
+  contact,
+  outgoing,
+  faded,
+  onOpen,
+}: {
+  contact: ContactNote
   outgoing: boolean
   faded: boolean
   onOpen: () => void
@@ -208,20 +262,24 @@ function InviteCard({
       type="button"
       onClick={onOpen}
       className={cn(
-        "bg-card flex min-w-52 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left shadow-sm",
-        "active:bg-muted transition-colors",
+        // One width whoever is in it: sized to content, the same card is a
+        // different object for every name. Wide enough for the address it
+        // falls back to, and capped so a small phone still fits it.
+        "flex w-64 max-w-full items-center gap-3 rounded-2xl px-3.5 py-3.5 text-left transition-colors",
+        outgoing ? "bg-primary/10" : "bg-muted",
         faded && "opacity-60",
       )}
     >
-      <span className="bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-full">
-        <Users className="size-4.5" strokeWidth={2} />
-      </span>
+      <AddressAvatar address={contact.address} size="md" />
       <div className="min-w-0">
-        <p className="text-muted-foreground text-[11px] font-semibold">
-          {t(outgoing ? "bubble.sharedGroup" : "bubble.groupInvite")}
+        {/* The same word from both ends. A name already sits over the bubble,
+            so "You shared" says "you" twice — and a longer label makes the
+            sender's card wider than the receiver's for no reason. */}
+        <p className="text-muted-foreground text-[12px] font-semibold">
+          {t("shareContact.card")}
         </p>
-        <p className="truncate text-[15px] leading-tight font-bold">
-          {invite.name || t("bubble.aGroup")}
+        <p className="mt-0.5 truncate text-[15px] leading-tight font-bold">
+          {contact.name || shortenAddress(contact.address)}
         </p>
       </div>
       <ChevronRight className="text-muted-foreground ml-auto size-4 shrink-0" />

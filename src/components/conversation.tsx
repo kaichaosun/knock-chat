@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronLeft, Clock, Coins, DoorClosed, Info } from "lucide-react"
+import { ChevronLeft, Clock, Coins, DoorClosed, Info, UserRound } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { AttachMenu } from "@/components/attach-menu"
 import { Composer } from "@/components/composer"
 import { SendNimSheet } from "@/components/send-nim-sheet"
 import { ContactSheet } from "@/components/contact-sheet"
+import { PickContactSheet } from "@/components/pick-contact-sheet"
 import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
@@ -31,6 +32,8 @@ export function Conversation({
   onCopyAddress,
   onPay,
   onOpenInvite,
+  onOpenContact,
+  onShareContact,
 }: {
   peer: string
   /** Your address, for the face over your own messages. */
@@ -48,6 +51,10 @@ export function Conversation({
   onPay: (peer: string, luna: number) => Promise<void>
   /** Open the door an invite card points at. */
   onOpenInvite: (group: string) => void
+  /** Open the door a shared contact points at. */
+  onOpenContact: (address: string) => void
+  /** Post somebody's contact into this chat. */
+  onShareContact: (address: string) => void
 }) {
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -56,6 +63,7 @@ export function Conversation({
   const name = nameIn(names, peer)
   const [attaching, setAttaching] = useState(false)
   const [paying, setPaying] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [showing, setShowing] = useState(false)
 
   // Knocking costs money, so it is its own deliberate act behind its own button
@@ -218,6 +226,7 @@ export function Conversation({
                           message={message}
                           onRetry={onRetry}
                           onOpenInvite={onOpenInvite}
+                          onOpenContact={onOpenContact}
                           channelOpen={!shut}
                           stamped={carriesTime(message, group.messages[index + 1])}
                         />
@@ -248,6 +257,12 @@ export function Conversation({
             description: t("chat.sendNimNote"),
             onSelect: () => setPaying(true),
           },
+          {
+            icon: UserRound,
+            label: t("shareContact.action"),
+            description: t("shareContact.actionNote"),
+            onSelect: () => setSharing(true),
+          },
         ]}
       />
 
@@ -256,6 +271,15 @@ export function Conversation({
         onOpenChange={setShowing}
         address={peer}
         onCopy={onCopyAddress}
+      />
+
+      <PickContactSheet
+        open={sharing}
+        onOpenChange={setSharing}
+        title={t("shareContact.title")}
+        note={t("shareContact.note")}
+        repeatable={false}
+        onPick={onShareContact}
       />
 
       <SendNimSheet

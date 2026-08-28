@@ -30,6 +30,7 @@ export function KnockSheet({
   onOpenChange,
   myAddress,
   peer,
+  reopening = false,
   suggestions,
   onReach,
   held,
@@ -39,9 +40,17 @@ export function KnockSheet({
   open: boolean
   onOpenChange: (open: boolean) => void
   myAddress: string
-  /** Set when knocking on a door you already know — from inside a closed chat.
-   *  The address is then fixed rather than typed. */
+  /** Set when the address is fixed rather than typed — from a closed chat, a
+   *  scanned code, or a contact somebody shared. */
   peer?: string
+  /**
+   * Whether this is a chat being reopened rather than a door being tried.
+   *
+   * A fixed address used to mean the same thing, because the only way to get
+   * one was from inside a closed chat. A scanned code is also a fixed address
+   * and is nobody you have talked to, so the two had to come apart.
+   */
+  reopening?: boolean
   suggestions: Array<{ label: string; address: string }>
   onReach: (peer: string) => Promise<Reachability>
   /** The payment already made for this address, if one is waiting to be used. */
@@ -172,11 +181,9 @@ export function KnockSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>{t(peer ? "knock.reopenTitle" : "knock.title")}</SheetTitle>
+          <SheetTitle>{t(reopening ? "knock.reopenTitle" : "knock.title")}</SheetTitle>
           <SheetDescription>
-            {peer
-              ? t("knock.reopenNote")
-              : t("knock.note")}
+            {reopening ? t("knock.reopenNote") : t("knock.note")}
           </SheetDescription>
         </SheetHeader>
 
