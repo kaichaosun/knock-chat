@@ -121,6 +121,23 @@ export function GroupRoom({
   // at ten and would have a room of thousands calling itself ten.
   const memberCount = detail?.member_count ?? detail?.members.length ?? 0
 
+  /**
+   * Whose faces the room's mark is drawn from.
+   *
+   * `detail` is cleared and refetched every time a room is opened, so waiting
+   * on it meant the mark spent a round trip as the fallback glyph and then
+   * changed — on the header and, in an empty room, on the mark in the middle of
+   * the screen. The list that was on screen a moment ago had already drawn it,
+   * from exactly this: `Group.members` and `GroupDetail.members` are both the
+   * earliest few, so the fallback is the same picture and not an approximation
+   * of it.
+   *
+   * `??` rather than `||`: once details land, an empty list is an answer — you
+   * are not in this room and it has no faces to show — and must not fall back
+   * to the membership the list remembered from when you were.
+   */
+  const faces = detail?.members ?? group.members
+
   return (
     <div className="flex h-full flex-col">
       <header className="bg-background/85 sticky top-0 z-10 border-b backdrop-blur-xl pt-safe">
@@ -138,7 +155,7 @@ export function GroupRoom({
             <ChevronLeft className="size-6" />
           </Button>
 
-          <GroupAvatar size="sm" members={detail?.members} className="size-9" />
+          <GroupAvatar size="sm" members={faces} className="size-9" />
 
           <button
             type="button"
@@ -172,7 +189,7 @@ export function GroupRoom({
         ref={scroller}
         className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
       >
-        {messages.length === 0 && <RoomIntro group={group} members={detail?.members} />}
+        {messages.length === 0 && <RoomIntro group={group} members={faces} />}
 
         {groups.map((day) => (
           <section key={day.label} className="mb-1">
