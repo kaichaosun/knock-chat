@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Check, Loader2, UserRound } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import {
@@ -36,6 +37,7 @@ export function PickContactSheet({
   members: string[]
   onPick: (address: string) => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const [contacts, setContacts] = useState<Contact[] | null>(null)
   const [sent, setSent] = useState<string[]>([])
@@ -80,7 +82,7 @@ export function PickContactSheet({
                 <UserRound className="size-7" strokeWidth={1.5} />
               </div>
               <p className="text-muted-foreground mt-4 text-sm text-balance">
-                An invite is an ordinary message, so it can only go to someone you can
+                {t("pickContact.note")}
                 already write to. Knock on them first.
               </p>
             </div>
@@ -117,7 +119,7 @@ export function PickContactSheet({
                       {(already || done) && (
                         <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-[12px]">
                           <Check className="size-3.5" />
-                          {already ? "In the group" : "Invited"}
+                          {t(already ? "pickContact.inGroup" : "pickContact.invited")}
                         </span>
                       )}
                     </button>

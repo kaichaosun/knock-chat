@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Loader2, Users } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { GroupAvatar } from "@/components/group-avatar"
@@ -39,6 +40,7 @@ export function Groups({
   /** Called once the relay has confirmed, so the chat goes with the room. */
   onLeft: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const [revealed, setRevealed] = useState<string | null>(null)
   // Held until confirmed: getting back into a room can cost money, and for a
   // room that asks the owner it may not be possible at all.
@@ -54,7 +56,7 @@ export function Groups({
       onLeft(group.id)
       toast.success(`Left ${group.name}`)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't leave")
+      toast.error(error instanceof Error ? error.message : t("groups.leaveFailed"))
     } finally {
       setLeaving(false)
     }
@@ -74,9 +76,9 @@ export function Groups({
         <div className="bg-accent text-accent-foreground flex size-20 items-center justify-center rounded-3xl">
           <Users className="size-9" strokeWidth={1.5} />
         </div>
-        <h2 className="mt-6 text-xl font-bold tracking-tight">No groups yet</h2>
+        <h2 className="mt-6 text-xl font-bold tracking-tight">{t("groups.emptyTitle")}</h2>
         <p className="text-muted-foreground mt-2 max-w-[18rem] text-balance">
-          Groups appear here once you make one, or open a link someone sends you.
+          {t("groups.emptyBody")}
         </p>
       </div>
     )
@@ -104,11 +106,11 @@ export function Groups({
                     before sending someone the link. */}
                 <p className="text-muted-foreground mt-0.5 truncate text-[12px]">
                   {[
-                    mine ? "Yours" : null,
+                    mine ? t("groups.yours") : null,
                     group.join_price_luna > 0
-                      ? `${formatNim(group.join_price_luna)} NIM to join`
-                      : "Free to join",
-                    group.requires_approval ? "approval needed" : null,
+                      ? t("groups.priceToJoin", { amount: formatNim(group.join_price_luna) })
+                      : t("groups.freeToJoin"),
+                    group.requires_approval ? t("groups.approvalNeeded") : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
@@ -123,16 +125,16 @@ export function Groups({
         <DialogContent className="max-w-[20rem] rounded-3xl">
           <DialogHeader className="items-center">
             <GroupAvatar members={confirming?.members} />
-            <DialogTitle className="mt-2">Leave this group?</DialogTitle>
+            <DialogTitle className="mt-2">{t("groups.leaveTitle")}</DialogTitle>
             <p className="text-[15px] font-semibold">{confirming?.name}</p>
             <DialogDescription className="text-balance">
               {confirming?.owner === owner
-                ? "You own this group, so you can't leave it. To end it for everyone, open it and tap the info button."
+                ? t("groups.leaveOwner")
                 : confirming?.requires_approval
-                  ? "You'd stop seeing what's said here, and getting back in means asking the owner again."
+                  ? t("groups.leaveApproval")
                   : confirming && confirming.join_price_luna > 0
-                    ? `You'd stop seeing what's said here, and getting back in would cost ${formatNim(confirming.join_price_luna)} NIM again.`
-                    : "You'd stop seeing what's said here. Your chat with the group is deleted too."}
+                    ? t("groups.leavePaid", { amount: formatNim(confirming.join_price_luna) })
+                    : t("groups.leaveFree")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-2">
@@ -141,7 +143,7 @@ export function Groups({
               className="h-11 rounded-2xl"
               onClick={() => setConfirming(null)}
             >
-              Stay
+              {t("groups.stay")}
             </Button>
             <Button
               variant="destructive"
@@ -150,7 +152,7 @@ export function Groups({
               onClick={() => confirming && void leave(confirming)}
             >
               {leaving && <Loader2 className="animate-spin" />}
-              Leave
+              {t("groups.leave")}
             </Button>
           </DialogFooter>
         </DialogContent>

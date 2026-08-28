@@ -1,4 +1,5 @@
 import { Clock, Loader2, ShieldOff } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { useState } from "react"
 
 import { GroupAvatar } from "@/components/group-avatar"
@@ -37,6 +38,7 @@ export function JoinGroupSheet({
   loading: boolean
   onJoin: (group: Group) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState("")
 
@@ -48,7 +50,7 @@ export function JoinGroupSheet({
       await onJoin(group)
       onOpenChange(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't join")
+      setError(e instanceof Error ? e.message : t("joinGroup.failed"))
     } finally {
       setJoining(false)
     }
@@ -60,11 +62,11 @@ export function JoinGroupSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>{group ? "Join this group" : "Opening group"}</SheetTitle>
+          <SheetTitle>{t(group ? "joinGroup.title" : "joinGroup.opening")}</SheetTitle>
           <SheetDescription>
             {group?.requires_approval
-              ? "The owner decides who comes in. You'll be asking, not walking in."
-              : "Anyone with this link can get in."}
+              ? t("joinGroup.approvalNote")
+              : t("joinGroup.openNote")}
           </SheetDescription>
         </SheetHeader>
 
@@ -80,7 +82,9 @@ export function JoinGroupSheet({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] leading-tight font-semibold">{group.name}</p>
                   <p className="text-muted-foreground text-[12px]">
-                    {free ? "Free to join" : `${formatNim(group.join_price_luna)} NIM to join`}
+                    {free
+                      ? t("groups.freeToJoin")
+                      : t("groups.priceToJoin", { amount: formatNim(group.join_price_luna) })}
                   </p>
                 </div>
               </div>
@@ -89,14 +93,14 @@ export function JoinGroupSheet({
                 <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-[12px] leading-snug">
                   <Clock className="mt-0.5 size-3 shrink-0" />
                   {free
-                    ? "Your request goes to the owner to answer."
-                    : "You pay now and the owner answers. Saying no doesn't return it — that's what makes asking cost something."}
+                    ? t("joinGroup.requestNote")
+                    : t("joinGroup.payNote")}
                 </p>
               )}
 
               <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-[12px] leading-snug">
                 <ShieldOff className="mt-0.5 size-3 shrink-0" />
-                Group messages aren't encrypted.
+                {t("misc.groupNotEncrypted")}
               </p>
 
               {/* Before the wallet, not after. The relay refuses a join into a
@@ -105,7 +109,7 @@ export function JoinGroupSheet({
                   screen where the decision is still being made. */}
               {full && (
                 <p className="text-destructive px-1 text-[13px] leading-snug">
-                  This group is full. Nobody else can join it for now.
+                  {t("misc.groupFull")}
                 </p>
               )}
 
@@ -119,9 +123,11 @@ export function JoinGroupSheet({
                 {joining && <Loader2 className="animate-spin" />}
                 {free
                   ? group.requires_approval
-                    ? "Ask to join"
+                    ? t("joinGroup.ask")
                     : "Join"
-                  : `${group.requires_approval ? "Ask to join" : "Join"} — ${formatNim(group.join_price_luna)} NIM`}
+                  : t(group.requires_approval ? "joinGroup.askFor" : "joinGroup.joinFor", {
+                      amount: formatNim(group.join_price_luna),
+                    })}
               </Button>
 
               {/* Only where money is involved, and only before it is spent. The
@@ -130,8 +136,7 @@ export function JoinGroupSheet({
                   deciding, not afterwards. */}
               {!free && (
                 <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-                  Paid to the owner, and not refundable. If they disband the group, it
-                  is not returned.
+                  {t("misc.notRefundable")}
                 </p>
               )}
             </>

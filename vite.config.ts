@@ -1,4 +1,4 @@
-import { defineConfig } from "vite"
+import { defineConfig } from "vitest/config"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 
@@ -6,6 +6,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { "@": new URL("./src", import.meta.url).pathname },
+  },
+  test: {
+    // Translated strings are asserted as the English somebody would read.
+    setupFiles: ["./src/test-setup.ts"],
   },
   server: {
     // Bind all interfaces so Nimiq Pay on a phone can reach the dev server.

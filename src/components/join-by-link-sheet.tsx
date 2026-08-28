@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { ClipboardPaste } from "lucide-react"
+import { Trans, useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -29,6 +30,7 @@ export function JoinByLinkSheet({
   /** Hands off to the same door the link would have opened. */
   onFound: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState("")
 
   useEffect(() => {
@@ -42,10 +44,9 @@ export function JoinByLinkSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Join a group</SheetTitle>
+          <SheetTitle>{t("joinByLink.title")}</SheetTitle>
           <SheetDescription>
-            Paste the link you were sent, or the group's id. You'll see what it is and
-            what it costs before joining.
+            {t("joinByLink.note")}
           </SheetDescription>
         </SheetHeader>
 
@@ -54,8 +55,8 @@ export function JoinByLinkSheet({
             rows={3}
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            placeholder="Link or group id"
-            aria-label="Group link or id"
+            placeholder={t("joinByLink.placeholder")}
+            aria-label={t("joinByLink.label")}
             aria-invalid={typed && id === null}
             className={cn(
               "bg-muted w-full resize-none rounded-2xl px-4 py-3 font-mono text-[13px] leading-snug outline-none",
@@ -67,7 +68,10 @@ export function JoinByLinkSheet({
 
           {typed && id === null && (
             <p className="text-destructive px-1 text-[13px]">
-              No group in that. A link looks like <span className="font-mono">?group=…</span>.
+              <Trans
+                i18nKey="joinByLink.nothingFound"
+                components={{ code: <span className="font-mono" /> }}
+              />
             </p>
           )}
 
@@ -77,7 +81,7 @@ export function JoinByLinkSheet({
             className="brand-gradient h-13 w-full rounded-2xl text-base"
           >
             <ClipboardPaste className="size-4" />
-            Find this group
+            {t("joinByLink.find")}
           </Button>
         </div>
       </SheetContent>

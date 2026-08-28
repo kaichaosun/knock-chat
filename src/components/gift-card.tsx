@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { ChevronRight, Clock, Gift as GiftIcon, Loader2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { GiftDetailSheet } from "@/components/gift-detail-sheet"
 import { Button } from "@/components/ui/button"
@@ -28,6 +29,7 @@ export function GiftCard({
   /** Your address, so your own share is named in the breakdown. */
   owner: string | null
 }) {
+  const { t } = useTranslation()
   const { detail, claiming, error, claim, refresh } = useGift(note.gift)
   const [showing, setShowing] = useState(false)
 
@@ -75,7 +77,7 @@ export function GiftCard({
           </span>
           <div className="min-w-0">
             <p className="text-[11px] font-semibold text-white/75">
-              {outgoing ? "You left a gift" : "A gift for the room"}
+              {t(outgoing ? "gift.youLeft" : "gift.forTheRoom")}
             </p>
             <p className="text-xl leading-tight font-bold tabular-nums">
               {formatNim(note.total_luna)} NIM
@@ -92,7 +94,7 @@ export function GiftCard({
             // yours — and the one people care about.
             <p className="text-success flex items-center gap-1.5 text-[13px] font-semibold">
               <GiftIcon className="size-3.5 shrink-0" />
-              You got {formatNim(yours)} NIM
+              {t("gift.youGot", { amount: formatNim(yours) })}
               {mine && !mine.payout_tx && (
                 <span className="text-muted-foreground font-normal">· sending</span>
               )}
@@ -100,7 +102,7 @@ export function GiftCard({
           ) : expired ? (
             <p className="text-muted-foreground flex items-center gap-1.5 text-[12px]">
               <Clock className="size-3 shrink-0" />
-              Over — what was left went back to the sender.
+              {t("gift.over")}
             </p>
           ) : left === 0 ? (
             <p className="text-muted-foreground text-[12px]">All gone.</p>
@@ -117,7 +119,7 @@ export function GiftCard({
               className="h-9 w-full rounded-xl"
             >
               {claiming && <Loader2 className="animate-spin" />}
-              Take a share
+              {t("gift.take")}
             </Button>
           )}
 

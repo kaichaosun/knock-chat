@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { ArrowUp, Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,7 @@ export function Composer({
   onAttach?: () => void
   disabled?: boolean
 }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState("")
   const textarea = useRef<HTMLTextAreaElement>(null)
 
@@ -57,7 +59,7 @@ export function Composer({
             variant="ghost"
             onClick={onAttach}
             disabled={disabled}
-            aria-label="Send something else"
+            aria-label={t("composer.attach")}
             className="text-muted-foreground size-11 shrink-0 rounded-full"
           >
             <Plus className="size-5" />
@@ -78,8 +80,8 @@ export function Composer({
               submit()
             }
           }}
-          placeholder="Message"
-          aria-label="Message"
+          placeholder={t("composer.message")}
+          aria-label={t("composer.message")}
           className={cn(
             "bg-muted placeholder:text-muted-foreground max-h-33 min-h-11 flex-1 resize-none",
             "rounded-2xl px-4 py-2.5 leading-snug outline-none",
@@ -93,7 +95,7 @@ export function Composer({
           size="icon"
           onClick={submit}
           disabled={!canSend}
-          aria-label="Send"
+          aria-label={t("composer.send")}
           className={cn(
             "size-11 shrink-0 rounded-full transition-transform",
             canSend ? "brand-gradient scale-100" : "scale-95",

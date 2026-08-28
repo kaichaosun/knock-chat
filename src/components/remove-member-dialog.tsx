@@ -1,4 +1,5 @@
 import { Loader2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ export function RemoveMemberDialog({
   onOpenChange: (open: boolean) => void
   onConfirm: (address: string) => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
 
   return (
@@ -48,7 +50,7 @@ export function RemoveMemberDialog({
       <DialogContent className="max-w-[20rem] rounded-3xl">
         <DialogHeader className="items-center">
           {address && <AddressAvatar address={address} />}
-          <DialogTitle className="mt-2">Remove them?</DialogTitle>
+          <DialogTitle className="mt-2">{t("member.confirmTitle")}</DialogTitle>
           {address && nameIn(names, address) && (
             <p className="text-[15px] font-semibold">{nameIn(names, address)}</p>
           )}
@@ -57,10 +59,10 @@ export function RemoveMemberDialog({
           </p>
           <DialogDescription className="text-balance">
             {group.requires_approval
-              ? "They keep what they've already read and lose the room. Coming back means asking you again."
+              ? t("member.confirmApproval")
               : group.join_price_luna > 0
                 ? `They keep what they've already read and lose the room. Coming back would cost them ${formatNim(group.join_price_luna)} NIM again.`
-                : "They keep what they've already read and lose the room — though with an open door they can walk straight back in."}
+                : t("member.confirmOpen")}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-2">
@@ -74,7 +76,7 @@ export function RemoveMemberDialog({
             onClick={() => address && onConfirm(address)}
           >
             {busy && <Loader2 className="animate-spin" />}
-            Remove
+            {t("member.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

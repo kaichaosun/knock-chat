@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -33,6 +34,7 @@ export function CreateGroupSheet({
     requires_approval: boolean
   }) => Promise<Group>
 }) {
+  const { t } = useTranslation()
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [approval, setApproval] = useState(false)
@@ -64,7 +66,7 @@ export function CreateGroupSheet({
       await onCreate({ name: trimmed, join_price_luna: luna, requires_approval: approval })
       onOpenChange(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't create the group")
+      setError(e instanceof Error ? e.message : t("newGroup.failed"))
     } finally {
       setCreating(false)
     }
@@ -74,7 +76,7 @@ export function CreateGroupSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>New group</SheetTitle>
+          <SheetTitle>{t("newGroup.title")}</SheetTitle>
           <SheetDescription>
             A room you own, and messages here aren't encrypted.
           </SheetDescription>
@@ -86,8 +88,8 @@ export function CreateGroupSheet({
               value={name}
               disabled={creating}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Group name"
-              aria-label="Group name"
+              placeholder={t("newGroup.namePlaceholder")}
+              aria-label={t("newGroup.namePlaceholder")}
               aria-invalid={nameTooLong}
               className={cn(
                 "bg-muted w-full rounded-2xl px-4 py-3.5 font-medium outline-none",
@@ -98,15 +100,15 @@ export function CreateGroupSheet({
             />
             {nameTooLong && (
               <p className="text-destructive mt-1.5 px-1 text-[13px]">
-                A name can be at most {MAX_NAME_LEN} characters.
+                {t("newGroup.nameTooLong", { max: MAX_NAME_LEN })}
               </p>
             )}
           </div>
 
           <div>
-            <h3 className="px-1 text-sm font-semibold">Cost to join</h3>
+            <h3 className="px-1 text-sm font-semibold">{t("newGroup.costTitle")}</h3>
             <p className="text-muted-foreground mt-1 px-1 text-[13px] leading-snug">
-              Paid to you, once, by anyone who joins. Leave it empty and anyone with the
+              {t("newGroup.costNote")}
               link walks in.
             </p>
             <div className="relative mt-2">
@@ -115,8 +117,8 @@ export function CreateGroupSheet({
                 inputMode="decimal"
                 disabled={creating}
                 onChange={(event) => setPrice(event.target.value.replace(/[^\d.]/g, ""))}
-                placeholder="Free"
-                aria-label="Cost to join, in NIM"
+                placeholder={t("newGroup.costPlaceholder")}
+                aria-label={t("newGroup.costLabel")}
                 aria-invalid={!priceValid}
                 className={cn(
                   "bg-muted w-full rounded-2xl py-3 pr-14 pl-4 font-semibold tabular-nums outline-none",
@@ -132,7 +134,7 @@ export function CreateGroupSheet({
           </div>
 
           <div>
-            <h3 className="px-1 text-sm font-semibold">Who can get in</h3>
+            <h3 className="px-1 text-sm font-semibold">{t("newGroup.doorTitle")}</h3>
             <div className="mt-2 flex gap-2">
               {[false, true].map((value) => (
                 <button
@@ -146,10 +148,10 @@ export function CreateGroupSheet({
                   )}
                 >
                   <span className="block font-semibold">
-                    {value ? "You approve" : "Anyone with the link"}
+                    {t(value ? "newGroup.youApprove" : "newGroup.anyoneWithLink")}
                   </span>
                   <span className="text-muted-foreground block text-[11px] leading-snug">
-                    {value ? "They ask, you answer" : "They walk straight in"}
+                    {t(value ? "newGroup.youApproveNote" : "newGroup.anyoneWithLinkNote")}
                   </span>
                 </button>
               ))}
@@ -158,8 +160,7 @@ export function CreateGroupSheet({
                 for nothing is the problem postage exists to solve. */}
             {approval && luna === 0 && (
               <p className="text-warning mt-2 px-1 text-[12px] leading-snug">
-                Asking is free, so anyone can fill your list with requests. A cost to join
-                is what keeps that in check.
+                {t("misc.freeAskingWarning")}
               </p>
             )}
           </div>
@@ -172,7 +173,7 @@ export function CreateGroupSheet({
             className="brand-gradient h-13 w-full rounded-2xl text-base"
           >
             {creating && <Loader2 className="animate-spin" />}
-            Create group
+            {t("newGroup.create")}
           </Button>
         </div>
       </SheetContent>

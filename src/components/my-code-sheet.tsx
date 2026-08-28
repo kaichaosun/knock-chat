@@ -1,4 +1,5 @@
 import { Copy } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -30,13 +31,14 @@ export function MyCodeSheet({
   onOpenChange: (open: boolean) => void
   address: string
 }) {
+  const { t } = useTranslation()
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Your invite link</SheetTitle>
+          <SheetTitle>{t("code.title")}</SheetTitle>
           <SheetDescription>
-            Send it or let someone scan it to find you.
+            {t("code.note")}
           </SheetDescription>
         </SheetHeader>
 
@@ -44,7 +46,7 @@ export function MyCodeSheet({
           <div className="flex justify-center">
             <QrCode
               value={peerLink(address)}
-              label="Scan to knock on this door"
+              label={t("code.label")}
               center={<AddressAvatar address={address} />}
               className="size-60 rounded-2xl"
             />
@@ -56,12 +58,12 @@ export function MyCodeSheet({
             onClick={async () => {
               const ok = await copyText(peerLink(address))
               toast[ok ? "success" : "info"](
-                ok ? "Invite link copied" : "Couldn't reach the clipboard",
+                ok ? t("groupSheet.inviteCopied") : t("groupSheet.clipboardFailed"),
               )
             }}
           >
             <Copy className="size-4" />
-            Copy invite link
+            {t("code.copy")}
           </Button>
         </div>
       </SheetContent>

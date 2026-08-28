@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Check, Loader2, X } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -32,6 +33,7 @@ export function JoinQueueSheet({
   onOpenChange: (open: boolean) => void
   onAnswer: (request: JoinRequest, admit: boolean) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -39,9 +41,9 @@ export function JoinQueueSheet({
     setBusy(request.id)
     try {
       await onAnswer(request, admit)
-      toast.success(admit ? "They're in" : "Left outside")
+      toast.success(t(admit ? "queue.admitted" : "queue.declined"))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't answer that")
+      toast.error(error instanceof Error ? error.message : t("queue.answerFailed"))
     } finally {
       setBusy(null)
     }
@@ -54,7 +56,7 @@ export function JoinQueueSheet({
         className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe"
       >
         <SheetHeader className="px-0">
-          <SheetTitle>{requests.length === 1 ? "Someone wants in" : "Who wants in"}</SheetTitle>
+          <SheetTitle>{t(requests.length === 1 ? "queue.oneWaiting" : "queue.manyWaiting")}</SheetTitle>
         </SheetHeader>
 
         {group && (
@@ -70,7 +72,7 @@ export function JoinQueueSheet({
                 <p className="text-muted-foreground truncate text-[12px]">
                   {group.join_price_luna > 0
                     ? `${formatNim(group.join_price_luna)} NIM to join`
-                    : "Free to join"}
+                    : t("groups.freeToJoin")}
                 </p>
               </div>
             </section>
@@ -103,7 +105,7 @@ export function JoinQueueSheet({
                     <Button
                       size="icon"
                       variant="ghost"
-                      aria-label="Decline"
+                      aria-label={t("queue.decline")}
                       disabled={busy === request.id}
                       onClick={() => void answer(request, false)}
                       className="size-9 rounded-full"
@@ -112,7 +114,7 @@ export function JoinQueueSheet({
                     </Button>
                     <Button
                       size="icon"
-                      aria-label="Let them in"
+                      aria-label={t("queue.admit")}
                       disabled={busy === request.id}
                       onClick={() => void answer(request, true)}
                       className="size-9 rounded-full"
@@ -132,10 +134,8 @@ export function JoinQueueSheet({
                 a transfer straight to the owner, so declining cannot send it
                 back — the relay never held it. */}
             <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-              Letting somebody in puts them in the room, and they read what is said from then
-              on.
-              {group.join_price_luna > 0 &&
-                " What they paid to ask is already yours, whichever way you answer."}
+              {t("misc.admitNote")}
+              {group.join_price_luna > 0 && t("misc.admitPaidNote")}
             </p>
           </div>
         )}

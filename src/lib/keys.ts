@@ -10,6 +10,7 @@
  * relay is not part of the trust boundary.
  */
 
+import { t } from "i18next"
 import { addressFromPublicKey, compact, formatAddress } from "./address"
 import { conversationKey, fromHex, generateKeyPair, publicKeyFrom, toHex } from "./crypto"
 import { request } from "./relay"
@@ -31,7 +32,7 @@ export class NoKeyError extends Error {
   address: string
 
   constructor(address: string) {
-    super("They haven't opened Knock yet, so there's no key to encrypt to.")
+    super(t("errors.noKey"))
     this.name = "NoKeyError"
     this.address = address
   }
@@ -224,7 +225,7 @@ export async function keyForPeer(
 
   const key = verifyCertificate(certificate)
   if (!key) {
-    throw new Error("That address's encryption key failed verification. Not sending.")
+    throw new Error(t("errors.badKey"))
   }
 
   const bytes = fromHex(key)

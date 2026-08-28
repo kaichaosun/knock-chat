@@ -1,4 +1,5 @@
 import { Crown, Gift as GiftIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import {
@@ -48,6 +49,7 @@ export function GiftDetailSheet({
   /** Your address, so your own share is called yours. */
   owner: string | null
 }) {
+  const { t } = useTranslation()
   const names = useNames()
 
   if (!detail) return null
@@ -78,9 +80,11 @@ export function GiftDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>{sender === "You" ? "Your gift" : `${sender}'s gift`}</SheetTitle>
+          <SheetTitle>
+            {sender === "You" ? t("gift.yours") : t("gift.theirs", { name: sender })}
+          </SheetTitle>
           <SheetDescription>
-            {gift.split === "random" ? "Random shares" : "Even shares"}
+            {t(gift.split === "random" ? "gift.randomShares" : "gift.evenShares")}
             {" · "}
             {gift.shares} {gift.shares === 1 ? "share" : "shares"}
           </SheetDescription>
@@ -105,7 +109,7 @@ export function GiftDetailSheet({
 
           {inOrder.length === 0 ? (
             <p className="text-muted-foreground px-1 py-6 text-center text-[13px]">
-              Nobody has taken a share yet.
+              {t("gift.nobodyYet")}
             </p>
           ) : (
             <ul className="space-y-1">

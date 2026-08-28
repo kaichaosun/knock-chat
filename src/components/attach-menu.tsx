@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
@@ -23,15 +24,16 @@ export type AttachAction = {
 export function AttachMenu({
   open,
   onOpenChange,
-  title = "Send something else",
+  title,
   actions,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** What this particular menu is offering. */
+  /** What this particular menu is offering. Defaults to the composer's own. */
   title?: string
   actions: AttachAction[]
 }) {
+  const { t } = useTranslation()
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       {/* Tighter than a sheet's default. That default assumes a title with a
@@ -43,7 +45,7 @@ export function AttachMenu({
         className="mx-auto w-full max-w-[30rem] gap-2 rounded-t-3xl px-5 pb-safe"
       >
         <SheetHeader className="px-0 pb-0">
-          <SheetTitle>{title}</SheetTitle>
+          <SheetTitle>{title ?? t("attach.title")}</SheetTitle>
         </SheetHeader>
 
         <ul className="space-y-2 pb-8">

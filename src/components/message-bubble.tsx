@@ -9,6 +9,7 @@ import {
   LockKeyhole,
   Users,
 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { GiftCard } from "@/components/gift-card"
 import type { Message } from "@/lib/messages"
@@ -40,6 +41,7 @@ export function MessageBubble({
    */
   stamped?: boolean
 }) {
+  const { t } = useTranslation()
   const outgoing = message.direction === "out"
   const failed = message.status === "failed" || message.status === "blocked"
   // A message still on its way, or one that never went, keeps its line whatever
@@ -53,7 +55,7 @@ export function MessageBubble({
       <div className="flex w-full justify-start">
         <div className="bg-muted/60 text-muted-foreground flex max-w-[80%] items-center gap-2 rounded-2xl rounded-bl-md px-3.5 py-2.5 text-[13px] italic">
           <LockKeyhole className="size-3.5 shrink-0" />
-          Can't be opened on this device
+          {t("bubble.locked")}
         </div>
       </div>
     )
@@ -100,7 +102,7 @@ export function MessageBubble({
               // two sides disagreeing about what was said.
               <span className="text-muted-foreground flex items-center gap-2 text-[13px] italic">
                 <HelpCircle className="size-3.5 shrink-0" />
-                Not supported in this version
+                {t("misc.unsupported")}
               </span>
             )}
           </div>
@@ -146,6 +148,7 @@ function PaymentCard({
   outgoing: boolean
   faded: boolean
 }) {
+  const { t } = useTranslation()
   const Icon = outgoing ? ArrowUpRight : ArrowDownLeft
 
   return (
@@ -165,7 +168,7 @@ function PaymentCard({
       </span>
       <div className="min-w-0">
         <p className="text-muted-foreground text-[11px] font-semibold">
-          {outgoing ? "Sent" : "Received"}
+          {t(outgoing ? "bubble.sent" : "bubble.received")}
         </p>
         <p
           className={cn(
@@ -199,6 +202,7 @@ function InviteCard({
   faded: boolean
   onOpen: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <button
       type="button"
@@ -214,10 +218,10 @@ function InviteCard({
       </span>
       <div className="min-w-0">
         <p className="text-muted-foreground text-[11px] font-semibold">
-          {outgoing ? "You shared a group" : "Group invite"}
+          {t(outgoing ? "bubble.sharedGroup" : "bubble.groupInvite")}
         </p>
         <p className="truncate text-[15px] leading-tight font-bold">
-          {invite.name || "A group"}
+          {invite.name || t("bubble.aGroup")}
         </p>
       </div>
       <ChevronRight className="text-muted-foreground ml-auto size-4 shrink-0" />
@@ -234,8 +238,9 @@ function DeliveryState({
   onRetry: (message: Message) => void
   channelOpen: boolean
 }) {
+  const { t } = useTranslation()
   if (message.status === "sending") {
-    return <Clock className="size-3 animate-pulse" aria-label="Sending" />
+    return <Clock className="size-3 animate-pulse" aria-label={t("bubble.sending")} />
   }
   if (message.status === "blocked" && !channelOpen) {
     // Deliberately not a button: there is nothing to tap that would help while
@@ -243,7 +248,7 @@ function DeliveryState({
     return (
       <span className="text-destructive flex items-center gap-1 font-medium">
         <AlertCircle className="size-3" />
-        Not delivered
+        {t("bubble.notDelivered")}
       </span>
     )
   }
@@ -257,9 +262,9 @@ function DeliveryState({
         className="text-destructive flex items-center gap-1 font-medium"
       >
         <AlertCircle className="size-3" />
-        Tap to retry
+        {t("bubble.retry")}
       </button>
     )
   }
-  return <Check className="size-3" aria-label="Sent" />
+  return <Check className="size-3" aria-label={t("bubble.delivered")} />
 }

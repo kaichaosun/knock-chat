@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Loader2, Search, UserMinus } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -53,6 +54,7 @@ export function MembersSheet({
   /** Told when somebody has gone, so the count outside can catch up. */
   onRemoved: () => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const [query, setQuery] = useState("")
   const [members, setMembers] = useState<string[]>([])
@@ -77,9 +79,9 @@ export function MembersSheet({
       setMembers((held) => held.filter((one) => one !== address))
       setRemoving(null)
       onRemoved()
-      toast.success("Removed")
+      toast.success(t("room.removed"))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't remove them")
+      toast.error(error instanceof Error ? error.message : t("room.removeFailed"))
     } finally {
       setBusy(false)
     }
@@ -102,7 +104,7 @@ export function MembersSheet({
           setMembers(page.members)
           setNext(page.next)
         })
-        .catch(() => mine === era.current && setError("Couldn't load the list"))
+        .catch(() => mine === era.current && setError(t("members.loadFailed")))
         .finally(() => mine === era.current && setLoading(false))
     }, query ? SETTLE_MS : 0)
 
@@ -130,7 +132,7 @@ export function MembersSheet({
         setMembers((held) => [...held, ...page.members.filter((one) => !held.includes(one))])
         setNext(page.next)
       })
-      .catch(() => mine === era.current && setError("Couldn't load more"))
+      .catch(() => mine === era.current && setError(t("members.loadMoreFailed")))
       .finally(() => mine === era.current && setLoading(false))
   }
 
@@ -141,7 +143,9 @@ export function MembersSheet({
         className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe"
       >
         <SheetHeader className="px-0">
-          <SheetTitle>{total > 1 ? `${total} in the room` : "In the room"}</SheetTitle>
+          <SheetTitle>
+            {total > 1 ? t("members.countInTheRoom", { count: total }) : t("members.inTheRoom")}
+          </SheetTitle>
         </SheetHeader>
 
         <div className="flex min-h-0 flex-col gap-3 pb-6">
@@ -150,8 +154,8 @@ export function MembersSheet({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by name or address"
-              aria-label="Search this room"
+              placeholder={t("members.search")}
+              aria-label={t("members.searchLabel")}
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
@@ -168,8 +172,8 @@ export function MembersSheet({
           {members.length === 0 && !loading && !error && (
             <p className="text-muted-foreground px-1 py-8 text-center text-[13px]">
               {query.trim()
-                ? "Nobody here by that name. A part of a name works; an address has to be the whole thing."
-                : "Nobody here yet."}
+                ? t("members.noMatch")
+                : t("members.nobodyYet")}
             </p>
           )}
 

@@ -1,4 +1,6 @@
 import { useState } from "react"
+import { t } from "i18next"
+import { useTranslation } from "react-i18next"
 import { Clock, MessageSquarePlus, Pin, PinOff, Plus } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -43,6 +45,7 @@ export function Inbox({
   const [revealed, setRevealed] = useState<string | null>(null)
   /** The thread a held finger opened the menu for. */
   const [holding, setHolding] = useState<Conversation | null>(null)
+  const { t } = useTranslation()
   const names = useNames()
   const pins = usePins()
   const remembered = useRooms()
@@ -113,10 +116,10 @@ export function Inbox({
             ? [
                 {
                   icon: isPinned(pins, holding.key) ? PinOff : Pin,
-                  label: isPinned(pins, holding.key) ? "Unpin" : "Pin to top",
-                  description: isPinned(pins, holding.key)
-                    ? "Let it sit by when it last stirred again."
-                    : "Hold it above the rest. The newest pin goes highest.",
+                  label: t(isPinned(pins, holding.key) ? "inbox.unpin" : "inbox.pin"),
+                  description: t(
+                    isPinned(pins, holding.key) ? "inbox.unpinNote" : "inbox.pinNote",
+                  ),
                   onSelect: () => togglePin(holding.key),
                 },
               ]
@@ -141,12 +144,14 @@ function threadTitle(
   names: Directory,
 ): string {
   if (conversation.group) {
-    return `Group chat: ${rooms.get(conversation.group)?.name ?? "Group"}`
+    return t("inbox.groupChatTitle", {
+      name: rooms.get(conversation.group)?.name ?? t("inbox.group"),
+    })
   }
   // Nothing to be "with" if the peer is missing, which is a thread that should
   // not exist — say the half that is still true rather than inventing a name.
-  if (!conversation.peer) return "Direct message"
-  return `Direct message with ${labelIn(names, conversation.peer)}`
+  if (!conversation.peer) return t("inbox.directMessage")
+  return t("inbox.directMessageWith", { name: labelIn(names, conversation.peer) })
 }
 
 function ConversationRow({
@@ -179,22 +184,25 @@ function ConversationRow({
   revealed: boolean
   onReveal: (open: boolean) => void
 }) {
+  const { t } = useTranslation()
   const { key, peer, group, last, at, unread } = conversation
   // A room you are in but nobody has spoken in yet. It is still a place.
-  const summary = last ? preview(last.body, last.direction) : "No messages yet"
+  const summary = last ? preview(last.body, last.direction) : t("inbox.noMessages")
 
   // A room is titled by its name; a chat by whoever it is with. A room whose
   // details have not arrived yet is still a room, so it says so rather than
   // showing a bare id nobody can read.
-  const title = group ? (room?.name ?? "Group") : (peer && nameIn(names, peer))
+  const title = group ? (room?.name ?? t("inbox.group")) : (peer && nameIn(names, peer))
   const mono = !group && !title
 
   return (
     <SwipeRow
       actionLabel={
         group
-          ? `Delete ${room?.name ?? "group"} chat`
-          : `Delete chat with ${peer ? labelIn(names, peer) : "this chat"}`
+          ? t("inbox.deleteGroupChat", { name: room?.name ?? t("inbox.group") })
+          : t("inbox.deleteChatWith", {
+              name: peer ? labelIn(names, peer) : t("inbox.thisChat"),
+            })
       }
       onAction={() => onDelete(key)}
       onClick={() => onOpen(key)}
@@ -278,12 +286,13 @@ function ConversationRow({
  * needs it reads twice as loud as one.
  */
 function ComposeButton({ onCompose }: { onCompose: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="pointer-events-none sticky bottom-0 mt-auto flex justify-end px-5 pb-float">
       <Button
         size="icon"
         onClick={onCompose}
-        aria-label="New chat"
+        aria-label={t("inbox.newChat")}
         className="bg-primary/85 pointer-events-auto mb-5 size-12 rounded-full shadow-md shadow-primary/20 backdrop-blur-sm"
       >
         <Plus className="size-5" />
@@ -293,14 +302,15 @@ function ComposeButton({ onCompose }: { onCompose: () => void }) {
 }
 
 function EmptyInbox() {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-10 pb-16 text-center">
       <div className="bg-accent text-accent-foreground flex size-20 items-center justify-center rounded-3xl">
         <MessageSquarePlus className="size-9" strokeWidth={1.5} />
       </div>
-      <h2 className="mt-6 text-xl font-bold tracking-tight">No messages yet</h2>
+      <h2 className="mt-6 text-xl font-bold tracking-tight">{t("inbox.emptyTitle")}</h2>
       <p className="text-muted-foreground mt-2 max-w-[18rem] text-balance">
-        Start a conversation with anyone who has opened Knock.
+        {t("inbox.emptyBody")}
       </p>
     </div>
   )

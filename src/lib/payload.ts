@@ -28,6 +28,8 @@
  * the chain, and no screen built on it should imply otherwise.
  */
 
+import { t } from "i18next"
+
 import { groupIdFrom } from "./group-link"
 import { formatNim } from "./postage"
 
@@ -190,20 +192,20 @@ export function preview(plain: string, direction: "in" | "out"): string {
   const payload = decode(plain)
   switch (payload.kind) {
     case "text":
-      return direction === "out" ? `You: ${payload.text}` : payload.text
+      return direction === "out" ? t("preview.youSaid", { text: payload.text }) : payload.text
     case "payment": {
       const amount = `${formatNim(payload.payment.luna)} NIM`
-      return direction === "out" ? `Sent ${amount}` : `Received ${amount}`
+      return t(direction === "out" ? "preview.sent" : "preview.received", { amount })
     }
     case "invite": {
-      const room = payload.invite.name || "a group"
-      return direction === "out" ? `You shared ${room}` : `Invited you to ${room}`
+      const room = payload.invite.name || t("preview.aGroup")
+      return t(direction === "out" ? "preview.youShared" : "preview.invitedYou", { room })
     }
     case "gift": {
       const amount = `${formatNim(payload.giftNote.total_luna)} NIM`
-      return direction === "out" ? `You left ${amount}` : `Left ${amount} for the room`
+      return t(direction === "out" ? "preview.youLeft" : "preview.leftForRoom", { amount })
     }
     case "unknown":
-      return "Unsupported message"
+      return t("preview.unsupported")
   }
 }

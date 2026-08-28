@@ -19,10 +19,10 @@ import { cn } from "@/lib/utils"
  * reach back for. Light before dark to match every other place these two are
  * offered together.
  */
-const THEMES: { value: Theme; label: string; icon: typeof Sun }[] = [
-  { value: "system", label: "System", icon: Smartphone },
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
+const THEMES: { value: Theme; key: string; icon: typeof Sun }[] = [
+  { value: "system", key: "settingsMore.system", icon: Smartphone },
+  { value: "light", key: "settingsMore.light", icon: Sun },
+  { value: "dark", key: "settingsMore.dark", icon: Moon },
 ]
 
 /**
@@ -31,9 +31,9 @@ const THEMES: { value: Theme; label: string; icon: typeof Sun }[] = [
  * Floating first, because it is the default and because it is what the tab
  * looks like before anybody comes here.
  */
-const SPOTS: { value: ComposeSpot; label: string; icon: typeof Sun }[] = [
-  { value: "floating", label: "Floating", icon: CirclePlus },
-  { value: "header", label: "In the header", icon: PanelTop },
+const SPOTS: { value: ComposeSpot; key: string; icon: typeof Sun }[] = [
+  { value: "floating", key: "settingsMore.floating", icon: CirclePlus },
+  { value: "header", key: "settingsMore.inHeader", icon: PanelTop },
 ]
 
 /**
@@ -67,19 +67,19 @@ export function SettingsSheet({
 
         <div className="space-y-7 pb-8">
           <section>
-            <h3 className="text-sm font-semibold">Appearance</h3>
+            <h3 className="text-sm font-semibold">{t("settingsMore.appearance")}</h3>
             <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
-              Choose how Knock looks on this phone.
+              {t("settingsMore.appearanceNote")}
             </p>
 
             {/* A row rather than a list: three choices that exclude each other,
                 where seeing them side by side is most of the answer. */}
             <div
               role="radiogroup"
-              aria-label="Appearance"
+              aria-label={t("settingsMore.appearance")}
               className="bg-muted mt-3 grid grid-cols-3 gap-1 rounded-2xl p-1"
             >
-              {THEMES.map(({ value, label, icon: Icon }) => {
+              {THEMES.map(({ value, key, icon: Icon }) => {
                 const picked = theme === value
                 return (
                   <button
@@ -96,7 +96,7 @@ export function SettingsSheet({
                     )}
                   >
                     <Icon className="size-4.5" />
-                    {label}
+                    {t(key)}
                   </button>
                 )
               })}
@@ -107,7 +107,7 @@ export function SettingsSheet({
                 above cannot show. */}
             {theme === "system" && (
               <p className="text-muted-foreground mt-2.5 text-[12px]">
-                Your phone is set to {palette} right now.
+                {t("settingsMore.phoneIs", { palette })}
               </p>
             )}
           </section>
@@ -130,18 +130,17 @@ export function SettingsSheet({
           </section>
 
           <section>
-            <h3 className="text-sm font-semibold">New chat button</h3>
+            <h3 className="text-sm font-semibold">{t("settingsMore.composeTitle")}</h3>
             <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
-              Floating puts it under your thumb but over the last rows of the list.
-              In the header it covers nothing, and matches the other tabs.
+              {t("settingsMore.composeNote")}
             </p>
 
             <div
               role="radiogroup"
-              aria-label="New chat button"
+              aria-label={t("settingsMore.composeTitle")}
               className="bg-muted mt-3 grid grid-cols-2 gap-1 rounded-2xl p-1"
             >
-              {SPOTS.map(({ value, label, icon: Icon }) => {
+              {SPOTS.map(({ value, key, icon: Icon }) => {
                 const picked = compose === value
                 return (
                   <button
@@ -158,7 +157,7 @@ export function SettingsSheet({
                     )}
                   >
                     <Icon className="size-4.5" />
-                    {label}
+                    {t(key)}
                   </button>
                 )
               })}
@@ -173,7 +172,7 @@ export function SettingsSheet({
             <BrandMark className="w-12" />
             <h3 className="font-semibold">Knock</h3>
             <p className="text-muted-foreground max-w-[17rem] text-[13px] leading-snug text-balance">
-              Messages between Nimiq wallets, with spam priced out instead of guessed at.
+              {t("settingsMore.about")}
             </p>
 
             {/* Agreed to at sign-in, and readable ever after — which is the
@@ -181,8 +180,8 @@ export function SettingsSheet({
                 they may never see again. */}
             <div className="mt-3 w-full space-y-1">
               {[
-                { label: "Terms of Service", doc: TERMS },
-                { label: "Privacy Policy", doc: PRIVACY },
+                { label: t("settingsMore.terms"), doc: TERMS },
+                { label: t("settingsMore.privacy"), doc: PRIVACY },
               ].map(({ label, doc }) => (
                 <button
                   key={label}

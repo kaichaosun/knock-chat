@@ -10,6 +10,8 @@ import {
   UserPlus,
   X,
 } from "lucide-react"
+import { t as translate } from "i18next"
+import { Trans, useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -79,20 +81,20 @@ function doorFor(requiresApproval: boolean, priceLuna: number) {
 
   if (requiresApproval) {
     return {
-      label: "You approve",
-      hint: price ? "They pay, you answer" : "They ask, you answer",
+      label: translate("groupSheet.doorApprove"),
+      hint: translate(price ? "groupSheet.doorApproveHintPaid" : "groupSheet.doorApproveHint"),
       means: price
-        ? `New people pay the ${price} and wait for your answer. Paying buys the asking, not the room — declining does not send it back. Everyone already in stays in.`
-        : "New people ask to join, and wait for your answer. Everyone already in stays in.",
+        ? translate("groupSheet.doorApproveMeansPaid", { price })
+        : translate("groupSheet.doorApproveMeans"),
     }
   }
 
   return {
-    label: "Anyone with the link",
-    hint: price ? "They pay and are in" : "They walk straight in",
+    label: translate("groupSheet.doorOpen"),
+    hint: translate(price ? "groupSheet.doorOpenHintPaid" : "groupSheet.doorOpenHint"),
     means: price
-      ? `Anyone with the link pays the ${price} and is in, without asking you. Anyone you remove can pay again and come back the same way.`
-      : "Anyone with the link walks straight in, without asking you. Anyone you remove can walk back in the same way.",
+      ? translate("groupSheet.doorOpenMeansPaid", { price })
+      : translate("groupSheet.doorOpenMeans"),
   }
 }
 
@@ -125,6 +127,7 @@ export function GroupSheet({
   /** Send this room's invite into your chat with them. */
   onInvite: (address: string) => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   // Nothing below acts on anything but a live room, and a disbanded one is not
   // there to act on. Dropping the owner's half is most of that; the rest goes
@@ -151,7 +154,7 @@ export function GroupSheet({
       onChanged()
       toast.success(`${group.name} is gone. Everyone keeps what was said.`)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't disband it")
+      toast.error(error instanceof Error ? error.message : t("groupSheet.disbandFailed"))
     } finally {
       setEnding(false)
     }
@@ -204,9 +207,9 @@ export function GroupSheet({
       await answerJoinRequest(group.id, request.id, admit)
       setRequests((current) => current.filter((r) => r.id !== request.id))
       onChanged()
-      toast.success(admit ? "They're in" : "Left outside")
+      toast.success(t(admit ? "queue.admitted" : "queue.declined"))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't answer that")
+      toast.error(error instanceof Error ? error.message : t("queue.answerFailed"))
     } finally {
       setBusy(null)
     }
@@ -220,11 +223,11 @@ export function GroupSheet({
       onChanged()
       toast.success(
         group.requires_approval
-          ? "Removed. They'd have to ask to come back."
-          : "Removed — though they can walk back in while the door is open.",
+          ? t("groupSheet.removedApproval")
+          : t("groupSheet.removedOpen"),
       )
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't remove them")
+      toast.error(error instanceof Error ? error.message : t("room.removeFailed"))
     } finally {
       setBusy(null)
     }
@@ -240,11 +243,11 @@ export function GroupSheet({
       // meant to make used to happen in silence.
       toast.success(
         requires_approval
-          ? "New people will have to ask you first."
-          : "Door open — anyone with the link walks in.",
+          ? t("groupSheet.doorApprovalOn")
+          : t("groupSheet.doorApprovalOff"),
       )
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't save")
+      toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
     } finally {
       setSaving(null)
     }
@@ -270,9 +273,9 @@ export function GroupSheet({
     try {
       await updateGroup(group.id, { name: name.trim() })
       onChanged()
-      toast.success("Name saved")
+      toast.success(t("groupSheet.nameSaved"))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't save")
+      toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
     } finally {
       setSaving(null)
     }
@@ -293,10 +296,12 @@ export function GroupSheet({
       setPrice(value === 0 ? "" : formatNim(value))
       onChanged()
       toast.success(
-        value === 0 ? "Anyone with the link can get in" : `Joining now costs ${formatNim(value)} NIM`,
+        value === 0
+          ? t("groupSheet.costFree")
+          : t("groupSheet.costSet", { amount: formatNim(value) }),
       )
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't save")
+      toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
     } finally {
       setSaving(null)
     }
@@ -314,10 +319,10 @@ export function GroupSheet({
           <SheetTitle>{group.name}</SheetTitle>
           <SheetDescription>
             {gone
-              ? "This group was disbanded. Nobody can post or rejoin, and the messages on your phone are yours to keep or delete."
+              ? t("groupSheet.disbandedNote")
               : group.join_price_luna === 0
-                ? "Anyone with the link can get in."
-                : `Getting in costs ${formatNim(group.join_price_luna)} NIM, paid to the owner.`}
+                ? t("groupSheet.freeNote")
+                : t("groupSheet.priceNote", { amount: formatNim(group.join_price_luna) })}
           </SheetDescription>
         </SheetHeader>
 
@@ -344,10 +349,10 @@ export function GroupSheet({
               </span>
               <span className="min-w-0">
                 <span className="text-destructive block text-[15px] font-semibold">
-                  Delete chat
+                  {t("groupSheet.deleteChat")}
                 </span>
                 <span className="text-muted-foreground block text-[13px] leading-snug">
-                  Takes the messages off this phone.
+                  {t("groupSheet.deleteChatNote")}
                 </span>
               </span>
             </button>
@@ -361,7 +366,7 @@ export function GroupSheet({
               <div className="flex justify-center pb-1">
                 <QrCode
                   value={groupLink(group.id)}
-                  label="Scan to join this group"
+                  label={t("groupSheet.scanToJoin")}
                   className="size-44 rounded-2xl"
                 />
               </div>
@@ -371,28 +376,28 @@ export function GroupSheet({
                 onClick={async () => {
                   const ok = await copyText(groupLink(group.id))
                   toast[ok ? "success" : "info"](
-                    ok ? "Invite link copied" : "Couldn't reach the clipboard",
+                    ok ? t("groupSheet.inviteCopied") : t("groupSheet.clipboardFailed"),
                   )
                 }}
               >
                 <Copy className="size-4" />
-                Copy invite link
+                {t("groupSheet.copyInvite")}
               </Button>
               <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-[12px] leading-snug">
                 <ShieldOff className="mt-0.5 size-3 shrink-0" />
-                Messages in a group aren't encrypted.
+                {t("groupSheet.notEncrypted")}
               </p>
             </section>
 
             {mine && (
               <section>
-                <h3 className="text-sm font-semibold">Name</h3>
+                <h3 className="text-sm font-semibold">{t("groupSheet.name")}</h3>
                 <div className="mt-2 flex gap-2">
                   <input
                     value={name}
                     disabled={saving !== null}
                     onChange={(event) => setName(event.target.value)}
-                    aria-label="Group name"
+                    aria-label={t("groupSheet.nameLabel")}
                     className={cn(
                       "bg-muted min-w-0 flex-1 rounded-2xl px-4 py-3 font-medium outline-none",
                       "focus-visible:ring-ring/60 focus-visible:ring-2",
@@ -412,10 +417,9 @@ export function GroupSheet({
 
             {mine && (
               <section>
-                <h3 className="text-sm font-semibold">Cost to join</h3>
+                <h3 className="text-sm font-semibold">{t("groupSheet.costTitle")}</h3>
                 <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
-                  What someone new pays you to get in. Changing it leaves everyone already
-                  here where they are.
+                  {t("groupSheet.costNote")}
                 </p>
 
                 <div className="mt-2 flex gap-2">
@@ -424,8 +428,8 @@ export function GroupSheet({
                       value={price}
                       inputMode="decimal"
                       disabled={saving !== null}
-                      placeholder="Free"
-                      aria-label="Cost to join, in NIM"
+                      placeholder={t("newGroup.costPlaceholder")}
+                      aria-label={t("newGroup.costLabel")}
                       aria-invalid={luna === null}
                       onChange={(event) => setPrice(event.target.value.replace(/[^\d.]/g, ""))}
                       className={cn(
@@ -459,7 +463,7 @@ export function GroupSheet({
 
             {mine && (
               <section>
-                <h3 className="text-sm font-semibold">Who can get in</h3>
+                <h3 className="text-sm font-semibold">{t("groupSheet.doorTitle")}</h3>
                 <div className="mt-2 flex gap-2">
                   {[false, true].map((approval) => (
                     <button
@@ -484,8 +488,8 @@ export function GroupSheet({
                 {!group.requires_approval && (
                   <p className="text-warning mt-2 text-[12px] leading-snug">
                     {group.join_price_luna > 0
-                      ? "With an open door, removing someone doesn't hold — they can pay again and come back."
-                      : "With an open door, removing someone doesn't hold — they can walk back in."}
+                      ? t("groupSheet.openDoorPaid")
+                      : t("groupSheet.openDoorFree")}
                   </p>
                 )}
               </section>
@@ -494,7 +498,9 @@ export function GroupSheet({
             {mine && requests.length > 0 && (
               <section>
                 <h3 className="text-sm font-semibold">
-                  {requests.length === 1 ? "Someone wants in" : `${requests.length} want in`}
+                  {requests.length === 1
+                    ? t("queue.oneWaiting")
+                    : t("queue.countWaiting", { count: requests.length })}
                 </h3>
                 <ul className="mt-2 space-y-2">
                   {requests.map((request) => (
@@ -517,7 +523,7 @@ export function GroupSheet({
                         <Button
                           size="icon"
                           variant="ghost"
-                          aria-label="Decline"
+                          aria-label={t("queue.decline")}
                           disabled={busy === request.id}
                           onClick={() => void answer(request, false)}
                           className="size-9 rounded-full"
@@ -526,7 +532,7 @@ export function GroupSheet({
                         </Button>
                         <Button
                           size="icon"
-                          aria-label="Let them in"
+                          aria-label={t("queue.admit")}
                           disabled={busy === request.id}
                           onClick={() => void answer(request, true)}
                           className="size-9 rounded-full"
@@ -547,7 +553,9 @@ export function GroupSheet({
             <section>
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-sm font-semibold">
-                  {memberCount > 1 ? `${memberCount} in the room` : "In the room"}
+                  {memberCount > 1
+                    ? t("members.countInTheRoom", { count: memberCount })
+                    : t("members.inTheRoom")}
                 </h3>
                 {/* Anyone in the room can bring somebody in — an invite is only a
                     message, and the door decides who actually gets through. */}
@@ -557,7 +565,7 @@ export function GroupSheet({
                   className="text-primary flex items-center gap-1 text-[13px] font-semibold"
                 >
                   <UserPlus className="size-3.5" />
-                  Add someone
+                  {t("groupSheet.addSomeone")}
                 </button>
               </div>
               <ul className="mt-2 space-y-1">
@@ -610,7 +618,7 @@ export function GroupSheet({
                   onClick={() => setListing(true)}
                   className="text-primary active:bg-muted mt-1 flex w-full items-center justify-center gap-1 rounded-2xl py-2.5 text-[13px] font-semibold transition-colors"
                 >
-                  Show all members
+                  {t("groupSheet.showAll")}
                   <ChevronRight className="size-3.5" />
                 </button>
               )}
@@ -639,10 +647,10 @@ export function GroupSheet({
                   </span>
                   <span className="min-w-0">
                     <span className="text-destructive block text-[15px] font-semibold">
-                      Disband group
+                      {t("groupSheet.disband")}
                     </span>
                     <span className="text-muted-foreground block text-[13px] leading-snug">
-                      Ends the room for everyone.
+                      {t("groupSheet.disbandNote")}
                     </span>
                   </span>
                 </button>
@@ -660,7 +668,7 @@ export function GroupSheet({
         mine={mine}
         onCopy={(address) => {
           void copyText(address).then((ok) =>
-            ok ? toast.success("Address copied") : toast.error("Couldn't copy that"),
+            ok ? toast.success(t("room.addressCopied")) : toast.error(t("room.copyFailed")),
           )
         }}
         onOpenChat={(address) => {
@@ -683,7 +691,7 @@ export function GroupSheet({
         mine={mine}
         onCopy={(address) => {
           void copyText(address).then((ok) =>
-            ok ? toast.success("Address copied") : toast.error("Couldn't copy that"),
+            ok ? toast.success(t("room.addressCopied")) : toast.error(t("room.copyFailed")),
           )
         }}
         onOpenChat={(address) => {
@@ -716,25 +724,26 @@ export function GroupSheet({
           className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe"
         >
           <SheetHeader className="px-0">
-            <SheetTitle>Disband {group.name}?</SheetTitle>
+            <SheetTitle>{t("groupSheet.disbandTitle", { name: group.name })}</SheetTitle>
             <SheetDescription>
-              The room ends for everyone in it. Nobody can post or rejoin, and what
-              people were charged to join is not refunded. Everyone keeps the messages
-              already on their phone until they delete the chat.
+              {t("groupSheet.disbandBody")}
             </SheetDescription>
           </SheetHeader>
 
           <div className="space-y-3 pb-8">
             <label className="text-muted-foreground block text-[13px]">
-              Type <span className="text-foreground font-semibold">{group.name}</span> to
-              confirm
+              <Trans
+                i18nKey="groupSheet.typeToConfirm"
+                values={{ name: group.name }}
+                components={{ name: <span className="text-foreground font-semibold" /> }}
+              />
               <input
                 value={typed}
                 onChange={(event) => setTyped(event.target.value)}
                 autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
-                aria-label={`Type ${group.name} to confirm`}
+                aria-label={t("groupSheet.typeToConfirmLabel", { name: group.name })}
                 className={cn(
                   "bg-muted mt-2 w-full rounded-2xl px-4 py-3.5 font-medium outline-none",
                   "focus-visible:ring-ring/60 focus-visible:ring-2",
@@ -776,15 +785,18 @@ export function GroupSheet({
               {changing === false && requests.length > 0 && (
                 <>
                   {" "}
-                  The {requests.length === 1 ? "one person" : `${requests.length} people`}{" "}
-                  already waiting still need an answer.
+                  {t("groupSheet.theWord")}
+                  {requests.length === 1
+                    ? t("groupSheet.onePersonWaiting")
+                    : t("groupSheet.peopleWaiting", { count: requests.length })}{" "}
+                  {t("groupSheet.stillNeedAnswer")}
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setChanging(null)}>
-              Cancel
+              {t("groupSheet.cancel")}
             </Button>
             <Button
               disabled={saving === "door"}
@@ -792,7 +804,7 @@ export function GroupSheet({
               onClick={() => changing !== null && void setApproval(changing)}
             >
               {saving === "door" && <Loader2 className="animate-spin" />}
-              Confirm
+              {t("groupSheet.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

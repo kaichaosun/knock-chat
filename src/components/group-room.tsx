@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -64,6 +65,7 @@ export function GroupRoom({
   /** Leave a pot in the room. Absent on a relay that doesn't hold gifts. */
   onGift?: () => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -85,9 +87,9 @@ export function GroupRoom({
       await removeGroupMember(group.id, address)
       setRemoving(null)
       onRefreshDetail()
-      toast.success("Removed")
+      toast.success(t("room.removed"))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't remove them")
+      toast.error(error instanceof Error ? error.message : t("room.removeFailed"))
     } finally {
       setBusy(false)
     }
@@ -122,7 +124,7 @@ export function GroupRoom({
             variant="ghost"
             size="icon"
             onClick={onBack}
-            aria-label="Back to messages"
+            aria-label={t("room.back")}
             className="size-11 shrink-0 rounded-full"
           >
             <ChevronLeft className="size-6" />
@@ -133,16 +135,16 @@ export function GroupRoom({
           <button
             type="button"
             onClick={() => setDetails(true)}
-            aria-label="Group details"
+            aria-label={t("room.details")}
             className="min-w-0 flex-1 px-1 text-left active:opacity-60"
           >
             <p className="truncate text-[17px] leading-tight font-semibold">{group.name}</p>
             <p className="text-muted-foreground truncate text-[12px]">
               {memberCount === 0
-                ? "Tap for details"
+                ? t("room.tapForDetails")
                 : memberCount === 1
-                  ? "Just you so far"
-                  : `${memberCount} members`}
+                  ? t("room.justYou")
+                  : t("room.memberCount", { count: memberCount })}
             </p>
           </button>
 
@@ -150,7 +152,7 @@ export function GroupRoom({
             variant="ghost"
             size="icon"
             onClick={() => setDetails(true)}
-            aria-label="Group details"
+            aria-label={t("room.details")}
             className="size-11 shrink-0 rounded-full"
           >
             <Info className="size-6" />
@@ -189,7 +191,7 @@ export function GroupRoom({
                           <button
                             type="button"
                             onClick={() => setShowing(owner)}
-                            aria-label="About you"
+                            aria-label={t("room.aboutYou")}
                             className="block active:opacity-60"
                           >
                             <AddressAvatar address={owner} size="sm" />
@@ -282,8 +284,8 @@ export function GroupRoom({
           <p className="text-muted-foreground flex items-center justify-center gap-2 px-5 py-4 text-[13px]">
             <DoorClosed className="size-4 shrink-0" />
             {gone
-              ? "This group was removed, no more messages."
-              : "You're not in this group any more."}
+              ? t("room.disbanded")
+              : t("room.notIn")}
           </p>
           <div className="pb-safe" />
         </div>
@@ -296,8 +298,8 @@ export function GroupRoom({
           actions={[
             {
               icon: GiftIcon,
-              label: "Leave a gift",
-              description: "A pot for the room, first come first served.",
+              label: t("room.leaveGift"),
+              description: t("room.leaveGiftNote"),
               onSelect: onGift,
             },
           ]}
@@ -312,7 +314,7 @@ export function GroupRoom({
         mine={mine}
         onCopy={(address) => {
           void copyText(address).then((ok) =>
-            ok ? toast.success("Address copied") : toast.error("Couldn't copy that"),
+            ok ? toast.success(t("room.addressCopied")) : toast.error(t("room.copyFailed")),
           )
         }}
         onOpenChat={(address) => {
@@ -356,12 +358,13 @@ export function GroupRoom({
 }
 
 function RoomIntro({ group, members }: { group: Group; members?: string[] }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center px-8 py-14 text-center">
       <GroupAvatar size="lg" members={members} />
       <p className="mt-4 text-base font-semibold">{group.name}</p>
       <p className="text-muted-foreground mt-2 text-sm text-balance">
-        Nothing said here yet. Anyone in the room sees what you write.
+        {t("room.emptyRoom")}
       </p>
     </div>
   )

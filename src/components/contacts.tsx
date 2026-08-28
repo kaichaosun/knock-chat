@@ -1,5 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from "react"
 import { DoorOpen, Loader2, Users } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -64,6 +65,7 @@ export function Contacts({
   /** Called once the relay has confirmed, so the chat goes with the channel. */
   onRemoved: (peer: string) => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const [revealed, setRevealed] = useState<string | null>(null)
   // Held until confirmed: removing costs the other side real money to undo, so
@@ -81,12 +83,12 @@ export function Contacts({
       // Only now: the row can be put back if this fails, but messages cannot.
       onRemoved(contact.address)
       forget(contact.address)
-      toast.success("Removed. The chat is gone, and they'd have to knock again.")
+      toast.success(t("contacts.removed"))
     } catch (e) {
       setContacts((current) =>
         current ? [contact, ...current].sort((a, b) => b.opened_at.localeCompare(a.opened_at)) : current,
       )
-      toast.error(e instanceof Error ? e.message : "Couldn't remove them")
+      toast.error(e instanceof Error ? e.message : t("contacts.removeFailed"))
     }
   }
 
@@ -108,9 +110,9 @@ export function Contacts({
         <div className="bg-accent text-accent-foreground flex size-20 items-center justify-center rounded-3xl">
           <Users className="size-9" strokeWidth={1.5} />
         </div>
-        <h2 className="mt-6 text-xl font-bold tracking-tight">No one yet</h2>
+        <h2 className="mt-6 text-xl font-bold tracking-tight">{t("contacts.emptyTitle")}</h2>
         <p className="text-muted-foreground mt-2 max-w-[17rem] text-balance">
-          People appear here once you've knocked and been let in, or answered a knock of
+          {t("contacts.emptyBody")}
           your own.
         </p>
       </div>
@@ -154,7 +156,7 @@ export function Contacts({
         <DialogContent className="max-w-[20rem] rounded-3xl">
           <DialogHeader className="items-center">
             {confirming && <AddressAvatar address={confirming.address} />}
-            <DialogTitle className="mt-2">Remove this contact?</DialogTitle>
+            <DialogTitle className="mt-2">{t("contacts.removeTitle")}</DialogTitle>
             {confirming && nameIn(names, confirming.address) && (
               <p className="text-[15px] font-semibold">{nameIn(names, confirming.address)}</p>
             )}
@@ -162,21 +164,19 @@ export function Contacts({
               {confirming ? shortenAddress(confirming.address) : ""}
             </p>
             <DialogDescription className="text-balance">
-              The door shuts both ways. Neither of you can write to the other for free,
-              and reaching you again means knocking and paying your postage. Your chat
-              with them is deleted too.
+              {t("contacts.removeBody")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setConfirming(null)}>
-              Keep
+              {t("contacts.keep")}
             </Button>
             <Button
               variant="destructive"
               className="h-11 rounded-2xl"
               onClick={() => confirming && remove(confirming)}
             >
-              Remove
+              {t("contacts.remove")}
             </Button>
           </DialogFooter>
         </DialogContent>

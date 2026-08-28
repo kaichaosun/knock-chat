@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -46,6 +47,7 @@ export function SendGiftSheet({
     note: string
   }) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const [amount, setAmount] = useState("")
   // Text rather than a number, so a half-typed value stays half-typed instead
   // of snapping to something the person did not mean.
@@ -93,7 +95,7 @@ export function SendGiftSheet({
       onOpenChange(false)
     } catch (e) {
       if (e instanceof AlreadyPaidError) setPaid(true)
-      setError(reason(e, "Couldn't leave the gift"))
+      setError(reason(e, t("gift.failed")))
     } finally {
       setSending(false)
     }
@@ -103,10 +105,9 @@ export function SendGiftSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Leave a gift</SheetTitle>
+          <SheetTitle>{t("gift.title")}</SheetTitle>
           <SheetDescription>
-            First come, first served. Whatever nobody takes comes back to you after{" "}
-            {expiresInHours} hours.
+            {t("gift.note", { hours: expiresInHours })}
           </SheetDescription>
         </SheetHeader>
 
@@ -118,7 +119,7 @@ export function SendGiftSheet({
               inputMode="decimal"
               disabled={sending || paid}
               placeholder="0"
-              aria-label="Total, in NIM"
+              aria-label={t("gift.totalLabel")}
               aria-invalid={typed && !enough}
               onChange={(event) => setAmount(event.target.value.replace(/[^\d.]/g, ""))}
               className={cn(
@@ -149,7 +150,7 @@ export function SendGiftSheet({
                 value={shareText}
                 inputMode="numeric"
                 disabled={sending || paid}
-                aria-label="How many shares"
+                aria-label={t("gift.sharesLabel")}
                 aria-invalid={!sharesValid}
                 onChange={(event) => setShareText(event.target.value.replace(/[^\d]/g, ""))}
                 className={cn(
@@ -183,7 +184,7 @@ export function SendGiftSheet({
 
             {!sharesValid && (
               <p className="text-destructive mt-2 px-1 text-[13px]">
-                Between 1 and {maxShares} people.
+                {t("gift.sharesRange", { max: maxShares })}
               </p>
             )}
           </div>
@@ -203,14 +204,14 @@ export function SendGiftSheet({
                   )}
                 >
                   <span className="block font-semibold">
-                    {mode === "random" ? "Random" : "Even"}
+                    {t(mode === "random" ? "gift.random" : "gift.even")}
                   </span>
                   <span className="text-muted-foreground block text-[11px] leading-snug">
                     {mode === "random"
-                      ? "Somebody gets the good one"
+                      ? t("gift.randomNote")
                       : enough
                         ? `${formatNim(each)} NIM each`
-                        : "Everyone the same"}
+                        : t("gift.evenNote")}
                   </span>
                 </button>
               ))}
@@ -221,8 +222,8 @@ export function SendGiftSheet({
             value={note}
             disabled={sending || paid}
             onChange={(event) => setNote(event.target.value)}
-            placeholder="Say something (optional)"
-            aria-label="A word with the gift"
+            placeholder={t("gift.wordPlaceholder")}
+            aria-label={t("gift.wordLabel")}
             className={cn(
               "bg-muted w-full rounded-2xl px-4 py-3 outline-none",
               "placeholder:text-muted-foreground/70",
@@ -233,7 +234,7 @@ export function SendGiftSheet({
           {typed && !enough && sharesValid && (
             <p className="text-destructive px-1 text-[13px]">
               {luna === null
-                ? "Enter an amount above zero."
+                ? t("gift.aboveZero")
                 : `Too little to split ${shares} ways — every share needs at least one luna.`}
             </p>
           )}
@@ -252,8 +253,7 @@ export function SendGiftSheet({
                 Close
               </Button>
               <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-                Your {formatNim(luna ?? 0)} NIM is safe. Knock will finish placing the gift
-                on its own — don't send it again.
+                {t("gift.safe", { amount: formatNim(luna ?? 0) })}
               </p>
             </>
           ) : (
@@ -264,12 +264,13 @@ export function SendGiftSheet({
                 className="brand-gradient h-13 w-full rounded-2xl text-base"
               >
                 {sending && <Loader2 className="animate-spin" />}
-                {enough && luna !== null ? `Leave ${formatNim(luna)} NIM` : "Leave a gift"}
+                {enough && luna !== null
+                  ? t("gift.leaveFor", { amount: formatNim(luna) })
+                  : t("gift.title")}
               </Button>
 
               <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-                Your wallet will ask you to confirm. The relay holds the money until it's
-                taken or returned.
+                {t("gift.confirmNote")}
               </p>
             </>
           )}

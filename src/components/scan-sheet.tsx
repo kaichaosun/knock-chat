@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 import {
   Sheet,
@@ -47,6 +48,7 @@ export function ScanSheet({
   /** The same door a pasted link opens. */
   onFound: (code: Code) => void
 }) {
+  const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   /** Why there is no picture, when there is none. */
   const [error, setError] = useState<string | null>(null)
@@ -121,11 +123,11 @@ export function ScanSheet({
 
     const start = async () => {
       if (!window.isSecureContext) {
-        setError("The camera needs a secure connection. Open Knock over https.")
+        setError(t("scan.insecure"))
         return
       }
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError("This browser won't hand over a camera.")
+        setError(t("scan.unsupported"))
         return
       }
 
@@ -138,10 +140,10 @@ export function ScanSheet({
         const name = cause instanceof Error ? cause.name : ""
         setError(
           name === "NotAllowedError"
-            ? "Knock wasn't given the camera. You can allow it and try again."
+            ? t("scan.refused")
             : name === "NotFoundError"
-              ? "No camera on this device."
-              : "The camera wouldn't start.",
+              ? t("scan.noCamera")
+              : t("scan.wontStart"),
         )
         return
       }
@@ -174,13 +176,13 @@ export function ScanSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Scan a code</SheetTitle>
+          <SheetTitle>{t("scan.title")}</SheetTitle>
           <SheetDescription>
             {error
-              ? "Nothing to scan with."
+              ? t("scan.failed")
               : foreign
-                ? "That code isn't a Knock one. Still looking."
-                : "Point it at someone's invite link or a group's code."}
+                ? t("scan.foreign")
+                : t("scan.hint")}
           </SheetDescription>
         </SheetHeader>
 
@@ -210,7 +212,7 @@ export function ScanSheet({
               />
               {!live && (
                 <p className="absolute inset-0 flex items-center justify-center text-[13px] text-white/70">
-                  Starting the camera…
+                  {t("scan.starting")}
                 </p>
               )}
               {/* Where to hold it. Nothing is cropped to this — the whole frame

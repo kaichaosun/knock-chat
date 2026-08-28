@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { ChevronLeft, Clock, Coins, DoorClosed, Info } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -50,6 +51,7 @@ export function Conversation({
 }) {
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation()
   const names = useNames()
   const name = nameIn(names, peer)
   const [attaching, setAttaching] = useState(false)
@@ -112,7 +114,7 @@ export function Conversation({
             variant="ghost"
             size="icon"
             onClick={onBack}
-            aria-label="Back to messages"
+            aria-label={t("chat.back")}
             className="size-11 shrink-0 rounded-full"
           >
             <ChevronLeft className="size-6" />
@@ -129,7 +131,7 @@ export function Conversation({
           <button
             type="button"
             onClick={() => setShowing(true)}
-            aria-label="Contact info"
+            aria-label={t("chat.contactInfo")}
             className="min-w-0 flex-1 px-1 text-left active:opacity-60"
           >
             {name ? (
@@ -153,7 +155,7 @@ export function Conversation({
             variant="ghost"
             size="icon"
             onClick={() => setShowing(true)}
-            aria-label="Contact info"
+            aria-label={t("chat.contactInfo")}
             className="size-11 shrink-0 rounded-full"
           >
             <Info className="size-6" />
@@ -199,7 +201,7 @@ export function Conversation({
                             <button
                               type="button"
                               onClick={() => setShowing(true)}
-                              aria-label={`About ${labelIn(names, peer)}`}
+                              aria-label={t("chat.about", { name: labelIn(names, peer) })}
                               className="block active:opacity-60"
                             >
                               <AddressAvatar address={peer} size="sm" />
@@ -209,7 +211,7 @@ export function Conversation({
                       <div className="min-w-0 flex-1">
                         {opens && (
                           <p className="text-muted-foreground mb-0.5 ml-1 max-w-full truncate text-[13px] font-semibold">
-                            {outgoing ? "You" : labelIn(names, peer)}
+                            {outgoing ? t("chat.you") : labelIn(names, peer)}
                           </p>
                         )}
                         <MessageBubble
@@ -242,8 +244,8 @@ export function Conversation({
         actions={[
           {
             icon: Coins,
-            label: "Send NIM",
-            description: "Straight from your wallet to theirs.",
+            label: t("chat.sendNim"),
+            description: t("chat.sendNimNote"),
             onSelect: () => setPaying(true),
           },
         ]}
@@ -279,6 +281,7 @@ function KnockPrompt({
   reachable: boolean | null
   onKnock: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="bg-muted/60 text-muted-foreground flex items-center gap-3 border-t px-4 py-3 text-[12px] leading-snug">
       {waiting ? (
@@ -288,17 +291,17 @@ function KnockPrompt({
       )}
       <p className="flex-1 text-balance">
         {waiting
-          ? "Knock sent. You can write again once they answer."
+          ? t("chat.knockSent")
           : reachable === false
-            ? "Nobody has opened Knock at this address, so there is nobody here to let you in."
-            : "This chat is closed. Knock to ask them to reopen it."}
+            ? t("chat.nobodyHere")
+            : t("chat.closed")}
       </p>
       {/* No price where there is nobody to pay it to. The knock would fail
           before the transaction — `keyForPeer` runs first — so this offers
           nothing it cannot do rather than charging for the discovery. */}
       {!waiting && reachable !== false && (
         <Button size="sm" onClick={onKnock} className="h-8 shrink-0 rounded-lg">
-          {cost === 0 ? "Knock" : `Knock — ${formatNim(cost)} NIM`}
+          {cost === 0 ? t("chat.knock") : t("chat.knockFor", { amount: formatNim(cost) })}
         </Button>
       )}
     </div>
@@ -306,6 +309,7 @@ function KnockPrompt({
 }
 
 function ThreadIntro({ peer, name }: { peer: string; name: string | null }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center px-8 py-14 text-center">
       <AddressAvatar address={peer} size="lg" />
@@ -314,7 +318,7 @@ function ThreadIntro({ peer, name }: { peer: string; name: string | null }) {
         {shortenAddress(peer)}
       </p>
       <p className="text-muted-foreground mt-2 text-sm text-balance">
-        This is the start of your conversation. Say hello.
+        {t("misc.threadStart")}
       </p>
     </div>
   )

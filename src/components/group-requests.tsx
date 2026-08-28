@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { GroupAvatar } from "@/components/group-avatar"
@@ -28,6 +29,7 @@ export function GroupRequests({
   /** Open the whole queue for one room. */
   onOpen: (group: string) => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const doors = groups.filter((group) => (queues[group.id]?.length ?? 0) > 0)
   if (doors.length === 0) return null
@@ -37,7 +39,7 @@ export function GroupRequests({
   return (
     <section className="px-3 pt-3 pb-4">
       <h2 className="text-muted-foreground mb-2 px-1 text-xs font-semibold">
-        {total === 1 ? "Someone wants in" : `${total} want in`}
+        {total === 1 ? t("queue.oneWaiting") : t("queue.countWaiting", { count: total })}
       </h2>
 
       <ul className="space-y-2">

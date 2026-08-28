@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Check, Loader2, LockKeyhole, X } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { KnockRequestSheet } from "@/components/knock-request-sheet"
@@ -35,6 +36,7 @@ export function KnockRequests({
   onAccept: (id: string) => Promise<void>
   onDecline: (id: string) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const [busy, setBusy] = useState<string | null>(null)
   // The knock being read in full. Held by id rather than by value so it follows
   // the poll — and disappears by itself if the knock is answered elsewhere.
@@ -64,7 +66,9 @@ export function KnockRequests({
     // meets edge-on and reads as a line drawn across its top by mistake.
     <section className="px-3 pt-3 pb-4">
       <h2 className="text-muted-foreground mb-2 px-1 text-xs font-semibold">
-        {knocks.length === 1 ? "Someone is knocking" : `${knocks.length} people are knocking`}
+        {knocks.length === 1
+          ? t("knocks.oneKnocking")
+          : t("knocks.manyKnocking", { count: knocks.length })}
       </h2>
 
       <ul className="space-y-2">
@@ -82,7 +86,7 @@ export function KnockRequests({
               <button
                 type="button"
                 onClick={() => setReadingId(knock.id)}
-                aria-label="Read this knock in full"
+                aria-label={t("knocks.readInFull")}
                 className="min-w-0 flex-1 text-left active:opacity-60"
               >
                 {nameIn(names, knock.from) && (
@@ -102,7 +106,7 @@ export function KnockRequests({
                 <Button
                   size="icon"
                   variant="ghost"
-                  aria-label="Decline"
+                  aria-label={t("knocks.decline")}
                   disabled={busy === knock.id}
                   onClick={() => act(knock.id, onDecline)}
                   className="size-9 rounded-full"
@@ -111,7 +115,7 @@ export function KnockRequests({
                 </Button>
                 <Button
                   size="icon"
-                  aria-label="Let them in"
+                  aria-label={t("knocks.admit")}
                   disabled={busy === knock.id}
                   onClick={() => act(knock.id, onAccept)}
                   className="size-9 rounded-full"
@@ -157,6 +161,7 @@ export function KnockRequests({
  * screen for the price of one knock.
  */
 function KnockNote({ note, onOpen }: { note: string | null | undefined; onOpen: () => void }) {
+  const { t } = useTranslation()
   if (note === undefined) return null
 
   if (note === null) {
@@ -172,7 +177,7 @@ function KnockNote({ note, onOpen }: { note: string | null | undefined; onOpen: 
     <button
       type="button"
       onClick={onOpen}
-      aria-label="Read the whole message"
+      aria-label={t("knocks.readWhole")}
       className={cn(
         "bg-muted mt-2.5 w-full rounded-xl px-3 py-2 text-left text-[13px] leading-snug",
         // No `whitespace-pre-wrap` and no `block` here, both deliberately.

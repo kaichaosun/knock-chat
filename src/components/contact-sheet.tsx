@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Copy } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -33,6 +34,7 @@ export function ContactSheet({
   address: string
   onCopy: (address: string) => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const theirs = givenNameIn(names, address)
   const yours = chosenNameIn(names, address)
@@ -56,13 +58,13 @@ export function ContactSheet({
   const save = () => {
     rename(address, trimmed === "" ? null : trimmed)
     onOpenChange(false)
-    toast.success(trimmed === "" ? "Name cleared" : `Saved as ${trimmed}`)
+    toast.success(trimmed === "" ? t("contacts.nameCleared") : t("contacts.savedAs", { name: trimmed }))
   }
 
   const clear = () => {
     rename(address, null)
     onOpenChange(false)
-    toast.success(theirs ? `Back to ${theirs}` : "Name cleared")
+    toast.success(theirs ? t("contacts.backTo", { name: theirs }) : t("contacts.nameCleared"))
   }
 
   return (
@@ -109,7 +111,7 @@ export function ContactSheet({
           <section>
             <h3 className="text-sm font-semibold">Your name for them</h3>
             <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
-              Only you see it — they are never told, and it stays on this phone.
+              {t("contacts.yourNameNote")}
             </p>
 
             <div className="mt-3 flex gap-2">
@@ -117,8 +119,8 @@ export function ContactSheet({
                 <input
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder={theirs ?? "Unnamed"}
-                  aria-label="Your name for this contact"
+                  placeholder={theirs ?? t("contacts.unnamed")}
+                  aria-label={t("contacts.yourNameLabel")}
                   aria-invalid={tooLong}
                   className={cn(
                     "bg-muted w-full rounded-2xl py-3 pr-14 pl-4 font-medium outline-none",
@@ -157,7 +159,7 @@ export function ContactSheet({
                 onClick={clear}
                 className="text-muted-foreground mt-2 h-10 w-full rounded-2xl"
               >
-                {theirs ? "Use their own name instead" : "Show their address instead"}
+                {t(theirs ? "contacts.useTheirName" : "contacts.useAddress")}
               </Button>
             )}
           </section>

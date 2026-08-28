@@ -39,7 +39,17 @@ describe("preferences", () => {
     // written a preference this one has dropped.
     stubStorage({ "knock.prefs": JSON.stringify({ compose: "sideways", ghosts: true }) })
     start()
-    expect(snapshot()).toEqual({ compose: "floating" })
+    expect(snapshot()).toEqual({ compose: "floating", language: "host" })
+  })
+
+  it("keep a language that is spoken and drop one that is not", () => {
+    stubStorage({ "knock.prefs": JSON.stringify({ language: "zh" }) })
+    start()
+    expect(snapshot().language).toBe("zh")
+
+    stubStorage({ "knock.prefs": JSON.stringify({ language: "kli" }) })
+    start()
+    expect(snapshot().language).toBe("host")
   })
 
   it("treat malformed storage as nothing chosen", () => {

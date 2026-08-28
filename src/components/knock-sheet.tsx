@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { CheckCircle2, Clock, DoorOpen, Loader2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Button } from "@/components/ui/button"
@@ -48,6 +49,7 @@ export function KnockSheet({
   onKnock: (peer: string, body: string, policyLuna: number) => Promise<void>
   onOpenThread: (peer: string) => void
 }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState("")
   const [body, setBody] = useState("")
   const [reach, setReach] = useState<Reachability | null>(null)
@@ -125,7 +127,7 @@ export function KnockSheet({
         setReach(r)
         rememberOne(value, r.name)
       })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Couldn't check"))
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : t("knock.checkFailed")))
       .finally(() => !cancelled && setChecking(false))
     return () => {
       cancelled = true
@@ -140,7 +142,7 @@ export function KnockSheet({
       await onKnock(value, body.trim(), reach.policy.amount_luna)
       onOpenChange(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't knock")
+      setError(e instanceof Error ? e.message : t("knock.knockFailed"))
     } finally {
       setSending(false)
     }
@@ -170,11 +172,11 @@ export function KnockSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>{peer ? "Knock to reopen" : "Knock on a door"}</SheetTitle>
+          <SheetTitle>{t(peer ? "knock.reopenTitle" : "knock.title")}</SheetTitle>
           <SheetDescription>
             {peer
-              ? "This chat is closed. Knocking asks them to open it again — after that, messages are free both ways."
-              : "Knocking may cost once. After they let you in, messages are free both ways and encrypted."}
+              ? t("knock.reopenNote")
+              : t("knock.note")}
           </SheetDescription>
         </SheetHeader>
 
@@ -198,8 +200,8 @@ export function KnockSheet({
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="NQ.. .... .... .... ...."
-              aria-label="Their address"
+              placeholder={t("knock.addressPlaceholder")}
+              aria-label={t("knock.addressLabel")}
               aria-invalid={(typed.length === 36 && !valid) || isSelf}
               // A pasted invite link is an address wrapped in a URL, and
               // regrouping one character by character turns it into nonsense.
@@ -226,7 +228,7 @@ export function KnockSheet({
 
           {typed.length === 36 && !valid && (
             <p className="text-destructive px-1 text-[13px]">
-              That address isn't valid — check for a mistyped character.
+              {t("knock.invalidAddress")}
             </p>
           )}
           {isSelf && <p className="text-destructive px-1 text-[13px]">That's your own address.</p>}
@@ -234,7 +236,7 @@ export function KnockSheet({
           {!peer && claimed && (
             <p className="text-muted-foreground px-1 text-[13px]">
               This address calls itself <span className="text-foreground font-semibold">{claimed}</span>.
-              Anyone can choose any name.
+              {t("knock.anyName")}
             </p>
           )}
 
@@ -272,7 +274,7 @@ export function KnockSheet({
             <>
               {alreadyPaid && (
                 <p className="text-muted-foreground px-1 text-[12px] leading-snug">
-                  This is what you wrote last time. Send it as it is, or change it.
+                  {t("knock.restored")}
                 </p>
               )}
 
@@ -280,8 +282,8 @@ export function KnockSheet({
                 rows={3}
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
-                placeholder="Say who you are"
-                aria-label="Your message"
+                placeholder={t("knock.messagePlaceholder")}
+                aria-label={t("knock.messageLabel")}
                 className={cn(
                   "bg-muted w-full resize-none rounded-2xl px-4 py-3 leading-snug outline-none",
                   "placeholder:text-muted-foreground/70",
@@ -302,23 +304,23 @@ export function KnockSheet({
                     quoting it here would put a number on something that cannot
                     happen, greyed out or not. */}
                 {reachable === false
-                  ? "Knock"
+                  ? t("knock.send")
                   : alreadyPaid
-                    ? "Knock — already paid"
+                    ? t("knock.sendPaid")
                     : cost === 0
-                      ? "Knock"
-                      : `Knock — ${formatNim(cost)} NIM`}
+                      ? t("knock.send")
+                      : t("knock.sendFor", { amount: formatNim(cost) })}
               </Button>
 
               <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
                 {reachable === false
-                  ? "Nobody has opened Knock at this address, so there is no key to seal a message to and no way for them to answer."
+                  ? t("knock.unreachable")
                   : !reach
-                  ? "Enter their address to see what it costs."
+                  ? t("knock.enterAddress")
                   : alreadyPaid
-                    ? "You've already paid for this one. Sending it again won't charge you."
+                    ? t("knock.alreadyPaid")
                     : cost === 0
-                      ? "They've made themselves free to reach."
+                      ? t("knock.free")
                       : `They keep the ${formatNim(cost)} NIM whether or not they answer.`}
               </p>
             </>
@@ -329,7 +331,7 @@ export function KnockSheet({
           {suggestions.length > 0 && !reach && !peer && (
             <div className="pt-2">
               <p className="text-muted-foreground mb-2 px-1 text-xs font-medium">
-                Test identities
+                {t("knock.testIdentities")}
               </p>
               <div className="space-y-1">
                 {suggestions.map(({ label, address }) => (

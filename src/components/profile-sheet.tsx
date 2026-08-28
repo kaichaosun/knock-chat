@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Copy, Loader2, LogOut, QrCode as QrCodeIcon, Settings, Wifi, WifiOff } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -57,6 +58,7 @@ export function ProfileSheet({
   /** End the relay session. Nothing on the device goes with it. */
   onSignOut: () => void
 }) {
+  const { t } = useTranslation()
   const [nim, setNim] = useState("")
   const [name, setName] = useState("")
   /** What the relay last confirmed, so Save can tell a change from a re-tap. */
@@ -115,7 +117,7 @@ export function ProfileSheet({
       setName(saved.name ?? "")
       setSavedName(saved.name ?? "")
       rememberOne(address, saved.name)
-      toast.success(saved.name ? `You'll show up as ${saved.name}` : "Name cleared")
+      toast.success(saved.name ? t("profile.showUpAs", { name: saved.name }) : t("profile.nameCleared"))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't save")
     } finally {
@@ -129,7 +131,7 @@ export function ProfileSheet({
     try {
       await setPolicy(luna)
       setSavedLuna(luna)
-      toast.success(parsed === 0 ? "Anyone can reach you now" : `Knocks now cost ${parsed} NIM`)
+      toast.success(parsed === 0 ? t("profile.nowFree") : t("profile.nowCosts", { amount: parsed }))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't save")
     } finally {
@@ -141,14 +143,14 @@ export function ProfileSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Your profile</SheetTitle>
+          <SheetTitle>{t("profile.title")}</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-7 pb-8">
           <section className="flex items-center gap-3.5">
             <AddressAvatar address={address} size="lg" />
             <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground text-[11px]">Your address</p>
+              <p className="text-muted-foreground text-[11px]">{t("profile.yourAddress")}</p>
               <p className="select-value font-mono text-[13px] leading-relaxed font-semibold wrap-anywhere">
                 {formatAddress(address)}
               </p>
@@ -156,7 +158,7 @@ export function ProfileSheet({
                 <Button
                   variant="secondary"
                   size="icon"
-                  aria-label="Copy your address"
+                  aria-label={t("profile.copyAddress")}
                   onClick={() => onCopy(formatAddress(address))}
                   className="size-9 rounded-lg"
                 >
@@ -166,7 +168,7 @@ export function ProfileSheet({
                 <Button
                   variant="secondary"
                   size="icon"
-                  aria-label="Your invite link"
+                  aria-label={t("profile.inviteLink")}
                   onClick={() => setCodeOpen(true)}
                   className="size-9 rounded-lg"
                 >
@@ -177,11 +179,9 @@ export function ProfileSheet({
           </section>
 
           <section>
-            <h3 className="text-sm font-semibold">Your name</h3>
+            <h3 className="text-sm font-semibold">{t("profile.yourName")}</h3>
             <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
-              Shown next to your address to anyone who looks you up. Anyone can pick any
-              name, so it is a label rather than proof — your address is what identifies
-              you.
+              {t("profile.yourNameNote")}
             </p>
 
             <div className="mt-3 flex gap-2">
@@ -190,8 +190,8 @@ export function ProfileSheet({
                   value={loading ? "" : name}
                   disabled={loading || savingName}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Unnamed"
-                  aria-label="Your name"
+                  placeholder={t("profile.unnamed")}
+                  aria-label={t("profile.nameLabel")}
                   aria-invalid={nameTooLong}
                   className={cn(
                     "bg-muted w-full rounded-2xl py-3 pr-14 pl-4 font-medium outline-none",
@@ -225,10 +225,9 @@ export function ProfileSheet({
           </section>
 
           <section>
-            <h3 className="text-sm font-semibold">Cost to knock</h3>
+            <h3 className="text-sm font-semibold">{t("profile.costTitle")}</h3>
             <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
-              What someone new pays to reach you. You keep it whether or not you answer.
-              People you've let in never pay again.
+              {t("profile.costNote")}
             </p>
 
             <div className="mt-3 flex gap-2">
@@ -238,7 +237,7 @@ export function ProfileSheet({
                   inputMode="decimal"
                   disabled={loading || saving}
                   onChange={(event) => setNim(event.target.value.replace(/[^\d.]/g, ""))}
-                  aria-label="Cost to knock, in NIM"
+                  aria-label={t("profile.costLabel")}
                   aria-invalid={!valid && nim.trim() !== ""}
                   className={cn(
                     "bg-muted w-full rounded-2xl py-3 pr-14 pl-4 font-semibold tabular-nums outline-none",
@@ -262,7 +261,7 @@ export function ProfileSheet({
 
             {overMax && (
               <p className="text-destructive mt-2 px-1 text-[12px] leading-snug">
-                {MAX_AMOUNT_NIM.toLocaleString()} NIM is the most that can be asked.
+                {t("profile.costMax", { max: MAX_AMOUNT_NIM.toLocaleString() })}
               </p>
             )}
 
@@ -279,7 +278,7 @@ export function ProfileSheet({
                     valid && parsed === preset && "border-primary text-primary",
                   )}
                 >
-                  {preset === 0 ? "Free" : `${preset} NIM`}
+                  {preset === 0 ? t("profile.free") : `${preset} NIM`}
                 </button>
               ))}
             </div>
@@ -288,7 +287,7 @@ export function ProfileSheet({
               // Worded as what free means rather than what is in force, because
               // this shows both before Save and after it.
               <p className="text-warning mt-2.5 text-[12px] leading-snug">
-                Free means anyone can reach you without paying.
+                {t("profile.freeNote")}
               </p>
             )}
           </section>
@@ -303,7 +302,7 @@ export function ProfileSheet({
               className="text-muted-foreground h-11 w-full rounded-2xl"
             >
               <LogOut className="size-4" />
-              Sign out
+              {t("profile.signOut")}
             </Button>
           </section>
 
@@ -320,10 +319,10 @@ export function ProfileSheet({
                 <Loader2 className="size-4 animate-spin" />
               )}
               {relayStatus === "offline"
-                ? "Relay unreachable"
+                ? t("profile.relayOffline")
                 : relayStatus === "online"
-                  ? "Relay connected"
-                  : "Checking relay"}
+                  ? t("profile.relayOnline")
+                  : t("profile.relayChecking")}
             </span>
             <span className="bg-border h-3.5 w-px" />
             {/* The app's own name, not the host's — inside Nimiq Pay the host
@@ -335,7 +334,7 @@ export function ProfileSheet({
                 a warning. */}
             <span className="font-semibold">
               Knock
-              {mode === "dev" && <span className="text-warning"> · dev identity</span>}
+              {mode === "dev" && <span className="text-warning">{t("profile.devIdentity")}</span>}
             </span>
 
             {/* At the far end of the line the app already ends on. Settings are
@@ -346,7 +345,7 @@ export function ProfileSheet({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Settings"
+              aria-label={t("profile.settings")}
               onClick={() => setSettingsOpen(true)}
               className="-my-2 ml-auto shrink-0 rounded-full"
             >
@@ -362,15 +361,14 @@ export function ProfileSheet({
       <Dialog open={leaving} onOpenChange={(next) => !next && setLeaving(false)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
           <DialogHeader className="items-center">
-            <DialogTitle>Sign out?</DialogTitle>
+            <DialogTitle>{t("profile.signOutTitle")}</DialogTitle>
             <DialogDescription className="text-balance">
-              Your chats, contacts and the names you gave them stay on this device. You can
-              sign back in any time — your wallet is all it takes.
+              {t("profile.signOutBody")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setLeaving(false)}>
-              Cancel
+              {t("profile.cancel")}
             </Button>
             <Button
               className="h-11 rounded-2xl"
@@ -379,7 +377,7 @@ export function ProfileSheet({
                 onSignOut()
               }}
             >
-              Sign out
+              {t("profile.signOut")}
             </Button>
           </DialogFooter>
         </DialogContent>

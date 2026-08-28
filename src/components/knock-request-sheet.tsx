@@ -1,4 +1,5 @@
 import { Loader2, LockKeyhole } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ export function KnockRequestSheet({
   onAccept: () => void
   onDecline: () => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const name = knock ? nameIn(names, knock.from) : null
 
@@ -90,7 +92,7 @@ export function KnockRequestSheet({
                 className="h-13 w-full rounded-2xl text-base"
               >
                 {busy && <Loader2 className="animate-spin" />}
-                Let them in
+                {t("knocks.admit")}
               </Button>
               {/* Outlined rather than ghost. A muted borderless label sitting
                   directly above a muted line of explanation is two pieces of
@@ -104,7 +106,7 @@ export function KnockRequestSheet({
                 Decline
               </Button>
               <p className="text-muted-foreground px-1 pt-2 text-center text-[12px] leading-snug">
-                Letting them in opens the channel both ways, and messages are free from
+                {t("knocks.admitNote")}
                 then on. Declining leaves the door shut.
               </p>
             </section>

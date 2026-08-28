@@ -1,4 +1,5 @@
 import { Copy, MessageSquare, UserMinus } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ export function MemberSheet({
   /** Absent where removing is not on offer — a room you do not own. */
   onRemove?: (address: string) => void
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const called = address ? nameIn(names, address) : null
 
@@ -66,7 +68,7 @@ export function MemberSheet({
           {/* What they are here, said once. A room has one owner and everybody
               else, so the title carries it rather than a line underneath
               repeating what the title could have said. */}
-          <SheetTitle>{isOwner ? "Owner" : "Member"}</SheetTitle>
+          <SheetTitle>{t(isOwner ? "member.owner" : "member.member")}</SheetTitle>
         </SheetHeader>
 
         {address && (
@@ -79,7 +81,7 @@ export function MemberSheet({
             <section className="flex items-center gap-3.5">
               <AddressAvatar address={address} size="lg" />
               <div className="min-w-0 flex-1">
-                <p className="text-muted-foreground text-[11px]">Address</p>
+                <p className="text-muted-foreground text-[11px]">{t("member.address")}</p>
                 <p className="select-value font-mono text-[13px] leading-relaxed font-semibold wrap-anywhere">
                   {formatAddress(address)}
                 </p>
@@ -90,7 +92,7 @@ export function MemberSheet({
                   className="mt-2 h-8 rounded-lg"
                 >
                   <Copy className="size-3.5" />
-                  Copy
+                  {t("member.copy")}
                 </Button>
               </div>
             </section>
@@ -100,11 +102,11 @@ export function MemberSheet({
                   has a second one to tell it apart from — the private one you
                   give somebody you have a channel with. Here there is only the
                   one they publish. */}
-              <h3 className="text-sm font-semibold">Name</h3>
+              <h3 className="text-sm font-semibold">{t("member.name")}</h3>
               {called ? (
                 <p className="text-muted-foreground mt-1.5 text-[15px] font-semibold">{called}</p>
               ) : (
-                <p className="text-muted-foreground mt-1.5 text-[15px]">Not set</p>
+                <p className="text-muted-foreground mt-1.5 text-[15px]">{t("member.notSet")}</p>
               )}
             </section>
 
@@ -122,7 +124,7 @@ export function MemberSheet({
                     <span className="min-w-0">
                       <span className="block text-[15px] font-semibold">Open chat</span>
                       <span className="text-muted-foreground block text-[13px] leading-snug">
-                        Write to them privately.
+                        {t("member.writeNote")}
                       </span>
                     </span>
                   </button>
@@ -139,10 +141,10 @@ export function MemberSheet({
                     </span>
                     <span className="min-w-0">
                       <span className="text-destructive block text-[15px] font-semibold">
-                        Remove from group
+                        {t("member.remove")}
                       </span>
                       <span className="text-muted-foreground block text-[13px] leading-snug">
-                        They stop getting new messages.
+                        {t("member.removeNote")}
                       </span>
                     </span>
                   </button>

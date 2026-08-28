@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Button } from "@/components/ui/button"
@@ -36,6 +37,7 @@ export function SendNimSheet({
   /** Raises the wallet, then posts the payment into the thread. */
   onSend: (luna: number) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const names = useNames()
   const [value, setValue] = useState("")
   const [sending, setSending] = useState(false)
@@ -60,7 +62,7 @@ export function SendNimSheet({
       await onSend(luna)
       onOpenChange(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The payment didn't go through")
+      setError(e instanceof Error ? e.message : t("sendNim.failed"))
     } finally {
       setSending(false)
     }
@@ -70,10 +72,9 @@ export function SendNimSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Send NIM</SheetTitle>
+          <SheetTitle>{t("sendNim.title")}</SheetTitle>
           <SheetDescription>
-            Straight from your wallet to theirs. It leaves a note in this chat, and it
-            cannot be undone.
+            {t("sendNim.note")}
           </SheetDescription>
         </SheetHeader>
 
@@ -97,7 +98,7 @@ export function SendNimSheet({
               inputMode="decimal"
               disabled={sending}
               placeholder="0"
-              aria-label="Amount in NIM"
+              aria-label={t("sendNim.amountLabel")}
               aria-invalid={typed && luna === null}
               onChange={(event) => setValue(event.target.value.replace(/[^\d.]/g, ""))}
               className={cn(
@@ -114,7 +115,7 @@ export function SendNimSheet({
 
           {typed && luna === null && (
             <p className="text-destructive px-1 text-[13px]">
-              Enter an amount above zero, with at most {NIM_DECIMALS} decimal places.
+              {t("sendNim.invalid", { decimals: NIM_DECIMALS })}
             </p>
           )}
 
@@ -130,7 +131,7 @@ export function SendNimSheet({
           </Button>
 
           <p className="text-muted-foreground px-1 text-center text-[12px] leading-snug">
-            Your wallet will ask you to confirm. The network fee is on top of the amount.
+            {t("sendNim.confirmNote")}
           </p>
         </div>
       </SheetContent>

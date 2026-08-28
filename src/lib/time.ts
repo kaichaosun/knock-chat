@@ -1,5 +1,7 @@
 /** Short, human timestamps for lists and bubbles. */
 
+import { t } from "i18next"
+
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
@@ -10,7 +12,7 @@ export function relativeTime(iso: string, now = Date.now()): string {
   if (Number.isNaN(then)) return ""
 
   const elapsed = now - then
-  if (elapsed < MINUTE) return "now"
+  if (elapsed < MINUTE) return t("time.now")
   if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m`
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`
   if (elapsed < 7 * DAY) {
@@ -57,8 +59,8 @@ export function dayLabel(iso: string, now = Date.now()): string {
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
   const days = Math.round((startOfDay(new Date(now)) - startOfDay(then)) / DAY)
 
-  if (days === 0) return "Today"
-  if (days === 1) return "Yesterday"
+  if (days === 0) return t("time.today")
+  if (days === 1) return t("time.yesterday")
   return then.toLocaleDateString(undefined, {
     day: "numeric",
     month: "long",

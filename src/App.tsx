@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { Link as LinkIcon, PenLine, Plus, ScanLine, Users } from "lucide-react"
 
@@ -86,6 +87,7 @@ export default function App() {
 const REACH_BACKOFF_MS = [10_000, 20_000, 40_000, 80_000]
 
 function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
+  const { t } = useTranslation()
   const revealProbes = useSecretTap(onRevealProbes)
   const { state, retry } = useWallet()
   const wallet = state.status === "connected" ? state.wallet : null
@@ -123,7 +125,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const onKnockRedeemed = useCallback(
     (receipt: Receipt, sent: { id: string }) => {
       recordOutgoing(receipt.peer, receipt.body, `knock:${sent.id}`)
-      toast.success("Your payment confirmed — the knock is on its way.")
+      toast.success(t("app.paymentConfirmed"))
     },
     [recordOutgoing],
   )
@@ -362,7 +364,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         })
         .catch(() => {
           setInviteOpen(false)
-          toast.error("That group link doesn't lead anywhere.")
+          toast.error(t("app.badGroupLink"))
         })
         .finally(() => setInviteLoading(false))
     },
@@ -403,7 +405,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
     const code = readCode(asked)
     if (code) openCode(code)
-    else toast.error("That link doesn't lead anywhere.")
+    else toast.error(t("app.badLink"))
   }, [owner, openCode])
 
   // How the open thread stands with its peer. A channel can be closed from the
@@ -492,7 +494,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     // instead of reporting a failure the user can do nothing about.
     const ok = await copyText(text)
     toast[ok ? "success" : "info"](
-      ok ? "Address copied" : "Couldn't reach the clipboard — long-press the address to select it",
+      ok ? t("app.addressCopied") : t("app.copyFailed"),
     )
   }, [])
 
@@ -507,17 +509,17 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         // knocking instead of offering a retry that cannot work.
         if (error instanceof RelayError && error.status === 402) {
           await refreshReach()
-          toast.error("They closed this chat. Send again to knock and reopen it.")
+          toast.error(t("app.chatClosed"))
           return
         }
         // Someone who has never opened Knock has published no key, so there is
         // nothing to encrypt to. Say that plainly instead of "failed to send".
         toast.error(
           error instanceof NoKeyError
-            ? "They haven't joined Knock yet — nothing to encrypt to."
+            ? t("app.notJoined")
             : error instanceof Error
               ? error.message
-              : "Message failed to send",
+              : t("app.sendFailed"),
         )
       }
     },
@@ -536,16 +538,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const onPay = useCallback(
     async (peer: string, luna: number) => {
       if (!wallet?.provider) {
-        throw new Error("Sending NIM needs Nimiq Pay. Open the app there to continue.")
+        throw new Error(t("app.needsPayForNim"))
       }
       const reference = await sendNim(wallet.provider, peer, luna)
       try {
         await send(peer, encodePayload(payment(luna, reference)))
       } catch {
-        toast.info(`Sent ${formatNim(luna)} NIM, but the note didn't reach this chat.`)
+        toast.info(t("app.sentButNoNote", { amount: formatNim(luna) }))
         return
       }
-      toast.success(`Sent ${formatNim(luna)} NIM`)
+      toast.success(t("app.sentNim", { amount: formatNim(luna) }))
     },
     [wallet, send],
   )
@@ -564,9 +566,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       if (!room) return
       try {
         await send(peer, encodePayload(invite(room.id, room.name)))
-        toast.success(`Invite sent — it's in your chat with them.`)
+        toast.success(t("app.inviteSent"))
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Couldn't send that invite")
+        toast.error(error instanceof Error ? error.message : t("app.inviteFailed"))
       }
     },
     [groups, openGroup, send],
@@ -612,7 +614,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       try {
         await say(group, card)
       } catch {
-        toast.error("Gift made, but the card didn't reach the room. Nobody can take a share yet.")
+        toast.error(t("app.giftNoCard"))
       }
     },
     [say, recordOutgoing],
@@ -634,7 +636,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         for (const receipt of outstandingGifts(owner)) {
           try {
             await placeGift(owner, receipt.group, receipt)
-            toast.success("Your gift went through — it's in the room now.")
+            toast.success(t("app.giftPlaced"))
           } catch {
             // Still not redeemable. Kept for next time.
           }
@@ -669,7 +671,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     }) => {
       if (!owner || !openGroup || !giftTerms) throw new Error("gifts aren't available here")
       if (!wallet?.provider) {
-        throw new Error("Leaving a gift needs Nimiq Pay. Open the app there to continue.")
+        throw new Error(t("app.needsPayForGift"))
       }
 
       const nonce = newNonce()
@@ -703,7 +705,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         // would take the money twice for one gift — the receipt above is what
         // finishes this one instead.
         throw new AlreadyPaidError(
-          reason(error, "The relay didn't take it, but your NIM is safe."),
+          reason(error, t("app.giftNotTaken")),
         )
       }
 
@@ -722,7 +724,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       try {
         await retrySend(message)
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Still couldn't send")
+        toast.error(error instanceof Error ? error.message : t("app.stillFailed"))
       }
     },
     [retrySend],
@@ -743,7 +745,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       try {
         await say(openGroup, body)
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Couldn't send that")
+        toast.error(error instanceof Error ? error.message : t("app.sendThatFailed"))
       }
     },
     [openGroup, owner, say, recordOutgoing],
@@ -786,7 +788,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         // The open thread's banner is driven by this, so it has to be re-asked
         // or the composer stays shut with no sign the knock went out.
         await refreshReach()
-        toast.success("Knocked. They'll see it next time they open Knock.")
+        toast.success(t("app.knocked"))
       }}
       onOpenThread={openThread}
       suggestions={
@@ -802,18 +804,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     <AttachMenu
       open={composing}
       onOpenChange={setComposing}
-      title="New chat"
+      title={t("app.newChat")}
       actions={[
         {
           icon: ScanLine,
-          label: "Scan a code",
-          description: "Someone's invite link, or a group's.",
+          label: t("app.scanCode"),
+          description: t("app.scanCodeNote"),
           onSelect: () => setScanning(true),
         },
         {
           icon: PenLine,
-          label: "Direct message",
-          description: "Knock on someone's door with their address.",
+          label: t("app.directMessage"),
+          description: t("app.directMessageNote"),
           onSelect: () => {
             setKnockPeer(null)
             setKnocking(true)
@@ -821,16 +823,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         },
         {
           icon: Users,
-          label: "New group",
-          description: "A room you own and invite people to.",
+          label: t("app.newGroup"),
+          description: t("app.newGroupNote"),
           onSelect: () => setCreatingGroup(true),
         },
         {
           // The Groups tab offers this too, but only while the tab is empty —
           // once you are in one room, the way into a second one disappeared.
           icon: LinkIcon,
-          label: "Join a group",
-          description: "Open a link or id somebody sent you.",
+          label: t("app.joinGroup"),
+          description: t("app.joinGroupNote"),
           onSelect: () => setPasting(true),
         },
       ]}
@@ -842,18 +844,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     <AttachMenu
       open={addingGroup}
       onOpenChange={setAddingGroup}
-      title="Add a new group"
+      title={t("app.addGroup")}
       actions={[
         {
           icon: Users,
-          label: "New group",
-          description: "A room you own and invite people to.",
+          label: t("app.newGroup"),
+          description: t("app.newGroupNote"),
           onSelect: () => setCreatingGroup(true),
         },
         {
           icon: LinkIcon,
-          label: "Join a group",
-          description: "Open a link or id somebody sent you.",
+          label: t("app.joinGroup"),
+          description: t("app.joinGroupNote"),
           onSelect: () => setPasting(true),
         },
       ]}
@@ -868,7 +870,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onCreate={async (input) => {
           const group = await create(input)
           setOpenGroup(group.id)
-          toast.success("Group created. Share the link to let people in.")
+          toast.success(t("app.groupCreated"))
           return group
         }}
       />
@@ -884,9 +886,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           const result = await join(group)
           if (result.status === "joined") {
             setOpenGroup(group.id)
-            toast.success(`You're in ${group.name}`)
+            toast.success(t("app.youreIn", { name: group.name }))
           } else {
-            toast.success("Asked to join. The owner will answer.")
+            toast.success(t("app.askedToJoin"))
           }
         }}
       />
@@ -924,7 +926,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             deleteThread(thread)
             forgetRoom(thread)
             unpin(thread)
-            toast.success("Chat deleted.")
+            toast.success(t("app.chatDeleted"))
           }}
           onSay={onSay}
           onRefreshDetail={() => {
@@ -988,18 +990,18 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const add =
     tab === "chats"
       ? compose === "header"
-        ? { label: "New chat or group", onSelect: () => setComposing(true) }
+        ? { label: t("app.newChatOrGroup"), onSelect: () => setComposing(true) }
         : null
       : tab === "contacts"
       ? {
-          label: "New message",
+          label: t("app.newMessage"),
           onSelect: () => {
             setKnockPeer(null)
             setKnocking(true)
           },
         }
       : tab === "groups"
-        ? { label: "Add a new group", onSelect: () => setAddingGroup(true) }
+        ? { label: t("app.addGroup"), onSelect: () => setAddingGroup(true) }
         : null
 
   return (
@@ -1029,7 +1031,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               onClick={revealProbes}
               className="text-[22px] font-extrabold tracking-[-0.02em] select-none"
             >
-              {tab === "chats" ? "Chats" : tab === "contacts" ? "Contacts" : "Groups"}
+              {t(tab === "chats" ? "tabs.chats" : tab === "contacts" ? "tabs.contacts" : "tabs.groups")}
             </h1>
             {add && (
               // The tap target is the button; what you see is the disc inside
@@ -1063,7 +1065,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             variant="ghost"
             size="icon"
             onClick={() => setProfileOpen(true)}
-            aria-label="Your profile"
+            aria-label={t("app.yourProfile")}
             className="size-11 shrink-0 rounded-full"
           >
             <AddressAvatar address={address} size="sm" className="size-9" />
@@ -1100,7 +1102,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
                 // find it within the minute; opening the door yourself is the
                 // one case where there is no reason to wait for that.
                 void refreshContacts()
-                toast.success("You're connected. Messages are free from here.")
+                toast.success(t("app.connected"))
               }}
               onDecline={decline}
             />
@@ -1125,8 +1127,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
                 // anything — which is why the durable thing has its own tab.
                 toast.success(
                   groups.some((group) => group.id === thread)
-                    ? "Chat deleted. You're still in the group."
-                    : "Chat deleted. They're still in Contacts.",
+                    ? t("app.chatDeletedInGroup")
+                    : t("app.chatDeletedInContacts"),
                 )
               }}
             />
