@@ -1,4 +1,5 @@
 import { MessageSquare, UserRound } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { cn } from "@/lib/utils"
 
@@ -38,13 +39,14 @@ export function TabBar({
   /** People waiting at the doors of rooms you own, all told. */
   waiting: number
 }) {
+  const { t } = useTranslation()
   const tabs = [
-    { id: "chats" as const, label: "Chats", icon: MessageSquare, badge: unread },
-    { id: "contacts" as const, label: "Contacts", icon: UserRound, badge: 0 },
+    { id: "chats" as const, label: t("tabs.chats"), icon: MessageSquare, badge: unread },
+    { id: "contacts" as const, label: t("tabs.contacts"), icon: UserRound, badge: 0 },
     // Rooms, not people — a different glyph so the two are told apart at the
     // size a tab bar gives them. Its badge is people at a door rather than
     // things unread: somebody is waiting on an answer only you can give.
-    { id: "groups" as const, label: "Groups", icon: Huddle, badge: waiting },
+    { id: "groups" as const, label: t("tabs.groups"), icon: Huddle, badge: waiting },
   ]
 
   return (

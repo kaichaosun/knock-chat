@@ -11,6 +11,8 @@
  * older than this one may have written a preference this one has dropped.
  */
 
+import { isLanguage, type LanguageChoice } from "@/i18n"
+
 const STORAGE_KEY = "knock.prefs"
 
 /**
@@ -24,9 +26,15 @@ export type ComposeSpot = "floating" | "header"
 
 export type Prefs = {
   compose: ComposeSpot
+  /**
+   * Which language to speak, or `host` to take the answer from Nimiq Pay and
+   * the device. A device preference rather than a profile one for the same
+   * reason as the rest of this file: it is about this screen, not about you.
+   */
+  language: LanguageChoice
 }
 
-const DEFAULTS: Prefs = { compose: "floating" }
+const DEFAULTS: Prefs = { compose: "floating", language: "host" }
 
 let prefs: Prefs = DEFAULTS
 const listeners = new Set<() => void>()
@@ -39,6 +47,7 @@ function read(): Prefs {
     const stored = parsed as Record<string, unknown>
     return {
       compose: stored.compose === "header" ? "header" : DEFAULTS.compose,
+      language: isLanguage(stored.language) ? stored.language : DEFAULTS.language,
     }
   } catch {
     // Private mode, no storage, or something that is not JSON.

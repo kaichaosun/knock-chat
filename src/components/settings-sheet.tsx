@@ -1,10 +1,13 @@
 import { useState } from "react"
 import { ChevronRight, CirclePlus, Moon, PanelTop, Smartphone, Sun } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { BrandMark } from "@/components/brand-mark"
+import { LanguageSheet } from "@/components/language-sheet"
 import { LegalSheet } from "@/components/legal-sheet"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { usePrefs } from "@/hooks/use-prefs"
+import { LANGUAGE_NAMES } from "@/i18n"
 import { useTheme } from "@/hooks/use-theme"
 import { PRIVACY, TERMS, type LegalDoc } from "@/lib/legal"
 import { update, type ComposeSpot } from "@/lib/prefs"
@@ -48,16 +51,18 @@ export function SettingsSheet({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const { t } = useTranslation()
   const { theme, palette } = useTheme()
-  const { compose } = usePrefs()
+  const { compose, language } = usePrefs()
   /** Whichever document is being read, if either. */
   const [reading, setReading] = useState<LegalDoc | null>(null)
+  const [picking, setPicking] = useState(false)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
-          <SheetTitle>Settings</SheetTitle>
+          <SheetTitle>{t("settings.title")}</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-7 pb-8">
@@ -105,6 +110,23 @@ export function SettingsSheet({
                 Your phone is set to {palette} right now.
               </p>
             )}
+          </section>
+
+          <section>
+            {/* One line, because there are only two things to say: what it is,
+                and what it is set to. A heading with a row under it would spend
+                three lines saying them. */}
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              className="active:bg-muted -mx-3 flex w-[calc(100%+1.5rem)] items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors"
+            >
+              <span className="text-sm font-semibold">{t("settings.language.title")}</span>
+              <span className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
+                {language === "host" ? t("settings.language.host") : LANGUAGE_NAMES[language]}
+                <ChevronRight className="size-4 shrink-0" />
+              </span>
+            </button>
           </section>
 
           <section>
@@ -176,6 +198,8 @@ export function SettingsSheet({
           </section>
         </div>
       </SheetContent>
+
+      <LanguageSheet open={picking} onOpenChange={setPicking} />
 
       <LegalSheet
         doc={reading}

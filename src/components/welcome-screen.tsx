@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Trans, useTranslation } from "react-i18next"
 import { ArrowUpRight, KeyRound, Loader2, RefreshCw, ShieldCheck, Zap } from "lucide-react"
 
 import { BrandMark } from "@/components/brand-mark"
@@ -27,17 +28,9 @@ export type WelcomeStatus =
   | "error"
 
 const POINTS = [
-  {
-    icon: Zap,
-    title: "No sign-up",
-    body: "Your Nimiq address is your account. Nothing to create, nothing to remember.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Spam costs money",
-    body: "Strangers attach a small amount of NIM to reach you. Contacts never pay.",
-  },
-]
+  { icon: Zap, key: "noSignup" },
+  { icon: ShieldCheck, key: "spamCosts" },
+] as const
 
 export function WelcomeScreen({
   status,
@@ -50,6 +43,7 @@ export function WelcomeScreen({
   onSignIn: () => void
   onRetry: () => void
 }) {
+  const { t } = useTranslation()
   /** Whichever document is being read, if either. */
   const [reading, setReading] = useState<LegalDoc | null>(null)
 
@@ -77,18 +71,20 @@ export function WelcomeScreen({
 
         <h1 className="mt-7 text-3xl font-extrabold tracking-tight">Knock</h1>
         <p className="text-muted-foreground mt-2 max-w-xs text-balance">
-          Messages between Nimiq wallets, with spam priced out instead of guessed at.
+          {t("welcome.tagline")}
         </p>
 
         <div className="mt-10 w-full max-w-sm space-y-3 text-left">
-          {POINTS.map(({ icon: Icon, title, body }) => (
-            <div key={title} className="bg-card flex gap-3.5 rounded-2xl border p-4 shadow-sm">
+          {POINTS.map(({ icon: Icon, key }) => (
+            <div key={key} className="bg-card flex gap-3.5 rounded-2xl border p-4 shadow-sm">
               <div className="bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-xl">
                 <Icon className="size-4.5" />
               </div>
               <div className="space-y-0.5">
-                <p className="text-sm font-semibold">{title}</p>
-                <p className="text-muted-foreground text-[13px] leading-snug">{body}</p>
+                <p className="text-sm font-semibold">{t(`welcome.points.${key}.title`)}</p>
+                <p className="text-muted-foreground text-[13px] leading-snug">
+                  {t(`welcome.points.${key}.body`)}
+                </p>
               </div>
             </div>
           ))}
@@ -115,7 +111,7 @@ export function WelcomeScreen({
               className="h-13 w-full rounded-2xl text-base"
               onClick={() => window.location.assign(nimiqPayDeeplink())}
             >
-              Open in Nimiq Pay
+              {t("welcome.openInPay")}
               <ArrowUpRight />
             </Button>
             {/* Only where it could work. Outside Nimiq Pay there is no provider
@@ -124,7 +120,7 @@ export function WelcomeScreen({
             {insideNimiqPay() && (
               <Button size="lg" variant="ghost" className="h-11 w-full rounded-2xl" onClick={onRetry}>
                 <RefreshCw />
-                Try again
+                {t("welcome.tryAgain")}
               </Button>
             )}
           </>
@@ -145,11 +141,13 @@ export function WelcomeScreen({
               className="h-13 w-full rounded-2xl text-base"
             >
               {status === "detecting" ? <Loader2 className="animate-spin" /> : <KeyRound />}
-              {label(status)}
+              {/* "resuming" never reaches here — it returns its own screen above
+                  — so the spinner's condition is the whole of it. */}
+              {t(status === "detecting" ? "welcome.looking" : "welcome.signIn")}
             </Button>
             <p className="text-muted-foreground flex items-center justify-center gap-1.5 text-[12px]">
               <ShieldCheck className="size-3.5" />
-              One signature. Nothing is spent.
+              {t("welcome.oneSignature")}
             </p>
 
             {/* Where the agreement is made, so it is on the screen the
@@ -157,23 +155,28 @@ export function WelcomeScreen({
                 nobody passed. Both open here rather than in a browser: a Mini
                 App has none to send anybody to. */}
             <p className="text-muted-foreground px-2 text-center text-[12px] leading-snug text-balance">
-              By signing in you agree to our{" "}
-              <button
-                type="button"
-                onClick={() => setReading(TERMS)}
-                className="text-foreground font-semibold underline underline-offset-2"
-              >
-                Terms of Service
-              </button>{" "}
-              and{" "}
-              <button
-                type="button"
-                onClick={() => setReading(PRIVACY)}
-                className="text-foreground font-semibold underline underline-offset-2"
-              >
-                Privacy Policy
-              </button>
-              .
+              {/* One sentence with two buttons inside it. Split into three
+                  strings it could not be reordered, and word order is the first
+                  thing a translation changes. */}
+              <Trans
+                i18nKey="welcome.agree"
+                components={{
+                  terms: (
+                    <button
+                      type="button"
+                      onClick={() => setReading(TERMS)}
+                      className="text-foreground font-semibold underline underline-offset-2"
+                    />
+                  ),
+                  privacy: (
+                    <button
+                      type="button"
+                      onClick={() => setReading(PRIVACY)}
+                      className="text-foreground font-semibold underline underline-offset-2"
+                    />
+                  ),
+                }}
+              />
             </p>
           </>
         )}
@@ -188,12 +191,3 @@ export function WelcomeScreen({
   )
 }
 
-function label(status: WelcomeStatus): string {
-  switch (status) {
-    case "detecting":
-    case "resuming":
-      return "Looking for your wallet"
-    default:
-      return "Sign in with your wallet"
-  }
-}
