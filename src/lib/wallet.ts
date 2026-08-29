@@ -21,6 +21,7 @@ import { init, getHostLanguage, type NimiqProvider } from "@nimiq/mini-app-sdk"
 import type HubApi from "@nimiq/hub-api"
 
 import { addressFromPublicKey } from "./address"
+import { unwrapTransaction } from "./payments"
 import { signedMessageDigest } from "./signed-message"
 
 /** How long to wait for Nimiq Pay to inject the provider before giving up. */
@@ -103,6 +104,27 @@ export type SignedMessage = { publicKey: string; signature: string }
  */
 export type Signer = (message: string | Promise<string>) => Promise<SignedMessage>
 
+/** One payment on chain. `data` is the postage commitment, where there is one. */
+export type Payment = { recipient: string; luna: number; data?: string }
+
+/**
+ * Pays, and answers with the transaction's hash.
+ *
+ * A hash rather than the transaction, because the hash is the whole of what
+ * anyone here does with it: the relay looks the payment up by it and checks the
+ * amount, the recipient and the data for itself.
+ *
+ * Takes a promise for the same reason [`Signer`] does — the Hub pays in a
+ * popup, and a popup only opens while the click is still in hand. It has a
+ * second use here, though, and it is the more important one: what the payment
+ * waits on is whatever must be true before money moves. Nimiq Pay raises no
+ * dialog until the promise settles, so a check that fails costs nothing and
+ * shows nothing; the Hub's window is already open by then and closes again
+ * with nothing done. Either way the order that matters — decide first, spend
+ * second — is the one the promise states.
+ */
+export type Payer = (payment: Payment | Promise<Payment>) => Promise<string>
+
 /**
  * A wallet is only a signer here.
  *
@@ -117,6 +139,14 @@ export type Wallet = {
   provider: NimiqProvider | null
   /** Signs a relay challenge. Prompts the user inside Nimiq Pay. */
   sign: Signer
+  /**
+   * Spends, where this wallet can. Null for a development identity, which has
+   * keys the relay believes but no coins anywhere to move.
+   *
+   * Every caller checks it before it counts on being able to pay, because
+   * "cannot pay" is a thing to say plainly rather than a failure to hit.
+   */
+  pay: Payer | null
   /**
    * Which stored session belongs to this wallet. One per dev identity so two
    * browser tabs can hold separate sessions against the same origin.
@@ -161,6 +191,56 @@ function hubSigner(hub: HubApi): Signer {
       Promise.resolve(message).then((text) => ({ appName: HUB_APP_NAME, message: text })),
     )
     return { publicKey: toHex(signed.signerPublicKey), signature: toHex(signed.signature) }
+  }
+}
+
+/**
+ * Pays through Nimiq Pay.
+ *
+ * Awaits the payment before raising anything, so the wallet's sheet still
+ * appears only once whatever the payment was waiting on has succeeded — which
+ * is exactly when it appeared before there was a promise to wait on.
+ *
+ * Two methods rather than one because the SDK has two, and passing empty data
+ * is not the same transaction as passing none.
+ */
+function providerPayer(provider: NimiqProvider): Payer {
+  return async (payment) => {
+    const { recipient, luna, data } = await payment
+    return unwrapTransaction(
+      data === undefined
+        ? await provider.sendBasicTransaction({ recipient, value: luna })
+        : await provider.sendBasicTransactionWithData({ recipient, value: luna, data }),
+    )
+  }
+}
+
+/**
+ * Pays through the Hub, in a popup.
+ *
+ * `checkout` both broadcasts the transaction and hands it back, which is what
+ * makes it the counterpart of `sendBasicTransactionWithData` rather than of
+ * `signTransaction` — the relay looks the payment up on chain, so one that was
+ * only signed would never be found.
+ *
+ * Called before this awaits anything, so the window opens on the click; see
+ * [`Payer`].
+ */
+function hubPayer(hub: HubApi): Payer {
+  return async (payment) => {
+    const signed = await hub.checkout(
+      Promise.resolve(payment).then(({ recipient, luna, data }) => ({
+        appName: HUB_APP_NAME,
+        recipient,
+        value: luna,
+        // Bytes, not the string. The relay hex-decodes what is on chain and
+        // compares it to the commitment as text, so what has to match is the
+        // exact UTF-8 — and encoding it here leaves nothing to be interpreted
+        // by anyone in between.
+        ...(data === undefined ? {} : { extraData: new TextEncoder().encode(data) }),
+      })),
+    )
+    return signed.hash
   }
 }
 
@@ -209,6 +289,8 @@ export async function connect(): Promise<ConnectResult> {
           mode: "dev",
           provider: null,
           sign: devSigner(asked),
+          // Real keys, and no coins behind them anywhere.
+          pay: null,
           scope: `dev:${asked}`,
           language: language(),
         },
@@ -225,14 +307,17 @@ export async function connect(): Promise<ConnectResult> {
     // Fetched while connecting, long before any click, so the popup below
     // still opens on the tap rather than after an import.
     try {
+      const HubApiClass = (await import("@nimiq/hub-api")).default
+      const hub = new HubApiClass(HUB_ENDPOINT)
       return {
         ok: true,
         wallet: {
           mode: "hub",
-          // No provider, and every payment path already checks for one before
-          // it spends anything. Signing in works; paying does not yet.
+          // No Mini App provider — nothing here speaks that dialect. Paying
+          // goes through the Hub's own checkout instead, below.
           provider: null,
-          sign: hubSigner(new (await import("@nimiq/hub-api")).default(HUB_ENDPOINT)),
+          sign: hubSigner(hub),
+          pay: hubPayer(hub),
           scope: "hub",
           language: language(),
         },
@@ -262,6 +347,7 @@ export async function connect(): Promise<ConnectResult> {
         if ("error" in result) throw new Error(result.error.message)
         return { publicKey: result.publicKey, signature: result.signature }
       },
+      pay: providerPayer(provider),
       scope: "wallet",
       language: language(),
     },

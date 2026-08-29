@@ -7,8 +7,6 @@
  * it is a note about something that already happened.
  */
 
-import type { NimiqProvider } from "@nimiq/mini-app-sdk"
-
 import { LUNA_PER_NIM } from "./relay"
 
 /** Luna are indivisible, so five decimal places is the whole of NIM. */
@@ -43,22 +41,4 @@ export function parseNim(input: string): number | null {
     return null
   }
   return Math.round(luna)
-}
-
-/**
- * Send NIM to an address, returning whatever reference the wallet gives back.
- *
- * No postage commitment and no data: this is an ordinary transfer that happens
- * to have been started from a chat. A knock is the other thing — it carries a
- * commitment because the relay has to tie the payment to a message it has not
- * seen yet, which is not a problem a plain transfer has.
- */
-export async function sendNim(
-  provider: NimiqProvider,
-  recipient: string,
-  luna: number,
-): Promise<string> {
-  return unwrapTransaction(
-    await provider.sendBasicTransaction({ recipient, value: luna }),
-  )
 }

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { encryptBody } from "@/lib/crypto"
 import { keyForPeer } from "@/lib/keys"
 import { remember } from "@/lib/names"
-import { unwrapTransaction } from "@/lib/payments"
 import { commitment, newNonce } from "@/lib/postage"
 import { all, drop, keep, outstanding, postageStep, type Receipt } from "@/lib/receipts"
 import { toHex } from "@/lib/crypto"
@@ -17,7 +16,7 @@ import {
   type Knock,
   type Reachability,
 } from "@/lib/relay"
-import type { Wallet } from "@/lib/wallet"
+import type { Payer, Wallet } from "@/lib/wallet"
 
 /** How often to look for new knocks. Slower than messages; they are rarer. */
 const POLL_INTERVAL_MS = 15_000
@@ -43,6 +42,37 @@ function wait(ms: number): Promise<void> {
  * relay the nonce that redeems the payment. Everything after an accepted knock
  * is free, which is why this is separate from ordinary sending.
  */
+/**
+ * Pay postage, on the condition that `ready` succeeds first.
+ *
+ * Exported for its own test. What it promises — that nothing is spent until
+ * `ready` has succeeded — is the one thing here that costs real money to get
+ * wrong, and it is not observable from outside the hook.
+ *
+ * The nonce is minted here and travels back out with the hash, because the two
+ * are only useful together: the commitment on chain is over this nonce, and
+ * revealing it is what redeems the payment. Mint a second one and the first
+ * payment is unredeemable by anybody, for good.
+ */
+export function startPostage(
+  pay: Payer,
+  ready: Promise<unknown>,
+  owner: string,
+  peer: string,
+  luna: number,
+): Promise<{ txHash: string; nonce: string }> {
+  const nonce = newNonce()
+  const paid = pay(
+    ready.then(() => ({ recipient: peer, luna, data: commitment(owner, nonce) })),
+  )
+  const postage = paid.then((txHash) => ({ txHash, nonce: toHex(nonce) }))
+  // When `ready` is what failed, the caller throws from awaiting it instead and
+  // never awaits this. Observed here so a peer with no key is not also an
+  // unhandled rejection; the `await` further on still sees it.
+  void postage.catch(() => {})
+  return postage
+}
+
 export function useKnocks(
   wallet: Wallet | null,
   owner: string | null,
@@ -169,7 +199,23 @@ export function useKnocks(
       if (!wallet || !owner) throw new Error("not signed in")
 
       const next = postageStep(owner, peer, policyLuna)
-      const key = await keyForPeer(peer, deviceSecretKey)
+
+      // Two things start here, and the order between them is the point.
+      //
+      // The key lookup is a round trip, and postage must not be paid unless it
+      // succeeds — a message that cannot be encrypted is one that cannot be
+      // sent, and paying for it would strand the money. So the payment is
+      // handed the lookup as its condition rather than being written after it:
+      // Nimiq Pay raises no dialog until the lookup lands, exactly as when this
+      // was two statements, and the Hub — which must open its window while the
+      // tap is still in hand — opens one that closes again with nothing done.
+      const keyed = keyForPeer(peer, deviceSecretKey)
+      const postage =
+        next.step === "pay" && wallet.pay
+          ? startPostage(wallet.pay, keyed, owner, peer, policyLuna)
+          : null
+
+      const key = await keyed
       const sealed = encryptBody(body, key, owner, peer)
 
       // Paid for already — on an earlier attempt, or before the app was killed.
@@ -190,18 +236,13 @@ export function useKnocks(
         return sendKnock(peer, sealed, null)
       }
 
-      if (!wallet.provider) {
-        throw new Error("Paying to knock needs Nimiq Pay. Open the app there to continue.")
+      // Nothing to pay with. Only reachable once the two branches above have
+      // returned, so this is the paying step and the wallet is what is missing.
+      if (!postage) {
+        throw new Error("Paying to knock needs a wallet that can spend.")
       }
 
-      const nonce = newNonce()
-      const txHash = unwrapTransaction(
-        await wallet.provider.sendBasicTransactionWithData({
-          recipient: peer,
-          value: policyLuna,
-          data: commitment(owner, nonce),
-        }),
-      )
+      const { txHash, nonce } = await postage
 
       // Written down before the relay hears a word about it. Everything after
       // this line can fail; the money cannot be unspent, so the proof has to
@@ -211,7 +252,7 @@ export function useKnocks(
         sealed,
         body,
         txHash,
-        nonce: toHex(nonce),
+        nonce,
         at: new Date().toISOString(),
       }
       keep(owner, receipt)

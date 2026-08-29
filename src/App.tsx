@@ -58,7 +58,6 @@ import {
 } from "@/lib/rooms"
 import type { Receipt } from "@/lib/receipts"
 import { contactNote, encode as encodePayload, giftNote, invite, payment } from "@/lib/payload"
-import { sendNim, unwrapTransaction } from "@/lib/payments"
 import { commitment, formatNim, newNonce } from "@/lib/postage"
 import { forgetPeerKey, NoKeyError } from "@/lib/keys"
 import { deviceKeyPair } from "@/lib/keys"
@@ -564,10 +563,12 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    */
   const onPay = useCallback(
     async (peer: string, luna: number) => {
-      if (!wallet?.provider) {
+      if (!wallet?.pay) {
         throw new Error(t("app.needsPayForNim"))
       }
-      const reference = await sendNim(wallet.provider, peer, luna)
+      // No commitment and no data: an ordinary transfer that happens to have
+      // been started from a chat. A knock is the other thing.
+      const reference = await wallet.pay({ recipient: peer, luna })
       try {
         await send(peer, encodePayload(payment(luna, reference)))
       } catch {
@@ -697,18 +698,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       note: string
     }) => {
       if (!owner || !openGroup || !giftTerms) throw new Error("gifts aren't available here")
-      if (!wallet?.provider) {
+      if (!wallet?.pay) {
         throw new Error(t("app.needsPayForGift"))
       }
 
       const nonce = newNonce()
-      const paid = unwrapTransaction(
-        await wallet.provider.sendBasicTransactionWithData({
-          recipient: giftTerms.fund_to,
-          value: input.total_luna,
-          data: commitment(owner, nonce),
-        }),
-      )
+      const paid = await wallet.pay({
+        recipient: giftTerms.fund_to,
+        luna: input.total_luna,
+        data: commitment(owner, nonce),
+      })
 
       // Written down before the relay hears anything. From here the money has
       // left, and everything below can fail — so the nonce that redeems it has

@@ -99,22 +99,19 @@ export function useGroups(wallet: Wallet | null, owner: string | null) {
         return result
       }
 
-      if (!wallet?.provider) {
-        throw new Error("Paying to join needs Nimiq Pay. Open the app there to continue.")
+      if (!wallet?.pay) {
+        throw new Error("Paying to join needs a wallet that can spend.")
       }
 
       const nonce = newNonce()
-      const paid = await wallet.provider.sendBasicTransactionWithData({
+      const txHash = await wallet.pay({
         recipient: group.owner,
-        value: group.join_price_luna,
+        luna: group.join_price_luna,
         data: commitment(owner, nonce),
       })
-      if (typeof paid === "object" && paid !== null && "error" in paid) {
-        throw new Error(paid.error.message)
-      }
 
       const result = await joinGroup(group.id, {
-        tx_hash: String(paid),
+        tx_hash: txHash,
         nonce: toHex(nonce),
       })
       await refresh()
