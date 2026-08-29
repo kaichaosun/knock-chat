@@ -57,6 +57,9 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        // Which edge this came from, so index.css can turn the bottom ones into
+        // centred dialogs where a bottom edge is the wrong place to come from.
+        data-side={side}
         // Radix focuses the first tabbable thing in a sheet as it opens. On a
         // phone that means the keyboard rises over the sheet before it has been
         // read — and the field it lands on is whichever one happens to be first

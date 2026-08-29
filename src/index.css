@@ -225,6 +225,97 @@
   }
 }
 
+/*
+ * Bottom sheets become centred dialogs where there is room for two panes.
+ *
+ * A sheet rising from the bottom edge is a phone idiom, and it earns its place
+ * there twice over: that edge is where the thumb already is, and the panel is
+ * full-width because the screen is narrow. Neither holds on a desktop. The
+ * pointer is wherever it was left, the bottom of a monitor is a long way from
+ * whatever was clicked, and a 30rem panel pinned to that edge reads as a phone
+ * someone left at the bottom of the window.
+ *
+ * Deliberately not `lg:` utilities on the component. Two reasons, and both bite:
+ *
+ * Centring must leave `transform` alone. The enter and exit keyframes set
+ * `transform` outright — see tw-animate-css — so a panel centred with
+ * `translate(-50%, -50%)` loses its centring for the length of the animation
+ * and jumps into place. `inset: 0` with `margin: auto` centres a fixed box on
+ * both axes and uses no transform at all, which leaves the animation the whole
+ * property to itself.
+ *
+ * And this has to outrank what the call sites pass — all 22 of them say
+ * `rounded-t-3xl`. Tailwind's utilities are a cascade layer that wins over
+ * `@layer base` however specific the base rule is, so this sits unlayered,
+ * where it beats every layer rather than losing to one.
+ */
+@media (min-width: 64rem) {
+  [data-slot="sheet-content"][data-side="bottom"] {
+    inset: 0;
+    margin: auto;
+    height: fit-content;
+    /* Short of the window on both sides now, rather than only at the top: a
+       dialog is a thing on a page, and a page is visible around all of it. */
+    max-height: 85vh;
+    /* What `rounded-t-3xl` was doing, now that there is no flat edge. */
+    border-radius: var(--radius-3xl, 1.5rem);
+
+    /* The same enter and exit, travelling the distance a dialog travels rather
+       than the height of a sheet. The keyframes read these, so nothing about
+       the animation itself has to change. */
+    --tw-enter-translate-y: 0.75rem;
+    --tw-exit-translate-y: 0.75rem;
+    --tw-enter-scale: 0.97;
+    --tw-exit-scale: 0.97;
+
+    /*
+     * And it has to fade, which as a sheet it never did.
+     *
+     * It got away with that because the slide was the full height of the panel:
+     * it had left the screen before the animation was over, so there was
+     * nothing left to see disappear. Moving three quarters of a rem instead,
+     * the panel is still sitting in plain view at full opacity when the
+     * animation ends — and then it is simply not there. The overlay does fade,
+     * so the dimming lifts first and leaves the dialog hanging over an
+     * undimmed page for the rest of the exit.
+     */
+    --tw-enter-opacity: 0;
+    --tw-exit-opacity: 0;
+  }
+
+  /*
+   * Faster, and quicker to leave than to arrive.
+   *
+   * 500ms and 300ms are a sheet travelling the height of a phone. A dialog
+   * crosses a few pixels, and at half a second that reads as lag rather than
+   * motion. Leaving is quicker than arriving because by then the thing has been
+   * decided, and it matches the overlay's own 150ms — the two used to disagree,
+   * which is what left the panel behind after its dimming had gone.
+   *
+   * `--tw-animation-duration` rather than the `duration-*` classes those two
+   * come from: it is read first in the animation shorthand, so it wins without
+   * touching what the classes also set on `transition-duration`.
+   */
+  [data-slot="sheet-content"][data-side="bottom"][data-state="open"] {
+    --tw-animation-duration: 200ms;
+  }
+
+  [data-slot="sheet-content"][data-side="bottom"][data-state="closed"] {
+    --tw-animation-duration: 150ms;
+    /*
+     * Hold the last frame until it is actually unmounted.
+     *
+     * The exit animation fills `none` by default, so on its final frame the
+     * panel reverts to the opacity it started from — fully opaque — and waits
+     * there for React to take it off the page. As a sheet that was invisible:
+     * it had already travelled its whole height downwards, so the frame it
+     * reverted to was off-screen. Faded in place, it is a flash of the whole
+     * dialog at the end of its own dismissal.
+     */
+    --tw-animation-fill-mode: forwards;
+  }
+}
+
 @utility brand-gradient {
   background-image: linear-gradient(
     135deg,
