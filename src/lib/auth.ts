@@ -94,9 +94,9 @@ export async function signIn(
   scope: string,
   sign: Signer,
   /**
-   * Called when the wallet is about to be asked — everything before this is a
-   * round trip to the relay, which happens with nothing on screen to show for
-   * it. It is the only part of signing in the caller can usefully report on.
+   * Called once the relay has answered and the wallet is what is left to wait
+   * for. Everything before it is a round trip with nothing on screen to show
+   * for it, and that is the part worth reporting on.
    */
   onPrompt?: () => void,
 ): Promise<Session> {
@@ -104,16 +104,33 @@ export async function signIn(
   // that proves identity also publishes the key. Two prompts for what is really
   // one act — registering this device — would be one prompt too many.
   const device = deviceKeyPair(scope)
-  const challenge = await request<ChallengeResponse>("/v1/auth/challenge", {
+
+  // Started, not awaited — and then handed to the signer as a promise.
+  //
+  // The Hub signs in a popup, and a popup is only allowed to open while the
+  // click that asked for it is still in hand. Awaiting the challenge here
+  // would spend that click on a network round trip and leave the Hub to open
+  // its window afterwards, which a browser blocks. Passing the promise means
+  // `sign` is called in the same turn as the tap, and the message it needs
+  // catches up. See `Signer` in lib/wallet.
+  const challenge = request<ChallengeResponse>("/v1/auth/challenge", {
     method: "POST",
     body: JSON.stringify({ encryption_key: toHex(device.publicKey) }),
   })
+  const signed = sign(challenge.then((issued) => issued.message))
+  // Nothing awaits `signed` if the challenge is what failed — the throw below
+  // happens first and the function is gone. Observing the rejection here keeps
+  // an unreachable relay from also being an unhandled rejection. The `await`
+  // further down still sees it: a handled promise rejects exactly as before.
+  void signed.catch(() => {})
+
+  const issued = await challenge
   onPrompt?.()
-  const { publicKey, signature } = await sign(challenge.message)
+  const { publicKey, signature } = await signed
 
   const verified = await request<VerifyResponse>("/v1/auth/verify", {
     method: "POST",
-    body: JSON.stringify({ nonce: challenge.nonce, public_key: publicKey, signature }),
+    body: JSON.stringify({ nonce: issued.nonce, public_key: publicKey, signature }),
   })
 
   const session: Session = {

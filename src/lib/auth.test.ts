@@ -81,23 +81,32 @@ describe("signIn", () => {
   }
 
   /**
-   * The whole point of the callback: the tap is answered on screen before the
-   * wallet is asked, not after. Between the two sits a round trip nobody can
-   * see, and a button that waits it out unchanged gets tapped again.
+   * The property the Hub depends on: the wallet is asked in the same turn as
+   * the tap, before the challenge it will sign has even arrived.
+   *
+   * A popup may only open while the click that asked for it is still in hand.
+   * Awaiting the challenge first would spend the click on a round trip and
+   * leave the Hub to open its window afterwards, which a browser blocks. So
+   * `sign` is called with a promise, and the message catches up.
    */
-  it("announces the prompt after the challenge and before the wallet is asked", async () => {
+  it("asks the wallet before the challenge lands", async () => {
     stubRelay()
     const order: string[] = []
+    let signedOver: string | undefined
     await signIn(
       "wallet",
-      (message) => {
-        expect(message).toBe("sign me")
+      async (message) => {
         order.push("sign")
-        return Promise.resolve({ publicKey: "pk", signature: "sig" })
+        signedOver = await message
+        return { publicKey: "pk", signature: "sig" }
       },
       () => void order.push("prompt"),
     )
-    expect(order).toEqual(["prompt", "sign"])
+    // First, and before the relay has answered — that is the whole point.
+    expect(order[0]).toBe("sign")
+    expect(order).toContain("prompt")
+    // And it still signs the challenge, not something of its own.
+    expect(signedOver).toBe("sign me")
   })
 
   it("does not announce a prompt the relay never got far enough to need", async () => {
@@ -106,7 +115,14 @@ describe("signIn", () => {
       vi.fn(() => Promise.reject(new Error("offline"))),
     )
     const onPrompt = vi.fn()
-    await expect(signIn("wallet", () => Promise.reject(new Error("unreachable")), onPrompt)).rejects.toThrow()
+    // The signer is handed a promise that rejects with the challenge, and the
+    // throw comes from the challenge rather than from here. A relay that is
+    // down must not also be an unhandled rejection.
+    const sign = vi.fn(async (message: string | Promise<string>) => {
+      await message
+      return { publicKey: "pk", signature: "sig" }
+    })
+    await expect(signIn("wallet", sign, onPrompt)).rejects.toThrow()
     expect(onPrompt).not.toHaveBeenCalled()
   })
 })
