@@ -287,6 +287,21 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     setOpenPeer(peer)
   }, [])
 
+  /**
+   * Open a room, leaving whatever thread was open.
+   *
+   * The mirror of [`openThread`], and needed for the same reason from the other
+   * side: only one of the two is ever drawn, so leaving the other set leaves a
+   * thread that is open as far as the state is concerned and invisible as far
+   * as anyone can tell. Every way into a room goes through here, so that
+   * "one thread at a time" is a fact about the state rather than a habit of
+   * whoever wrote the call.
+   */
+  const openRoom = useCallback((group: string) => {
+    setOpenPeer(null)
+    setOpenGroup(group)
+  }, [])
+
   // Opening a chat is the moment worth re-checking who you are writing to.
   // A cached key stays right until the peer signs in on another device, and
   // nothing announces when they do — so the next message would be sealed to a
@@ -324,10 +339,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       const isRoom =
         groups.some((group) => group.id === thread) ||
         threadWith(thread).some((message) => message.group === thread)
-      if (isRoom) setOpenGroup(thread)
-      else setOpenPeer(thread)
+      if (isRoom) openRoom(thread)
+      else openThread(thread)
     },
-    [groups, threadWith],
+    [groups, threadWith, openRoom, openThread],
   )
 
   /**
@@ -950,7 +965,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onOpenChange={setCreatingGroup}
         onCreate={async (input) => {
           const group = await create(input)
-          setOpenGroup(group.id)
+          openRoom(group.id)
           toast.success(t("app.groupCreated"))
           return group
         }}
@@ -966,7 +981,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onJoin={async (group) => {
           const result = await join(group)
           if (result.status === "joined") {
-            setOpenGroup(group.id)
+            openRoom(group.id)
             toast.success(t("app.youreIn", { name: group.name }))
           } else {
             toast.success(t("app.askedToJoin"))
@@ -1229,7 +1244,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               groups={groups}
               owner={address}
               loading={groupsLoading}
-              onOpen={setOpenGroup}
+              onOpen={openRoom}
               onLeft={(id) => {
                 // The room goes, and its chat with it — the same shape as
                 // removing a contact, which also takes the conversation.
