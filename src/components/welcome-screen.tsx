@@ -71,7 +71,7 @@ export function WelcomeScreen({
     // Scrollable because a centred column that outgrows the screen would
     // otherwise lose both ends of itself.
     <div className="flex h-full flex-col justify-center overflow-y-auto px-6 pt-safe pb-safe">
-      <div className="flex flex-col items-center text-center">
+      <div className="mx-auto flex w-full max-w-sm flex-col items-center text-center">
         <BrandMark className="w-24" />
 
         <h1 className="mt-7 text-3xl font-extrabold tracking-tight">Knock</h1>
@@ -96,7 +96,7 @@ export function WelcomeScreen({
         </div>
       </div>
 
-      <div className="mt-10 w-full shrink-0 space-y-3">
+      <div className="mx-auto mt-10 w-full max-w-sm shrink-0 space-y-3">
         {message && (
           <p
             className={

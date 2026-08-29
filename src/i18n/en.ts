@@ -447,6 +447,8 @@ export const en = {
     privacy: "Privacy Policy",
   },
   app: {
+    /** Only ever on a window wide enough to show the list and a thread at once. */
+    pickAThread: "Pick a conversation to read it here.",
     paymentConfirmed: "Your payment confirmed — the knock is on its way.",
     badGroupLink: "That group link doesn't lead anywhere.",
     badLink: "That link doesn't lead anywhere.",

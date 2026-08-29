@@ -428,6 +428,7 @@ export const zh: Dictionary = {
     privacy: "隐私政策",
   },
   app: {
+    pickAThread: "选择一个对话，在这里查看。",
     paymentConfirmed: "付款已确认，敲门消息正在发送。",
     badGroupLink: "这个群组链接无效。",
     badLink: "这个链接无效。",

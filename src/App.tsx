@@ -22,12 +22,14 @@ import { TabBar, type Tab } from "@/components/tab-bar"
 import { Button } from "@/components/ui/button"
 import { CreateGroupSheet } from "@/components/create-group-sheet"
 import { GroupRoom } from "@/components/group-room"
+import { NoThread } from "@/components/no-thread"
 import { JoinByLinkSheet } from "@/components/join-by-link-sheet"
 import { JoinGroupSheet } from "@/components/join-group-sheet"
 import { SendGiftSheet } from "@/components/send-gift-sheet"
 import { useContacts } from "@/hooks/use-contacts"
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
 import { useGroups } from "@/hooks/use-groups"
+import { useWide } from "@/hooks/use-wide"
 import { useJoinRequests } from "@/hooks/use-join-requests"
 import { useKnocks } from "@/hooks/use-knocks"
 import { usePrefs } from "@/hooks/use-prefs"
@@ -94,6 +96,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const revealProbes = useSecretTap(onRevealProbes)
   const { state, retry } = useWallet()
   const wallet = state.status === "connected" ? state.wallet : null
+  /** Whether the window can hold the list and a thread at the same time. */
+  const wide = useWide()
 
   const session = useSession(wallet)
   // Only poll once there is a session; the relay would answer 401 otherwise.
@@ -984,84 +988,76 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     joined ??
     (groupDetail?.group.id === openGroup ? groupDetail.group : undefined) ??
     (openGroup ? roomIn(rooms, openGroup) : undefined)
-  if (openGroup && room) {
-    return (
-      <>
-        <GroupRoom
-          group={room}
-          detail={groupDetail}
-          member={joined !== undefined}
-          gone={roomGone}
-          owner={address}
-          messages={roomMessages}
-          onBack={closeThreadView}
-          onDeleteChat={() => {
-            if (!openGroup) return
-            const thread = openGroup
-            // Out of the room first: what is being deleted is what is on
-            // screen, and there is nothing left to come back to.
-            closeThreadView()
-            deleteThread(thread)
-            forgetRoom(thread)
-            unpin(thread)
-            toast.success(t("app.chatDeleted"))
-          }}
-          onSay={onSay}
-          onOpenContact={setShowingContact}
-          onShareContact={(address) => shareContact((body) => onSay(body), address)}
-          onRefreshDetail={() => {
-            void refreshGroupDetail()
-            void refreshGroups()
-          }}
-          onOpenChat={openThread}
-          onOpenInvite={openInvite}
-          onInvite={onInviteToRoom}
-          onGift={giftTerms ? () => setGifting(true) : undefined}
-        />
-        {giftTerms && (
-          <SendGiftSheet
-            open={gifting}
-            onOpenChange={setGifting}
-            expiresInHours={giftTerms.expires_in_hours}
-            maxShares={giftTerms.max_shares}
-            onSend={onGift}
-          />
-        )}
-        {groupSheets}
-        {/* A shared contact opens a knock, and a room is one of the places a
-            card like that is read — without this the sheet has nowhere to
-            appear until the room is closed. */}
-        {knockSheet}
-        {contactSheet}
-      </>
-    )
-  }
+  // The screens below are built rather than returned, because on a wide window
+  // a thread does not replace the list — it sits beside it, and both are on the
+  // page at once. Which sheets go with them differs between those two shapes,
+  // so the sheets are composed at the end rather than attached here.
+  const roomScreen =
+    openGroup && room ? (
+      <GroupRoom
+        group={room}
+        detail={groupDetail}
+        member={joined !== undefined}
+        gone={roomGone}
+        owner={address}
+        messages={roomMessages}
+        onBack={closeThreadView}
+        onDeleteChat={() => {
+          if (!openGroup) return
+          const thread = openGroup
+          // Out of the room first: what is being deleted is what is on
+          // screen, and there is nothing left to come back to.
+          closeThreadView()
+          deleteThread(thread)
+          forgetRoom(thread)
+          unpin(thread)
+          toast.success(t("app.chatDeleted"))
+        }}
+        onSay={onSay}
+        onOpenContact={setShowingContact}
+        onShareContact={(address) => shareContact((body) => onSay(body), address)}
+        onRefreshDetail={() => {
+          void refreshGroupDetail()
+          void refreshGroups()
+        }}
+        onOpenChat={openThread}
+        onOpenInvite={openInvite}
+        onInvite={onInviteToRoom}
+        onGift={giftTerms ? () => setGifting(true) : undefined}
+      />
+    ) : null
 
-  if (openPeer) {
-    return (
-      <>
-        <Conversation
-          peer={openPeer}
-          owner={address}
-          messages={openMessages}
-          reach={openReach}
-          onBack={closeThreadView}
-          onSend={onSend}
-          onKnock={knockOnOpenPeer}
-          onRetry={onRetrySend}
-          onCopyAddress={copy}
-          onPay={onPay}
-          onOpenInvite={openInvite}
-          onOpenContact={setShowingContact}
-          onShareContact={(address) => shareContact((body) => onSend(body), address)}
-        />
-        {knockSheet}
-        {contactSheet}
-        {composeMenu}
-        {groupSheets}
-      </>
-    )
-  }
+  const peerScreen = openPeer ? (
+    <Conversation
+      peer={openPeer}
+      owner={address}
+      messages={openMessages}
+      reach={openReach}
+      onBack={closeThreadView}
+      onSend={onSend}
+      onKnock={knockOnOpenPeer}
+      onRetry={onRetrySend}
+      onCopyAddress={copy}
+      onPay={onPay}
+      onOpenInvite={openInvite}
+      onOpenContact={setShowingContact}
+      onShareContact={(address) => shareContact((body) => onSend(body), address)}
+    />
+  ) : null
+
+  const thread = roomScreen ?? peerScreen
+
+  /** Offered in a room and nowhere else, so it goes wherever the room does. */
+  const giftSheet =
+    giftTerms && roomScreen ? (
+      <SendGiftSheet
+        open={gifting}
+        onOpenChange={setGifting}
+        expiresInHours={giftTerms.expires_in_hours}
+        maxShares={giftTerms.max_shares}
+        onSend={onGift}
+      />
+    ) : null
 
   /**
    * What the plus beside the title does here.
@@ -1090,7 +1086,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         ? { label: t("app.addGroup"), onSelect: () => setAddingGroup(true) }
         : null
 
-  return (
+  const listPane = (
     <div className="flex h-full flex-col">
       {/* The rule is kept transparent rather than removed, so turning it on
           costs no layout shift. It means "there is something above you" — at
@@ -1286,6 +1282,53 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           session.invalidate()
         }}
       />
+    </div>
+  )
+
+  // One thing at a time, a thread covering the list. What a phone is, and what
+  // this was everywhere before there was room to be anything else. Each screen
+  // carries the sheets it can open, which is why the two lists differ.
+  if (!wide) {
+    if (roomScreen) {
+      return (
+        <>
+          {roomScreen}
+          {giftSheet}
+          {groupSheets}
+          {/* A shared contact opens a knock, and a room is one of the places a
+              card like that is read — without this the sheet has nowhere to
+              appear until the room is closed. */}
+          {knockSheet}
+          {contactSheet}
+        </>
+      )
+    }
+    if (peerScreen) {
+      return (
+        <>
+          {peerScreen}
+          {knockSheet}
+          {contactSheet}
+          {composeMenu}
+          {groupSheets}
+        </>
+      )
+    }
+    return listPane
+  }
+
+  // Both at once, and the list is never the thing that goes away — closing a
+  // thread leaves the half it was in empty rather than putting the list back,
+  // because the list never left.
+  //
+  // Every shared sheet comes from the list, which is on the page whatever is
+  // open beside it. A thread adds none of its own here: the two would be
+  // mounted twice over, and open twice over with them.
+  return (
+    <div className="flex h-full">
+      <div className="flex w-[22rem] shrink-0 flex-col border-r">{listPane}</div>
+      <div className="min-w-0 flex-1">{thread ?? <NoThread />}</div>
+      {giftSheet}
     </div>
   )
 }

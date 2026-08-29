@@ -123,7 +123,10 @@ export function Conversation({
             size="icon"
             onClick={onBack}
             aria-label={t("chat.back")}
-            className="size-11 shrink-0 rounded-full"
+            /* Gone where the list is beside this rather than behind it: there
+               is nothing to go back to. `lg` is the line `useWide` draws, so
+               what this hides and what puts the two panes up always agree. */
+            className="size-11 shrink-0 rounded-full lg:hidden"
           >
             <ChevronLeft className="size-6" />
           </Button>

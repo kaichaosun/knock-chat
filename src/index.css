@@ -182,7 +182,9 @@
   /*
    * Inside Nimiq Pay the WebView is already phone-width, so this is a no-op.
    * On a desktop browser it keeps the app in a phone-shaped column instead of
-   * stretching line lengths across a monitor.
+   * stretching line lengths across a monitor — until there is room for the
+   * list and a thread side by side, which is a different shape rather than a
+   * bigger one. See `hooks/use-wide`, which draws the line at the same place.
    */
   #root {
     position: relative;
@@ -203,6 +205,15 @@
 
     #root {
       border-inline: 1px solid var(--border);
+    }
+  }
+
+  /* Two panes. Capped so the thread does not set lines the width of a monitor,
+     which is the thing the phone column was protecting against in the first
+     place. */
+  @media (min-width: 64rem) {
+    #root {
+      max-width: 80rem;
     }
   }
 
