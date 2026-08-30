@@ -243,6 +243,17 @@ export function recordOutgoing(
   id: string,
   /** Files it under a room instead of under the recipient. */
   group?: string,
+  /**
+   * Defaults to `sent` because the first caller here was a knock, which the
+   * relay has already accepted by the time it is written down — there is
+   * nothing left to wait for.
+   *
+   * Anything recorded *before* it has been sent must say `sending` instead. A
+   * message that has not left yet, wearing the tick that means it arrived, is
+   * the worst thing this file can do: the one moment somebody needs to know
+   * their words went nowhere is the moment they walk away believing they did.
+   */
+  status: MessageStatus = "sent",
 ): Snapshot {
   return appendOutgoing(snapshot, {
     id,
@@ -251,7 +262,7 @@ export function recordOutgoing(
     direction: "out",
     body,
     at: new Date().toISOString(),
-    status: "sent",
+    status,
   })
 }
 

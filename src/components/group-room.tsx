@@ -37,6 +37,7 @@ export function GroupRoom({
   onBack,
   onDeleteChat,
   onSay,
+  onRetrySay,
   onRefreshDetail,
   onOpenChat,
   onOpenInvite,
@@ -58,6 +59,8 @@ export function GroupRoom({
   /** Offered only once the room is gone: the thread is all that is left. */
   onDeleteChat: () => void
   onSay: (body: string) => void
+  /** Say again something that never left. Rooms can fail like anything else. */
+  onRetrySay: (message: Message) => void
   onRefreshDetail: () => void
   /** Knock on a member — a room opens no channel, so this still costs. */
   onOpenChat: (address: string) => void
@@ -238,7 +241,7 @@ export function GroupRoom({
                         )}
                         <MessageBubble
                           message={message}
-                          onRetry={() => {}}
+                          onRetry={onRetrySay}
                           onOpenInvite={onOpenInvite}
                           onOpenContact={onOpenContact}
                           channelOpen
@@ -283,7 +286,7 @@ export function GroupRoom({
                       )}
                       <MessageBubble
                         message={message}
-                        onRetry={() => {}}
+                        onRetry={onRetrySay}
                         onOpenInvite={onOpenInvite}
                         onOpenContact={onOpenContact}
                         channelOpen

@@ -281,6 +281,33 @@ describe("recordOutgoing", () => {
     const snapshot = recordOutgoing(emptySnapshot(), ALICE, "let me in", "knock:abc")
     expect(conversations(snapshot)[0].unread).toBe(0)
   })
+
+  /**
+   * A knock has already been accepted by the relay when it is written down, so
+   * `sent` is the truth for it and stays the default.
+   */
+  it("calls a knock sent, because by then it is", () => {
+    const snapshot = recordOutgoing(emptySnapshot(), ALICE, "let me in", "knock:abc")
+    expect(threadWith(snapshot, ALICE)[0].status).toBe("sent")
+  })
+
+  /**
+   * The bug this pins: a room message was written down as `sent` and only then
+   * handed to the relay, so a relay that was down — or a phone that was offline
+   * — left the tick meaning "delivered" on a message that had gone nowhere. The
+   * toast saying so is missed or dismissed; the tick is what stays.
+   */
+  it("can say a message is still on its way, for anything not yet sent", () => {
+    const snapshot = recordOutgoing(
+      emptySnapshot(),
+      ALICE,
+      "hello room",
+      "local:1",
+      ROOM,
+      "sending",
+    )
+    expect(threadWith(snapshot, ROOM)[0].status).toBe("sending")
+  })
 })
 
 describe("resend", () => {

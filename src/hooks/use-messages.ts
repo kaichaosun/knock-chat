@@ -4,7 +4,7 @@ import { compact } from "@/lib/address"
 import { decryptBody, encryptBody } from "@/lib/crypto"
 import { forgetPeerKey, keyForPeer } from "@/lib/keys"
 import * as history from "@/lib/messages"
-import type { Message, OpenedEnvelope, Snapshot } from "@/lib/messages"
+import type { Message, MessageStatus, OpenedEnvelope, Snapshot } from "@/lib/messages"
 import { RelayError, ackMessages, fetchMessages, sendMessage } from "@/lib/relay"
 import type { Envelope } from "@/lib/relay"
 
@@ -195,10 +195,29 @@ export function useMessages(
     [update],
   )
 
+  /**
+   * Settle a message this hook did not send itself.
+   *
+   * `send` owns the whole life of a direct message, but a room's messages go
+   * out through `useGroups` — so writing one down and learning what became of
+   * it happen in different places. This is the second half.
+   */
+  const setStatus = useCallback(
+    (id: string, status: MessageStatus) =>
+      update((current) => history.setStatus(current, id, status)),
+    [update],
+  )
+
+  /** Put a message back on its way, timed for when it is actually resent. */
+  const resend = useCallback(
+    (id: string) => update((current) => history.resend(current, id)),
+    [update],
+  )
+
   /** Record a message this device sent outside the normal send path — a knock. */
   const recordOutgoing = useCallback(
-    (peer: string, body: string, id: string, group?: string) =>
-      update((current) => history.recordOutgoing(current, peer, body, id, group)),
+    (peer: string, body: string, id: string, group?: string, status?: MessageStatus) =>
+      update((current) => history.recordOutgoing(current, peer, body, id, group, status)),
     [update],
   )
 
@@ -220,6 +239,8 @@ export function useMessages(
     deleteThread,
     dismissed,
     recordOutgoing,
+    setStatus,
+    resend,
     relayStatus,
     refresh,
   }

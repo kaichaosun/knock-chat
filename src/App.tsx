@@ -116,6 +116,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     markRead,
     deleteThread,
     recordOutgoing,
+    setStatus,
+    resend,
     dismissed,
     relayStatus,
     refresh: refreshMessages,
@@ -810,14 +812,42 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     async (body: string) => {
       if (!openGroup || !owner) return
       const id = `local:${messageId()}`
-      recordOutgoing(owner, body, id, openGroup)
+      // On its way, not arrived. The tick this used to be written with is the
+      // only thing on screen that says the room has the message, and both a
+      // relay that is down and a phone that is offline end up here — where the
+      // toast is missed or dismissed and the tick is what is left behind.
+      recordOutgoing(owner, body, id, openGroup, "sending")
       try {
         await say(openGroup, body)
+        setStatus(id, "sent")
       } catch (error) {
+        setStatus(id, "failed")
         toast.error(error instanceof Error ? error.message : t("app.sendThatFailed"))
       }
     },
-    [openGroup, owner, say, recordOutgoing],
+    [openGroup, owner, say, recordOutgoing, setStatus],
+  )
+
+  /**
+   * Say it again, for something that never got out.
+   *
+   * The room's counterpart of [`onRetrySend`]. Rooms had no such thing while
+   * nothing said in one could fail; now that a failure is recorded as one, the
+   * bubble offers a retry and it has to lead somewhere.
+   */
+  const onRetrySay = useCallback(
+    async (message: Message) => {
+      if (!message.group) return
+      resend(message.id)
+      try {
+        await say(message.group, message.body)
+        setStatus(message.id, "sent")
+      } catch (error) {
+        setStatus(message.id, "failed")
+        toast.error(error instanceof Error ? error.message : t("app.sendThatFailed"))
+      }
+    },
+    [say, resend, setStatus],
   )
 
   if (session.state.status !== "active") {
@@ -1028,6 +1058,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           toast.success(t("app.chatDeleted"))
         }}
         onSay={onSay}
+        onRetrySay={onRetrySay}
         onOpenContact={setShowingContact}
         onShareContact={(address) => shareContact((body) => onSay(body), address)}
         onRefreshDetail={() => {
