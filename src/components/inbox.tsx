@@ -277,6 +277,7 @@ function ConversationRow({
       onLongPress={onLongPress}
       onMenu={onMenu}
       menuLabel={menuLabel}
+      menuAlign="top"
       revealed={revealed}
       onReveal={onReveal}
       // One tinted block rather than a mark on every row: what is being said is
@@ -303,7 +304,17 @@ function ConversationRow({
           >
             {title ?? (peer ? shortenAddress(peer) : "")}
           </span>
-          <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+          {/* Steps aside for the actions button, which takes this corner while
+              the pointer is on the row. It keeps its space rather than being
+              removed, so nothing else moves — and when a row is being acted on,
+              how long ago it last stirred is the one thing on it nobody is
+              reading. Below the fold of the pointer, it never happens. */}
+          <span
+            className={cn(
+              "text-muted-foreground shrink-0 text-[11px] tabular-nums transition-opacity",
+              "lg:group-hover:opacity-0",
+            )}
+          >
             {relativeTime(at)}
           </span>
         </div>

@@ -48,6 +48,7 @@ export function SwipeRow({
   onLongPress,
   onMenu,
   menuLabel,
+  menuAlign = "center",
   className,
   surface,
   children,
@@ -67,6 +68,16 @@ export function SwipeRow({
   onMenu?: () => void
   /** Read out for that button; say what it opens and for which row. */
   menuLabel?: string
+  /**
+   * Where that button sits.
+   *
+   * `top` for a row that already puts something in its top-right corner — a
+   * time — which then steps aside for it. Anywhere else the corner is empty
+   * and the middle of the row is the natural place. Neither ever moves the
+   * row's own content: covering it and pushing it aside are both worse than
+   * trading places with the one thing that can spare the moment.
+   */
+  menuAlign?: "center" | "top"
   /** For the row's outer shape — rounding a run of rows into one block. */
   className?: string
   /**
@@ -252,11 +263,6 @@ export function SwipeRow({
           // diagonal.
           "touch-pan-y",
           "relative flex w-full items-center gap-3.5 px-3 py-3.5 text-left transition-colors",
-          // Room kept for the button above, rather than letting it sit on top
-          // of whatever the row put at its right edge — a time, an unread
-          // count. Always, not on hover: reflowing the row under the pointer
-          // that is about to click is worse than a little space nobody minds.
-          onMenu && "lg:pr-11",
           // Opaque, always: a translucent row would let the Delete panel wash
           // through it while the finger is down.
           surface ?? "bg-background active:bg-muted",
@@ -278,9 +284,10 @@ export function SwipeRow({
           aria-label={menuLabel}
           onClick={onMenu}
           className={cn(
-            "text-muted-foreground hover:bg-muted hover:text-foreground absolute top-1/2",
-            "right-2 hidden -translate-y-1/2 rounded-lg p-1.5 opacity-0 transition-opacity",
-            "focus-visible:opacity-100 group-hover:opacity-100 lg:block",
+            "text-muted-foreground hover:bg-muted hover:text-foreground absolute right-2",
+            "hidden rounded-lg p-1.5 opacity-0 transition-opacity lg:block",
+            "focus-visible:opacity-100 group-hover:opacity-100",
+            menuAlign === "top" ? "top-2" : "top-1/2 -translate-y-1/2",
           )}
         >
           <MoreHorizontal className="size-4" />
