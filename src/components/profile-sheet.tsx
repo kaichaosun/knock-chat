@@ -360,7 +360,7 @@ export function ProfileSheet({
           for is the thing this app tries hardest never to cause. */}
       <Dialog open={leaving} onOpenChange={(next) => !next && setLeaving(false)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
-          <DialogHeader className="items-center">
+          <DialogHeader className="items-center text-center sm:text-center">
             <DialogTitle>{t("profile.signOutTitle")}</DialogTitle>
             <DialogDescription className="text-balance">
               {t("profile.signOutBody")}

@@ -1,13 +1,21 @@
 import { useState } from "react"
 import { t } from "i18next"
 import { useTranslation } from "react-i18next"
-import { Clock, MessageSquarePlus, Pin, PinOff, Plus } from "lucide-react"
+import { Clock, MessageSquarePlus, Pin, PinOff, Plus, Trash2 } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { AttachMenu } from "@/components/attach-menu"
 import { GroupAvatar } from "@/components/group-avatar"
 import { SwipeRow } from "@/components/swipe-row"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useNames } from "@/hooks/use-names"
 import { usePins } from "@/hooks/use-pins"
 import { useRooms } from "@/hooks/use-rooms"
@@ -43,8 +51,17 @@ export function Inbox({
   // Only one row open at a time, so a stray Delete is never left lurking under
   // a row the user has moved on from.
   const [revealed, setRevealed] = useState<string | null>(null)
-  /** The thread a held finger opened the menu for. */
+  /** The thread a held finger — or a right-click — opened the menu for. */
   const [holding, setHolding] = useState<Conversation | null>(null)
+  /**
+   * The chat somebody has asked to delete, before they have said yes.
+   *
+   * This was the one destructive thing in the app that never asked: the tap
+   * that uncovered Delete deleted. And it is the deletion least able to afford
+   * being wrong — history lives on this device, so what goes from here is gone
+   * everywhere this device can reach.
+   */
+  const [deleting, setDeleting] = useState<Conversation | null>(null)
   const { t } = useTranslation()
   const names = useNames()
   const pins = usePins()
@@ -88,12 +105,14 @@ export function Inbox({
               room={conversation.group ? rooms.get(conversation.group) : undefined}
               names={names}
               onOpen={onOpen}
-              onDelete={onDelete}
+              onDelete={() => setDeleting(conversation)}
               waiting={conversation.peer !== null && knocked.has(conversation.peer)}
               pinned={index < pinnedCount}
               blockStart={index === 0}
               blockEnd={index === pinnedCount - 1}
               onLongPress={() => setHolding(conversation)}
+              onMenu={() => setHolding(conversation)}
+              menuLabel={t("inbox.rowMenu")}
               revealed={revealed === conversation.key}
               onReveal={(open) => setRevealed(open ? conversation.key : null)}
             />
@@ -122,10 +141,53 @@ export function Inbox({
                   ),
                   onSelect: () => togglePin(holding.key),
                 },
+                {
+                  icon: Trash2,
+                  label: t("inbox.delete"),
+                  description: t("inbox.deleteNote"),
+                  tone: "destructive" as const,
+                  // Choosing it here is not the deletion — the dialog is. The
+                  // swipe's Delete goes through the same one.
+                  onSelect: () => setDeleting(holding),
+                },
               ]
             : []
         }
       />
+
+      {/* Asked every time, from either way in. What this removes is not on the
+          relay: nobody else loses anything, and nobody else can give it back. */}
+      <Dialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
+        <DialogContent className="max-w-[20rem] rounded-3xl">
+          <DialogHeader className="items-center text-center sm:text-center">
+            <DialogTitle>{t("inbox.deleteTitle")}</DialogTitle>
+            {deleting && (
+              <p className="text-[15px] font-semibold text-balance">
+                {threadTitle(deleting, rooms, names)}
+              </p>
+            )}
+            <DialogDescription className="text-balance">
+              {t("inbox.deleteBody")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setDeleting(null)}>
+              {t("inbox.deleteCancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              className="h-11 rounded-2xl"
+              onClick={() => {
+                const thread = deleting
+                setDeleting(null)
+                if (thread) onDelete(thread.key)
+              }}
+            >
+              {t("inbox.deleteConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -165,6 +227,8 @@ function ConversationRow({
   blockStart,
   blockEnd,
   onLongPress,
+  onMenu,
+  menuLabel,
   revealed,
   onReveal,
 }: {
@@ -175,12 +239,16 @@ function ConversationRow({
   /** A knock of yours is at this door, unanswered. */
   waiting: boolean
   onOpen: (thread: string) => void
-  onDelete: (thread: string) => void
+  /** Asks for this row to go. What that means is settled by the list. */
+  onDelete: () => void
   pinned: boolean
   /** Where this row sits in the pinned block, so only its ends are rounded. */
   blockStart: boolean
   blockEnd: boolean
   onLongPress: () => void
+  /** The pointer's way to the same menu. */
+  onMenu: () => void
+  menuLabel: string
   revealed: boolean
   onReveal: (open: boolean) => void
 }) {
@@ -204,9 +272,11 @@ function ConversationRow({
               name: peer ? labelIn(names, peer) : t("inbox.thisChat"),
             })
       }
-      onAction={() => onDelete(key)}
+      onAction={onDelete}
       onClick={() => onOpen(key)}
       onLongPress={onLongPress}
+      onMenu={onMenu}
+      menuLabel={menuLabel}
       revealed={revealed}
       onReveal={onReveal}
       // One tinted block rather than a mark on every row: what is being said is

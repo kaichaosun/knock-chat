@@ -113,7 +113,6 @@ export function Contacts({
         <h2 className="mt-6 text-xl font-bold tracking-tight">{t("contacts.emptyTitle")}</h2>
         <p className="text-muted-foreground mt-2 max-w-[17rem] text-balance">
           {t("contacts.emptyBody")}
-          your own.
         </p>
       </div>
     )
@@ -127,6 +126,10 @@ export function Contacts({
             key={contact.address}
             actionLabel={`Remove ${labelIn(names, contact.address)}`}
             onAction={() => setConfirming(contact)}
+            // The same question a swipe asks, for a pointer that cannot swipe.
+            // One action, so it opens the confirmation rather than a menu of one.
+            onMenu={() => setConfirming(contact)}
+            menuLabel={t("contacts.rowMenu")}
             onClick={() => onOpen(contact.address)}
             revealed={revealed === contact.address}
             onReveal={(open) => setRevealed(open ? contact.address : null)}
@@ -154,7 +157,7 @@ export function Contacts({
 
       <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
-          <DialogHeader className="items-center">
+          <DialogHeader className="items-center text-center sm:text-center">
             {confirming && <AddressAvatar address={confirming.address} />}
             <DialogTitle className="mt-2">{t("contacts.removeTitle")}</DialogTitle>
             {confirming && nameIn(names, confirming.address) && (

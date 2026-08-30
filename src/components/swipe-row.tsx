@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { Trash2 } from "lucide-react"
+import { MoreHorizontal, Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -31,6 +31,13 @@ const LABEL_PX = 64
  * A held finger is reported separately and changes nothing about the swipe: the
  * two are told apart by whether the finger moved, which is the same question the
  * swipe already had to answer.
+ *
+ * Neither gesture exists for a mouse. Both are bound to touch, so on a desktop
+ * every action behind them — deleting, pinning — was simply unreachable. What
+ * stands in for them is `onMenu`: the right-click a list row is expected to
+ * answer, and a button that appears on hover for anyone who does not think to
+ * try it. Not a delete button, though, for the reason above; it opens the same
+ * thing a held finger does, and the choosing still happens there.
  */
 export function SwipeRow({
   actionLabel,
@@ -39,6 +46,8 @@ export function SwipeRow({
   revealed,
   onReveal,
   onLongPress,
+  onMenu,
+  menuLabel,
   className,
   surface,
   children,
@@ -51,6 +60,13 @@ export function SwipeRow({
   onReveal: (open: boolean) => void
   /** Fires when the finger stays put. Omit and the row has no press. */
   onLongPress?: () => void
+  /**
+   * The pointer's way to whatever a held finger opens — right-click, or the
+   * button that appears on hover. Omit and the row offers neither.
+   */
+  onMenu?: () => void
+  /** Read out for that button; say what it opens and for which row. */
+  menuLabel?: string
   /** For the row's outer shape — rounding a run of rows into one block. */
   className?: string
   /**
@@ -150,7 +166,9 @@ export function SwipeRow({
     // measurements, so the two cannot drift apart.
     <li
       className={cn(
-        "relative overflow-hidden rounded-2xl",
+        // `group` so the hover button below can key off the whole row rather
+        // than only the few pixels it covers.
+        "group relative overflow-hidden rounded-2xl",
         "after:bg-border/70 after:pointer-events-none after:absolute after:right-4",
         "after:bottom-0 after:left-[4.375rem] after:h-px last:after:hidden",
         className,
@@ -199,6 +217,15 @@ export function SwipeRow({
           }, HOLD_MS)
         }}
         onTouchCancel={stopHolding}
+        onContextMenu={
+          onMenu &&
+          ((event) => {
+            // The browser's own menu offers nothing for a row like this, and
+            // having both would bury ours under it.
+            event.preventDefault()
+            onMenu()
+          })
+        }
         onTouchEnd={() => {
           stopHolding()
           if (drag > COMMIT_PX) onReveal(true)
@@ -225,6 +252,11 @@ export function SwipeRow({
           // diagonal.
           "touch-pan-y",
           "relative flex w-full items-center gap-3.5 px-3 py-3.5 text-left transition-colors",
+          // Room kept for the button above, rather than letting it sit on top
+          // of whatever the row put at its right edge — a time, an unread
+          // count. Always, not on hover: reflowing the row under the pointer
+          // that is about to click is worse than a little space nobody minds.
+          onMenu && "lg:pr-11",
           // Opaque, always: a translucent row would let the Delete panel wash
           // through it while the finger is down.
           surface ?? "bg-background active:bg-muted",
@@ -233,6 +265,27 @@ export function SwipeRow({
       >
         {children}
       </button>
+
+      {/* Only where there is a pointer to hover with. On a phone the row is
+          already covered by the swipe and the press, and a permanent target
+          this close to the whole row is what those two were avoiding.
+
+          Kept present rather than mounted on hover so it can be tabbed to,
+          which is the other way a mouseless desktop reaches it. */}
+      {onMenu && (
+        <button
+          type="button"
+          aria-label={menuLabel}
+          onClick={onMenu}
+          className={cn(
+            "text-muted-foreground hover:bg-muted hover:text-foreground absolute top-1/2",
+            "right-2 hidden -translate-y-1/2 rounded-lg p-1.5 opacity-0 transition-opacity",
+            "focus-visible:opacity-100 group-hover:opacity-100 lg:block",
+          )}
+        >
+          <MoreHorizontal className="size-4" />
+        </button>
+      )}
     </li>
   )
 }

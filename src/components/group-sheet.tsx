@@ -776,7 +776,7 @@ export function GroupSheet({
           rather than a second thing to understand. */}
       <Dialog open={changing !== null} onOpenChange={(open) => !open && setChanging(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
-          <DialogHeader className="items-center">
+          <DialogHeader className="items-center text-center sm:text-center">
             <DialogTitle>
               {changing !== null && doorFor(changing, group.join_price_luna).label}
             </DialogTitle>

@@ -48,7 +48,7 @@ export function RemoveMemberDialog({
   return (
     <Dialog open={address !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[20rem] rounded-3xl">
-        <DialogHeader className="items-center">
+        <DialogHeader className="items-center text-center sm:text-center">
           {address && <AddressAvatar address={address} />}
           <DialogTitle className="mt-2">{t("member.confirmTitle")}</DialogTitle>
           {address && nameIn(names, address) && (

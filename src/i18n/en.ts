@@ -58,6 +58,16 @@ export const en = {
     groupChatTitle: "Group chat: {{name}}",
     directMessage: "Direct message",
     directMessageWith: "Direct message with {{name}}",
+    /** The row in a held-or-right-clicked row's menu, and the button under it. */
+    delete: "Delete chat",
+    deleteNote: "Only from this device. Nobody else loses anything.",
+    /** What the pointer's way into that menu is called, for a screen reader. */
+    rowMenu: "Actions for this chat",
+    deleteTitle: "Delete this chat?",
+    deleteBody:
+      "The messages go from this device. It is not deleted for anyone else, and the channel stays open — they can still write to you.",
+    deleteConfirm: "Delete",
+    deleteCancel: "Keep",
     deleteGroupChat: "Delete {{name}} chat",
     deleteChatWith: "Delete chat with {{name}}",
     thisChat: "this chat",
@@ -98,6 +108,7 @@ export const en = {
     priceToJoin: "{{amount}} NIM to join",
     freeToJoin: "Free to join",
     approvalNeeded: "approval needed",
+    rowMenu: "Actions for this group",
     leaveTitle: "Leave this group?",
     leaveOwner:
       "You own this group, so you can't leave it. To end it for everyone, open it and tap the info button.",
@@ -244,7 +255,7 @@ export const en = {
   },
   contacts: {
     emptyBody:
-      "People appear here once you've knocked and been let in, or answered a knock of your own.",
+      "People appear here once you've knocked and been let in, or answered a knock from someone else.",
     removed: "Removed. The chat is gone, and they'd have to knock again.",
     removeFailed: "Couldn't remove them",
     nameCleared: "Name cleared",
@@ -263,6 +274,7 @@ export const en = {
     yourNameFor: "Your name for them",
     copy: "Copy",
     save: "Save",
+    rowMenu: "Actions for this contact",
     removeTitle: "Remove this contact?",
     removeBody:
       "The door shuts both ways. Neither of you can write to the other for free, and reaching you again means knocking and paying your postage. Your chat with them is deleted too.",

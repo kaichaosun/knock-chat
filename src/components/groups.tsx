@@ -94,6 +94,13 @@ export function Groups({
               key={group.id}
               actionLabel={`Leave ${group.name}`}
               onAction={() => setConfirming(group)}
+              // The swipe's question, for a pointer that cannot swipe. Offered
+              // for a room you own too: leaving is not something an owner can
+              // do, and the dialog is where that is said — along with where to
+              // go instead. Hiding it would leave an owner with the question
+              // and nowhere it is answered.
+              onMenu={() => setConfirming(group)}
+              menuLabel={t("groups.rowMenu")}
               onClick={() => onOpen(group.id)}
               revealed={revealed === group.id}
               onReveal={(open) => setRevealed(open ? group.id : null)}
@@ -123,7 +130,7 @@ export function Groups({
 
       <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <DialogContent className="max-w-[20rem] rounded-3xl">
-          <DialogHeader className="items-center">
+          <DialogHeader className="items-center text-center sm:text-center">
             <GroupAvatar members={confirming?.members} />
             <DialogTitle className="mt-2">{t("groups.leaveTitle")}</DialogTitle>
             <p className="text-[15px] font-semibold">{confirming?.name}</p>

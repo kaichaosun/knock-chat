@@ -2,12 +2,21 @@ import type { LucideIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { cn } from "@/lib/utils"
 
 export type AttachAction = {
   icon: LucideIcon
   label: string
   description: string
   onSelect: () => void
+  /**
+   * Marks the one row in a menu that takes something away.
+   *
+   * Colour rather than position, because the list is short enough that a row at
+   * the bottom is no further from the thumb than a row at the top — and reading
+   * a menu is how you find the destructive item, not counting down it.
+   */
+  tone?: "destructive"
 }
 
 /**
@@ -59,11 +68,25 @@ export function AttachMenu({
                 }}
                 className="active:bg-muted flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors"
               >
-                <span className="bg-accent text-accent-foreground flex size-11 shrink-0 items-center justify-center rounded-2xl">
+                <span
+                  className={cn(
+                    "flex size-11 shrink-0 items-center justify-center rounded-2xl",
+                    action.tone === "destructive"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-accent text-accent-foreground",
+                  )}
+                >
                   <action.icon className="size-5" strokeWidth={1.75} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[15px] font-semibold">{action.label}</span>
+                  <span
+                    className={cn(
+                      "block text-[15px] font-semibold",
+                      action.tone === "destructive" && "text-destructive",
+                    )}
+                  >
+                    {action.label}
+                  </span>
                   <span className="text-muted-foreground block text-[13px] leading-snug">
                     {action.description}
                   </span>
