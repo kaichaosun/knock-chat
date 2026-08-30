@@ -22,7 +22,7 @@ Two repos: this app, and the relay at `../knock-relay`.
 | Messages | Post, fetch, ack. Opaque server-issued cursors (`{instance}.{seq}`) that replay rather than stall when a cursor is from another relay or past the end. |
 | Knocks | Send, list, accept, decline. Accepting opens the channel and delivers the knock's body as the first message. |
 | Postage | On-chain payment verified by tx hash before a knock is stored. Commitment binds payer to sender, since the wallet signs with one address and pays from another. Spend is recorded in the same transaction as the knock. |
-| Policy | Per-address price for strangers, `0` to waive. Default 10 NIM. |
+| Policy | Per-address price for strangers, `0` to waive. Default 1 NIM. |
 | Contacts | Channels as the durable record of who can reach whom, so a fresh device knows without local history. |
 | Remove contact | `DELETE /v1/contacts/{address}`. One normalised row, so closing is symmetric by construction. |
 | Groups | `chat_group` / `group_member` / `group_request`, plus a `group_id` on delivered messages. A room is a lobby, not a shortcut: membership opens no channel, so reaching a member privately still costs their postage. The door mirrors a knock — pay the owner, get in forever — with the price defaulting to 0 and an optional approval queue. Owner-only moderation, link-only distribution, no ban list. **Bodies are plain text**; the relay can read them. |

@@ -199,7 +199,7 @@ message plus proof of payment. If they accept, a channel opens and **both direct
 free forever**. If they decline or ignore it, nothing more happens — and they keep the NIM
 either way.
 
-**The recipient sets the amount and keeps it. Default 10 NIM (~$0.004).**
+**The recipient sets the amount and keeps it. Default 1 NIM (~$0.0004).**
 
 Postage is therefore the one-time cost of opening a channel, not a toll on every message.
 That distinction is load-bearing. A per-message toll would charge you to *answer* someone

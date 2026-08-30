@@ -86,7 +86,7 @@ everywhere identity matters. Nothing reserves it and nothing verifies it: two pe
 pick the same name, so every screen that shows a stranger's name shows their address with
 it. Leave it blank and you are your address, as before.
 
-Cost to knock is what a stranger pays to reach you — default 10 NIM, and you keep it whether or not you answer. Presets go down to
+Cost to knock is what a stranger pays to reach you — default 1 NIM, and you keep it whether or not you answer. Presets go down to
 **Free** (0), which is the one to use while testing: it removes the payment step entirely
 so knocks need no chain access.
 
