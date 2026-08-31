@@ -24,6 +24,7 @@ export const en = {
       },
     },
     openInPay: "Open in Nimiq Pay",
+    useBrowserWallet: "Use a wallet in this browser",
     tryAgain: "Try again",
     looking: "Looking for your wallet",
     opening: "Opening your wallet",

@@ -260,13 +260,31 @@ export function requestedDevIdentity(): string | null {
 }
 
 /**
- * Whether to reach for the Hub rather than a dev identity in development.
+ * Set when somebody picks the browser wallet over the app on the welcome
+ * screen. Lives for this page load and no longer.
  *
- * Without this the Hub path is unreachable on a laptop — the dev identity
- * answers first — and the one thing worth checking about it is the part no
- * unit test covers: that the popup survives the click.
+ * Not remembered on purpose. Remembering it would need a way to un-remember
+ * it — being stuck with the wrong wallet is being stuck out of your account —
+ * and the choice costs one tap on a screen you only see when signed out.
+ */
+let browserWalletChosen = false
+
+/** Take the browser wallet on a device that would otherwise be sent to the app. */
+export function chooseBrowserWallet(): void {
+  browserWalletChosen = true
+}
+
+/**
+ * Whether to reach for the Hub rather than the wallet this device would
+ * otherwise get — a dev identity in development, Nimiq Pay on a phone.
+ *
+ * Two ways in. The query string is the developer's: without it the Hub path is
+ * unreachable on a laptop, since the dev identity answers first. The flag above
+ * is the phone user's, and is the second of the two buttons on the welcome
+ * screen.
  */
 function wantsHub(): boolean {
+  if (browserWalletChosen) return true
   return new URLSearchParams(window.location.search).get("wallet") === "hub"
 }
 
@@ -294,6 +312,23 @@ export async function connect(): Promise<ConnectResult> {
           scope: `dev:${asked}`,
           language: language(),
         },
+      }
+    }
+
+    // No provider means we are not inside Nimiq Pay — and that is the whole of
+    // what is knowable here. Whether the app is *installed*, or whether this is
+    // even a device that could install it, is not: a user agent is a claim, not
+    // a fact, and iPadOS calls itself a Macintosh. So the screen asks instead of
+    // guessing, and offers both ways in — see `WelcomeScreen`'s `no-host`.
+    //
+    // Guessing would not be neutral either. Wrong about a phone and its owner
+    // loses the app entirely; wrong about a desktop and somebody sees one
+    // button that does nothing. Asking is wrong in neither direction.
+    if (!wantsHub()) {
+      return {
+        ok: false,
+        reason: "no-host",
+        message: "Knock needs a Nimiq wallet.",
       }
     }
 

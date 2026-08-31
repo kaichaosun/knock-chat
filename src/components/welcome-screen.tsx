@@ -6,7 +6,7 @@ import { BrandMark } from "@/components/brand-mark"
 import { LegalSheet } from "@/components/legal-sheet"
 import { Button } from "@/components/ui/button"
 import { PRIVACY, TERMS, type LegalDoc } from "@/lib/legal"
-import { insideNimiqPay, nimiqPayDeeplink } from "@/lib/wallet"
+import { chooseBrowserWallet, insideNimiqPay, nimiqPayDeeplink } from "@/lib/wallet"
 
 /**
  * Everything before the inbox, on one screen.
@@ -51,6 +51,15 @@ export function WelcomeScreen({
 
   /** The two waits with nothing else on screen: finding the wallet, and asking the relay. */
   const waiting = status === "detecting" || status === "preparing"
+
+  // The one thing actually knowable about where this is running. Inside Nimiq
+  // Pay the host may have answered too late, which is worth another try;
+  // outside it there is no provider to wait for and the way in is a choice.
+  const inPay = insideNimiqPay()
+
+  // Being offered that choice is not a failure and should not read as one.
+  // `message` is the wallet's own words, right for something that broke.
+  const explain = status === "no-host" && !inPay ? null : message
 
   // Somebody with a session is not being asked to do anything — they are
   // waiting. Showing them the pitch and a "sign in" control for the seconds it
@@ -97,7 +106,7 @@ export function WelcomeScreen({
       </div>
 
       <div className="mx-auto mt-10 w-full max-w-sm shrink-0 space-y-3">
-        {message && (
+        {explain && (
           <p
             className={
               status === "error"
@@ -105,12 +114,18 @@ export function WelcomeScreen({
                 : "text-muted-foreground px-2 text-center text-[13px] text-balance"
             }
           >
-            {message}
+            {explain}
           </p>
         )}
 
         {status === "no-host" ? (
           <>
+            {/* First, because it is the answer for most of the people who get
+                here: Knock is a Nimiq Pay Mini App, and the wallet they already
+                have is in that app. On a desktop this leads nowhere — nothing
+                answers `nimiqpay://` — but the alternative is guessing at the
+                device from its user agent, and a guess that goes the other way
+                costs a phone user the app entirely. */}
             <Button
               size="lg"
               className="h-13 w-full rounded-2xl text-base"
@@ -119,10 +134,35 @@ export function WelcomeScreen({
               {t("welcome.openInPay")}
               <ArrowUpRight />
             </Button>
-            {/* Only where it could work. Outside Nimiq Pay there is no provider
-                to find, however many times it is asked for — the offer to look
-                again belongs to the case where one is late, not absent. */}
-            {insideNimiqPay() && (
+
+            {/* The second way in, and deliberately the quieter one. Both work,
+                but they are not equals here: a wallet in this browser is not a
+                shortcut to the one in the app — it is a different wallet, in
+                storage only this browser can see. Ranked rather than paired,
+                so the common case is one tap and the other is still there for
+                whoever wants it.
+
+                Chosen for this page load only, then `connect` is re-run in
+                place by the same retry the other cases use. */}
+            {!inPay && (
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-12 w-full rounded-2xl"
+                onClick={() => {
+                  chooseBrowserWallet()
+                  onRetry()
+                }}
+              >
+                {t("welcome.useBrowserWallet")}
+              </Button>
+            )}
+
+            {/* Only inside Nimiq Pay, where a provider that did not answer in
+                time may still answer now. Outside it nothing is being waited
+                for, and the second button above is already the way to try
+                again. */}
+            {inPay && (
               <Button size="lg" variant="ghost" className="h-11 w-full rounded-2xl" onClick={onRetry}>
                 <RefreshCw />
                 {t("welcome.tryAgain")}

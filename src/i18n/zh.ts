@@ -27,6 +27,7 @@ export const zh: Dictionary = {
       },
     },
     openInPay: "在 Nimiq Pay 中打开",
+    useBrowserWallet: "使用此浏览器中的钱包",
     tryAgain: "重试",
     looking: "正在寻找你的钱包",
     opening: "正在打开你的钱包",
