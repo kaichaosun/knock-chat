@@ -1258,6 +1258,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
                     : t("app.chatDeletedInContacts"),
                 )
               }}
+              selectedThread={wide ? openThreadKey : null}
             />
           </>
         ) : tab === "contacts" ? (
@@ -1267,6 +1268,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             error={contactsError}
             onOpen={openThread}
             onRemoved={deleteThread}
+            selectedAddress={wide ? openPeer : null}
           />
         ) : (
           <>
@@ -1282,6 +1284,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
                 deleteThread(id)
                 void refreshGroups()
               }}
+              selectedId={wide ? openGroup : null}
             />
           </>
         )}

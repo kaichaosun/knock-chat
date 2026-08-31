@@ -31,6 +31,7 @@ export function Groups({
   loading,
   onOpen,
   onLeft,
+  selectedId,
 }: {
   groups: Group[]
   owner: string
@@ -39,6 +40,8 @@ export function Groups({
   onOpen: (id: string) => void
   /** Called once the relay has confirmed, so the chat goes with the room. */
   onLeft: (id: string) => void
+  /** The group id currently selected, or null if none. */
+  selectedId?: string | null
 }) {
   const { t } = useTranslation()
   const [revealed, setRevealed] = useState<string | null>(null)
@@ -104,6 +107,7 @@ export function Groups({
               onClick={() => onOpen(group.id)}
               revealed={revealed === group.id}
               onReveal={(open) => setRevealed(open ? group.id : null)}
+              selected={selectedId === group.id}
             >
               <GroupAvatar members={group.members} />
               <div className="min-w-0 flex-1">

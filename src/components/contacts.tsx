@@ -55,6 +55,7 @@ export function Contacts({
   error,
   onOpen,
   onRemoved,
+  selectedAddress,
 }: {
   /** Null until the first read lands. Held above this screen so it survives a
    *  trip to another tab — see [`useContacts`]. */
@@ -64,6 +65,8 @@ export function Contacts({
   onOpen: (peer: string) => void
   /** Called once the relay has confirmed, so the chat goes with the channel. */
   onRemoved: (peer: string) => void
+  /** The address currently selected, or null if none. */
+  selectedAddress?: string | null
 }) {
   const { t } = useTranslation()
   const names = useNames()
@@ -133,6 +136,7 @@ export function Contacts({
             onClick={() => onOpen(contact.address)}
             revealed={revealed === contact.address}
             onReveal={(open) => setRevealed(open ? contact.address : null)}
+            selected={selectedAddress === contact.address}
           >
             <AddressAvatar address={contact.address} />
             <div className="min-w-0 flex-1">

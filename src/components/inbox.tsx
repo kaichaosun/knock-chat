@@ -36,6 +36,7 @@ export function Inbox({
   onCompose,
   onDelete,
   floating,
+  selectedThread,
 }: {
   conversations: Conversation[]
   /** The rooms you are in, so a room's thread can be labelled with its name. */
@@ -47,6 +48,8 @@ export function Inbox({
   onDelete: (thread: string) => void
   /** Whether the compose button belongs here. Off, it lives in the header. */
   floating: boolean
+  /** The thread currently selected, or null if none. */
+  selectedThread?: string | null
 }) {
   // Only one row open at a time, so a stray Delete is never left lurking under
   // a row the user has moved on from.
@@ -115,6 +118,7 @@ export function Inbox({
               menuLabel={t("inbox.rowMenu")}
               revealed={revealed === conversation.key}
               onReveal={(open) => setRevealed(open ? conversation.key : null)}
+              selected={selectedThread === conversation.key}
             />
           ))}
         </ul>
@@ -231,6 +235,7 @@ function ConversationRow({
   menuLabel,
   revealed,
   onReveal,
+  selected,
 }: {
   conversation: Conversation
   /** Set when this thread is a room, and absent while its details load. */
@@ -251,6 +256,8 @@ function ConversationRow({
   menuLabel: string
   revealed: boolean
   onReveal: (open: boolean) => void
+  /** Whether this row is the one currently selected. */
+  selected: boolean
 }) {
   const { t } = useTranslation()
   const { key, peer, group, last, at, unread } = conversation
@@ -290,6 +297,7 @@ function ConversationRow({
         pinned && blockStart && "rounded-t-2xl",
         pinned && blockEnd && "rounded-b-2xl",
       )}
+      selected={selected}
     >
       {group ? <GroupAvatar members={room?.members} /> : peer && <AddressAvatar address={peer} />}
 

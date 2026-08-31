@@ -51,6 +51,7 @@ export function SwipeRow({
   menuAlign = "center",
   className,
   surface,
+  selected,
   children,
 }: {
   /** Read out for the Delete button; say what is being deleted. */
@@ -85,6 +86,8 @@ export function SwipeRow({
    * and would wash through anything less.
    */
   surface?: string
+  /** Whether this row is the one currently selected. */
+  selected?: boolean
   children: ReactNode
 }) {
   // Tracked in a ref rather than state: this updates on every touchmove, and
@@ -266,6 +269,8 @@ export function SwipeRow({
           // Opaque, always: a translucent row would let the Delete panel wash
           // through it while the finger is down.
           surface ?? "bg-background active:bg-muted",
+          // Selected state for desktop - subtle highlight with left border accent
+          selected && "bg-accent/50 border-l-2 border-primary",
           drag === 0 && "transition-transform",
         )}
       >
