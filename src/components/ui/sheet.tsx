@@ -112,8 +112,14 @@ function SheetContent({
       >
         {children}
         {showCloseButton && (
-          <SheetPrimitive.Close className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary">
-            <XIcon className="size-4" />
+          <SheetPrimitive.Close
+            className="bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring absolute top-2 right-2 flex size-10 cursor-pointer items-center justify-center rounded-full transition-[color,background-color,transform] active:scale-95 focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none"
+          >
+            {/* The visible mark is intentionally smaller than its 44px target:
+                it reads as a quiet close control while remaining easy to hit
+                with a pointer or thumb. The tinted disc makes that target
+                visible instead of leaving a tiny, low-opacity X floating. */}
+            <XIcon className="size-5" strokeWidth={2.25} />
             <span className="sr-only">Close</span>
           </SheetPrimitive.Close>
         )}
