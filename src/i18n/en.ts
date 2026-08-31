@@ -506,6 +506,8 @@ export const en = {
     newChatOrGroup: "New chat or group",
     newMessage: "New message",
     yourProfile: "Your profile",
+    hideSidebar: "Hide sidebar",
+    showSidebar: "Show sidebar",
     connected: "You're connected. Messages are free from here.",
     chatDeletedInGroup: "Chat deleted. You're still in the group.",
     chatDeletedInContacts: "Chat deleted. They're still in Contacts.",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info, UserRound } from "lucide-react"
+import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info, PanelLeftOpen, UserRound } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -18,6 +18,7 @@ import { copyText } from "@/lib/clipboard"
 import { labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
 import { removeGroupMember, type Group, type GroupDetail } from "@/lib/relay"
+import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
 import { dayLabel } from "@/lib/time"
 
 /**
@@ -45,6 +46,7 @@ export function GroupRoom({
   onShareContact,
   onInvite,
   onGift,
+  onShowSidebar,
 }: {
   group: Group
   /** Members and settings; null until the first read lands. */
@@ -74,6 +76,8 @@ export function GroupRoom({
   onInvite: (address: string) => void
   /** Leave a pot in the room. Absent on a relay that doesn't hold gifts. */
   onGift?: () => void
+  /** Restore the desktop thread list after it has been hidden. */
+  onShowSidebar?: () => void
 }) {
   const { t } = useTranslation()
   const names = useNames()
@@ -160,6 +164,20 @@ export function GroupRoom({
           >
             <ChevronLeft className="size-6" />
           </Button>
+
+          {onShowSidebar && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onShowSidebar}
+              aria-label={t("app.showSidebar")}
+              aria-keyshortcuts={SIDEBAR_SHORTCUT_KEYS}
+              title={`${t("app.showSidebar")} (${SIDEBAR_SHORTCUT_LABEL})`}
+              className="size-11 shrink-0 rounded-full"
+            >
+              <PanelLeftOpen className="size-5" />
+            </Button>
+          )}
 
           <GroupAvatar size="sm" members={faces} className="size-9" />
 

@@ -480,6 +480,8 @@ export const zh: Dictionary = {
     newChatOrGroup: "新建聊天或群组",
     newMessage: "新消息",
     yourProfile: "你的资料",
+    hideSidebar: "隐藏侧边栏",
+    showSidebar: "显示侧边栏",
     connected: "已建立连接。从现在起消息免费。",
     chatDeletedInGroup: "聊天已删除。你仍在这个群组中。",
     chatDeletedInContacts: "聊天已删除。对方仍在你的联系人里。",

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronLeft, Clock, Coins, DoorClosed, Info, UserRound } from "lucide-react"
+import { ChevronLeft, Clock, Coins, DoorClosed, Info, PanelLeftOpen, UserRound } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { AttachMenu } from "@/components/attach-menu"
@@ -17,6 +17,7 @@ import { carriesTime, opensTurn, type Message } from "@/lib/messages"
 import { labelIn, nameIn } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
+import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
 import { dayLabel } from "@/lib/time"
 import { cn } from "@/lib/utils"
 
@@ -34,6 +35,7 @@ export function Conversation({
   onOpenInvite,
   onOpenContact,
   onShareContact,
+  onShowSidebar,
 }: {
   peer: string
   /** Your address, for the face over your own messages. */
@@ -55,6 +57,8 @@ export function Conversation({
   onOpenContact: (address: string) => void
   /** Post somebody's contact into this chat. */
   onShareContact: (address: string) => void
+  /** Restore the desktop thread list after it has been hidden. */
+  onShowSidebar?: () => void
 }) {
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -130,6 +134,20 @@ export function Conversation({
           >
             <ChevronLeft className="size-6" />
           </Button>
+
+          {onShowSidebar && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onShowSidebar}
+              aria-label={t("app.showSidebar")}
+              aria-keyshortcuts={SIDEBAR_SHORTCUT_KEYS}
+              title={`${t("app.showSidebar")} (${SIDEBAR_SHORTCUT_LABEL})`}
+              className="size-11 shrink-0 rounded-full"
+            >
+              <PanelLeftOpen className="size-5" />
+            </Button>
+          )}
 
           <AddressAvatar address={peer} size="sm" className="size-9" />
 

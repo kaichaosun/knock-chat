@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { Link as LinkIcon, PenLine, Plus, ScanLine, Users } from "lucide-react"
+import { Link as LinkIcon, PanelLeftClose, PenLine, Plus, ScanLine, Users } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 
@@ -43,6 +43,7 @@ import { copyText } from "@/lib/clipboard"
 import { haveStoredSession } from "@/lib/auth"
 import { toHex } from "@/lib/crypto"
 import { reason } from "@/lib/reason"
+import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
 import { cn } from "@/lib/utils"
 import { AlreadyPaidError, fundGift } from "@/lib/gift-funding"
 import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftReceipt } from "@/lib/gift-receipts"
@@ -97,6 +98,22 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const wallet = state.status === "connected" ? state.wallet : null
   /** Whether the window can hold the list and a thread at the same time. */
   const wide = useWide()
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // The desktop list is useful context, but it should not have to keep a third
+  // of the window when the conversation needs the room. This is deliberately
+  // global, including while writing: Command/Ctrl+Backslash is a layout
+  // command rather than text intended for the composer.
+  useEffect(() => {
+    if (!wide) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((!event.metaKey && !event.ctrlKey) || event.key !== "\\" || event.repeat) return
+      event.preventDefault()
+      setSidebarOpen((open) => !open)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [wide])
 
   const session = useSession(wallet)
   // Only poll once there is a session; the relay would answer 401 otherwise.
@@ -1069,6 +1086,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onOpenInvite={openInvite}
         onInvite={onInviteToRoom}
         onGift={giftTerms ? () => setGifting(true) : undefined}
+        onShowSidebar={wide && !sidebarOpen ? () => setSidebarOpen(true) : undefined}
       />
     ) : null
 
@@ -1087,6 +1105,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       onOpenInvite={openInvite}
       onOpenContact={setShowingContact}
       onShareContact={(address) => shareContact((body) => onSend(body), address)}
+      onShowSidebar={wide && !sidebarOpen ? () => setSidebarOpen(true) : undefined}
     />
   ) : null
 
@@ -1188,15 +1207,28 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               the identicon inside is smaller, so the target is generous without
               the mark being loud. Its own transparent bands take off another
               tenth top and bottom, which is why 36 does not look like 36. */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setProfileOpen(true)}
-            aria-label={t("app.yourProfile")}
-            className="size-11 shrink-0 rounded-full"
-          >
-            <AddressAvatar address={address} size="sm" className="size-9" />
-          </Button>
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(false)}
+              aria-label={t("app.hideSidebar")}
+              aria-keyshortcuts={SIDEBAR_SHORTCUT_KEYS}
+              title={`${t("app.hideSidebar")} (${SIDEBAR_SHORTCUT_LABEL})`}
+              className="hidden size-11 shrink-0 rounded-full lg:flex"
+            >
+              <PanelLeftClose className="size-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setProfileOpen(true)}
+              aria-label={t("app.yourProfile")}
+              className="size-11 shrink-0 rounded-full"
+            >
+              <AddressAvatar address={address} size="sm" className="size-9" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -1365,17 +1397,22 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     return listPane
   }
 
-  // Both at once, and the list is never the thing that goes away — closing a
-  // thread leaves the half it was in empty rather than putting the list back,
-  // because the list never left.
+  // Both at once unless the person has hidden the list to give the thread the
+  // full window. Closing a thread leaves its pane empty rather than changing
+  // the list's visibility.
   //
-  // Every shared sheet comes from the list, which is on the page whatever is
-  // open beside it. A thread adds none of its own here: the two would be
-  // mounted twice over, and open twice over with them.
+  // Shared sheets live in the list pane. A thread adds none of its own here:
+  // the two would be mounted twice over, and open twice over with them.
   return (
     <div className="flex h-full">
-      <div className="flex w-[22rem] shrink-0 flex-col border-r">{listPane}</div>
-      <div className="min-w-0 flex-1">{thread ?? <NoThread />}</div>
+      {sidebarOpen && (
+        <div className="flex w-[22rem] shrink-0 flex-col border-r">{listPane}</div>
+      )}
+      <div className="min-w-0 flex-1">
+        {thread ?? (
+          <NoThread onShowSidebar={!sidebarOpen ? () => setSidebarOpen(true) : undefined} />
+        )}
+      </div>
       {giftSheet}
     </div>
   )
