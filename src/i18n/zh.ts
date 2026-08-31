@@ -423,8 +423,7 @@ export const zh: Dictionary = {
   },
   notifications: {
     title: "消息提醒",
-    from: "来自 {{name}} 的消息",
-    note: "当 Knock 在其他标签页时，告诉你消息来自谁，但绝不会显示内容。",
+    note: "有新消息时提醒你，但绝不会显示内容。",
     blocked: "浏览器阻止了本站的通知。请在浏览器设置中允许，之后就会生效。",
   },
   settingsMore: {

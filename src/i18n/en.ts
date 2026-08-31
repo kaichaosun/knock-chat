@@ -444,11 +444,9 @@ export const en = {
   },
   notifications: {
     title: "Notify me",
-    /** The whole of a notification. A name, and nothing that was said. */
-    from: "Message from {{name}}",
     /** Says what it will and will not put on your screen, because that is the
      *  question somebody turning this on is actually asking. */
-    note: "Tells you who a message is from while Knock is in another tab. Never what it says.",
+    note: "Tells you when a new message arrives. Never what it says.",
     /** Only where the browser has been asked and said no. */
     blocked: "Your browser is blocking notifications for this site. Allow them in its settings and this will start working.",
   },
