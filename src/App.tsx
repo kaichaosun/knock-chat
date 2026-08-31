@@ -29,6 +29,7 @@ import { SendGiftSheet } from "@/components/send-gift-sheet"
 import { useContacts } from "@/hooks/use-contacts"
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
 import { useGroups } from "@/hooks/use-groups"
+import { useNotifications } from "@/hooks/use-notifications"
 import { useWide } from "@/hooks/use-wide"
 import { useJoinRequests } from "@/hooks/use-join-requests"
 import { useKnocks } from "@/hooks/use-knocks"
@@ -41,13 +42,14 @@ import { compact } from "@/lib/address"
 import { readCode, type Code } from "@/lib/knock-code"
 import { copyText } from "@/lib/clipboard"
 import { haveStoredSession } from "@/lib/auth"
+import { announce } from "@/lib/notify"
 import { toHex } from "@/lib/crypto"
 import { reason } from "@/lib/reason"
 import { cn } from "@/lib/utils"
 import { AlreadyPaidError, fundGift } from "@/lib/gift-funding"
 import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftReceipt } from "@/lib/gift-receipts"
-import { messageId, withRooms, type Message } from "@/lib/messages"
-import { adopt as adoptNames, givenNameIn, rememberOne } from "@/lib/names"
+import { messageId, threadKey, withRooms, type Message } from "@/lib/messages"
+import { adopt as adoptNames, givenNameIn, labelIn, rememberOne } from "@/lib/names"
 import { adopt as adoptPins, unpin } from "@/lib/pins"
 import {
   adopt as adoptRooms,
@@ -98,6 +100,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   /** Whether the window can hold the list and a thread at the same time. */
   const wide = useWide()
 
+  const notifications = useNotifications()
+  /** What landed while the tab was hidden, waiting to be said out loud. */
+  const [unannounced, setUnannounced] = useState<Message[]>([])
+
   const session = useSession(wallet)
   // Only poll once there is a session; the relay would answer 401 otherwise.
   const owner = session.state.status === "active" ? session.state.session.address : null
@@ -121,7 +127,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     dismissed,
     relayStatus,
     refresh: refreshMessages,
-  } = useMessages(owner, deviceSecretKey, session.invalidate)
+  } = useMessages(owner, deviceSecretKey, session.invalidate, {
+    on: notifications.armed,
+    // Collected rather than announced here: naming a thread needs the name
+    // directory and the room list, and opening one needs a callback defined
+    // further down. Kept until the effect below, which has all three.
+    onArrived: (arrived) => setUnannounced((waiting) => [...waiting, ...arrived]),
+  })
 
   /**
    * A knock that was paid for earlier and has only now got through.
@@ -346,6 +358,32 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     },
     [groups, threadWith, openRoom, openThread],
   )
+
+  /**
+   * Say what arrived while nobody was looking.
+   *
+   * One notification per thread rather than per message: four lines typed in a
+   * row are one thing to be told about, and `announce` tags by thread so they
+   * would collapse into one anyway. What it says is who it is from — a name, or
+   * a room's — and never a word of what was said; the click brings you here,
+   * which is where the words are.
+   */
+  useEffect(() => {
+    if (unannounced.length === 0) return
+    const latest = new Map(unannounced.map((message) => [threadKey(message), message]))
+    for (const [thread, message] of latest) {
+      announce(
+        t("notifications.from", {
+          name: message.group
+            ? (roomIn(rooms, message.group)?.name ?? t("inbox.group"))
+            : labelIn(names, message.peer),
+        }),
+        thread,
+        () => openAnyThread(thread),
+      )
+    }
+    setUnannounced([])
+  }, [unannounced, names, rooms, openAnyThread, t])
 
   /**
    * Whether the relay says this room no longer exists.

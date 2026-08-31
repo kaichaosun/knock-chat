@@ -12,6 +12,7 @@ import { useTheme } from "@/hooks/use-theme"
 import { PRIVACY, TERMS, type LegalDoc } from "@/lib/legal"
 import { update, type ComposeSpot } from "@/lib/prefs"
 import { choose, type Theme } from "@/lib/theme"
+import { useNotifications } from "@/hooks/use-notifications"
 import { cn } from "@/lib/utils"
 
 /**
@@ -58,6 +59,8 @@ export function SettingsSheet({
   const [reading, setReading] = useState<LegalDoc | null>(null)
   const [picking, setPicking] = useState(false)
 
+  const notifications = useNotifications()
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
@@ -82,6 +85,40 @@ export function SettingsSheet({
               </span>
             </button>
           </section>
+
+          {/* Absent where there is no such thing rather than shown and dead:
+              inside Nimiq Pay the browser has no notifications to give, and a
+              switch that cannot do anything is worse than no switch. */}
+          {notifications.supported && (
+            <section>
+              <label className="flex items-start justify-between gap-4">
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold">
+                    {t("notifications.title")}
+                  </span>
+                  <span className="text-muted-foreground mt-1 block text-[13px] leading-snug">
+                    {t("notifications.note")}
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={notifications.armed}
+                  // Asked for on the tick, because the browser will only raise
+                  // its own prompt inside a click.
+                  onChange={(event) => {
+                    if (event.target.checked) void notifications.enable()
+                    else notifications.disable()
+                  }}
+                  className="accent-primary mt-0.5 size-5 shrink-0"
+                />
+              </label>
+              {notifications.blocked && (
+                <p className="text-warning mt-2 text-[13px] leading-snug">
+                  {t("notifications.blocked")}
+                </p>
+              )}
+            </section>
+          )}
 
           <section>
             <h3 className="text-sm font-semibold">{t("settingsMore.appearance")}</h3>

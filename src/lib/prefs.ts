@@ -32,9 +32,18 @@ export type Prefs = {
    * reason as the rest of this file: it is about this screen, not about you.
    */
   language: LanguageChoice
+  /**
+   * Whether to be told about messages that arrive while you are looking
+   * elsewhere.
+   *
+   * Off until asked for, and only half the answer: the browser's own
+   * permission is the other half, and this being on without that granted
+   * means nothing can be shown — see `lib/notify`.
+   */
+  notify: boolean
 }
 
-const DEFAULTS: Prefs = { compose: "floating", language: "host" }
+const DEFAULTS: Prefs = { compose: "floating", language: "host", notify: false }
 
 let prefs: Prefs = DEFAULTS
 const listeners = new Set<() => void>()
@@ -48,6 +57,7 @@ function read(): Prefs {
     return {
       compose: stored.compose === "header" ? "header" : DEFAULTS.compose,
       language: isLanguage(stored.language) ? stored.language : DEFAULTS.language,
+      notify: stored.notify === true,
     }
   } catch {
     // Private mode, no storage, or something that is not JSON.

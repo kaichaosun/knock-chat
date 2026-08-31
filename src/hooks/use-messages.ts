@@ -10,6 +10,16 @@ import type { Envelope } from "@/lib/relay"
 
 /** How often to ask the relay for new mail while the app is in the foreground. */
 const POLL_INTERVAL_MS = 3000
+/**
+ * How often to look while the tab is hidden, and only where something is
+ * waiting to be told — see `watching` below.
+ *
+ * Slower than the foreground on purpose. Nobody is reading a thread they
+ * cannot see, so the only thing this buys is how soon a notification appears,
+ * and fifteen seconds is soon enough for that to cost a laptop nothing worth
+ * measuring.
+ */
+const HIDDEN_POLL_INTERVAL_MS = 15000
 
 export type RelayStatus = "connecting" | "online" | "offline"
 
@@ -22,6 +32,15 @@ export function useMessages(
   owner: string | null,
   deviceSecretKey: Uint8Array | null,
   onUnauthorized?: () => void,
+  /**
+   * Whether to keep reading while the tab is hidden, and who to tell when
+   * something arrives that way.
+   *
+   * `watching` is false unless notifications are both wanted and permitted, so
+   * a hidden tab goes quiet again the moment either stops being true. A toggle
+   * turned on against a refused permission shows nothing, and so costs nothing.
+   */
+  watching?: { on: boolean; onArrived: (messages: Message[]) => void },
 ) {
   const [snapshot, setSnapshot] = useState<Snapshot>(() =>
     owner ? history.load(owner) : history.emptySnapshot(),
@@ -30,6 +49,16 @@ export function useMessages(
 
   // Kept in a ref so the polling effect doesn't restart on every message.
   const snapshotRef = useRef(snapshot)
+  /**
+   * The watch, in a ref.
+   *
+   * The poll lives in an effect keyed on the identity it reads for, and must
+   * not be torn down and rebuilt every time a preference changes — restarting
+   * it would re-ack and re-read for no reason. A ref lets the running poll see
+   * the current answer without being rebuilt to hear it.
+   */
+  const watchRef = useRef(watching)
+  watchRef.current = watching
   const update = useCallback(
     (change: (current: Snapshot) => Snapshot) => {
       setSnapshot((current) => {
@@ -62,7 +91,11 @@ export function useMessages(
     let acked: string | null = null
 
     const poll = async () => {
-      if (document.hidden) return
+      // A hidden tab reads on only for the sake of saying something about what
+      // it finds. Without that it is asking a question nobody will hear the
+      // answer to.
+      const hidden = document.hidden
+      if (hidden && !watchRef.current?.on) return
       try {
         // What is already written down here, the relay can let go of.
         //
@@ -97,7 +130,27 @@ export function useMessages(
           : result.messages
         if (cancelled) return
 
+        // Which of these are new has to be asked before the merge, because
+        // after it there is nothing left to compare against: the merge is
+        // idempotent by id, so a replayed message looks exactly like a fresh
+        // one once it is in.
+        const known = new Set(snapshotRef.current.messages.map((message) => message.id))
         update((current) => history.mergeIncoming(current, opened, result.next))
+
+        // Only what arrived while nobody was looking, and only from somebody
+        // else. Announcing the backlog that lands on the first read after a
+        // reconnect would be a dozen notifications for a conversation already
+        // over.
+        if (hidden && watchRef.current?.on) {
+          const arrived = opened.filter(
+            (envelope) => !known.has(envelope.id) && envelope.from !== owner,
+          )
+          if (arrived.length > 0) {
+            watchRef.current.onArrived(
+              history.mergeIncoming(history.emptySnapshot(), arrived, result.next).messages,
+            )
+          }
+        }
       } catch (error) {
         if (cancelled) return
         if (error instanceof RelayError && error.status === 401) {
@@ -110,8 +163,17 @@ export function useMessages(
 
     polling.current = poll
     void poll()
-    const timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS)
-    const onVisible = () => void poll()
+    // Two rates, swapped as the tab comes and goes: reading at three seconds
+    // into a tab nobody is looking at is a cost with no reader.
+    let timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS)
+    const onVisible = () => {
+      window.clearInterval(timer)
+      timer = window.setInterval(
+        () => void poll(),
+        document.hidden ? HIDDEN_POLL_INTERVAL_MS : POLL_INTERVAL_MS,
+      )
+      void poll()
+    }
     document.addEventListener("visibilitychange", onVisible)
 
     return () => {

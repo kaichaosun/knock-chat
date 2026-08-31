@@ -421,6 +421,12 @@ export const zh: Dictionary = {
     nobodyYet: "还没有人领取。",
     sending: " · 发放中",
   },
+  notifications: {
+    title: "消息提醒",
+    from: "来自 {{name}} 的消息",
+    note: "当 Knock 在其他标签页时，告诉你消息来自谁，但绝不会显示内容。",
+    blocked: "浏览器阻止了本站的通知。请在浏览器设置中允许，之后就会生效。",
+  },
   settingsMore: {
     appearance: "外观",
     appearanceNote: "选择 Knock 在这台手机上的样子。",
