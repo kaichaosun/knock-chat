@@ -329,6 +329,21 @@ export const en = {
       "Anyone with the link walks straight in, without asking you. Anyone you remove can walk back in the same way.",
     doorApprovalOn: "New people will have to ask you first.",
     doorApprovalOff: "Door open — anyone with the link walks in.",
+    pastTitle: "What new people can read",
+    pastPrivate: "From when they join",
+    pastPrivateHint: "The room starts for them",
+    pastPrivateMeans:
+      "People who join hear the room from the moment they are in it. Everything said before that stays with the people who were here for it.",
+    pastShared: "Everything",
+    pastSharedHint: "The room reads from the start",
+    pastSharedMeans:
+      "Everyone in the room can read the whole of it, back to the first message — including anyone who joins later.",
+    pastSharedOn: "The room now reads from the beginning.",
+    pastSharedOff: "New people will start from when they join.",
+    pastSharedWarning:
+      "Anyone who joins can read everything ever said here, including messages from before they arrived.",
+    pastNoRecall:
+      "It cannot take back what has already been read — those messages are on their device now.",
     removedApproval: "Removed. They'd have to ask to come back.",
     removedOpen: "Removed — though they can walk back in while the door is open.",
     openDoorPaid:

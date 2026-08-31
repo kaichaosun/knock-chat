@@ -65,6 +65,7 @@ import { deviceKeyPair } from "@/lib/keys"
 import {
   RelayError,
   getGiftTerms,
+  groupHistory,
   type GiftTerms,
   type Group,
   type GroupDetail,
@@ -133,6 +134,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     markRead,
     deleteThread,
     recordOutgoing,
+    absorbHistory,
     setStatus,
     resend,
     dismissed,
@@ -331,6 +333,36 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   useEffect(() => {
     if (openPeer) forgetPeerKey(openPeer)
   }, [openPeer])
+
+  /** Rooms whose past has already been asked for, so it is asked for once. */
+  const backfilled = useRef<Set<string>>(new Set())
+
+  /**
+   * Fill in what a room said before you got here.
+   *
+   * Only for rooms whose owner shares their history, so an ordinary room costs
+   * nothing — the check is on the group we already hold, not a request.
+   *
+   * It has to be asked for. The message feed is a queue drained by a cursor
+   * that only moves forward, so a member who is up to date is by definition
+   * past every message older than their membership, and no amount of polling
+   * would ever reach one. Keyed on `openGroup` for the same reason the effect
+   * above is keyed on `openPeer`: every way into a room goes through it.
+   */
+  useEffect(() => {
+    if (!openGroup) return
+    const room = groups.find((group) => group.id === openGroup)
+    if (!room?.share_history || backfilled.current.has(openGroup)) return
+    backfilled.current.add(openGroup)
+    void groupHistory(openGroup)
+      .then((page) => absorbHistory(page.messages))
+      .catch(() => {
+        // Nothing to say out loud: the room works from here on, which is
+        // exactly what it did before there was any history to fetch. Forgotten
+        // rather than remembered, so opening it again tries once more.
+        backfilled.current.delete(openGroup)
+      })
+  }, [openGroup, groups, absorbHistory])
 
   /**
    * The chat list: threads that have messages, plus rooms that do not yet.

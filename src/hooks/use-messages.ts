@@ -216,6 +216,23 @@ export function useMessages(
     [update],
   )
 
+  /**
+   * Fold a room's past into the history, leaving the feed's cursor alone.
+   *
+   * The same merge the feed uses — keyed on message id, so anything already
+   * here is not added twice — but the cursor is passed back unchanged. That
+   * cursor is the feed's position, and a room's past is not the feed: moving it
+   * to a `seq` from before the room was joined would tell the relay this device
+   * is behind and replay everything since.
+   *
+   * Room bodies are plain text, so there is nothing to decrypt on the way in.
+   */
+  const absorbHistory = useCallback(
+    (envelopes: Envelope[]) =>
+      update((current) => history.mergeIncoming(current, envelopes, current.cursor)),
+    [update],
+  )
+
   /** Record a message this device sent outside the normal send path — a knock. */
   const recordOutgoing = useCallback(
     (peer: string, body: string, id: string, group?: string, status?: MessageStatus) =>
@@ -241,6 +258,7 @@ export function useMessages(
     deleteThread,
     dismissed,
     recordOutgoing,
+    absorbHistory,
     setStatus,
     resend,
     relayStatus,

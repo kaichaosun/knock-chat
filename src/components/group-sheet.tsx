@@ -76,6 +76,28 @@ import { cn } from "@/lib/utils"
  * decides is whether paying is the whole of getting in, or only what it takes
  * to be asked about.
  */
+/**
+ * The two things a room can do with its past, in the room's own words.
+ *
+ * Same shape and same reason as [`doorFor`] below: the card and the dialog that
+ * confirms it both read from here, so the dialog is the choice restated rather
+ * than a second thing to read and reconcile.
+ */
+function pastFor(shares: boolean) {
+  if (shares) {
+    return {
+      label: translate("groupSheet.pastShared"),
+      hint: translate("groupSheet.pastSharedHint"),
+      means: translate("groupSheet.pastSharedMeans"),
+    }
+  }
+  return {
+    label: translate("groupSheet.pastPrivate"),
+    hint: translate("groupSheet.pastPrivateHint"),
+    means: translate("groupSheet.pastPrivateMeans"),
+  }
+}
+
 function doorFor(requiresApproval: boolean, priceLuna: number) {
   const price = priceLuna > 0 ? `${formatNim(priceLuna)} NIM` : null
 
@@ -165,9 +187,11 @@ export function GroupSheet({
   // value after the owner changed it on another device.
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
-  const [saving, setSaving] = useState<"name" | "price" | "door" | null>(null)
+  const [saving, setSaving] = useState<"name" | "price" | "door" | "past" | null>(null)
   /** The door being changed to, while it is being confirmed. Null when nothing is. */
   const [changing, setChanging] = useState<boolean | null>(null)
+  /** The history setting being moved to, while it is still only being offered. */
+  const [changingPast, setChangingPast] = useState<boolean | null>(null)
   // Held until confirmed. It is a small icon in a list of faces, and getting
   // somebody back in can cost them money — or be up to the owner entirely.
   const [removing, setRemoving] = useState<string | null>(null)
@@ -266,6 +290,34 @@ export function GroupSheet({
     // used to save the setting it already had.
     if (approval === group.requires_approval) return
     setChanging(approval)
+  }
+
+  const setPast = async (share_history: boolean) => {
+    setSaving("past")
+    try {
+      await updateGroup(group.id, { share_history })
+      setChangingPast(null)
+      onChanged()
+      toast.success(
+        share_history ? t("groupSheet.pastSharedOn") : t("groupSheet.pastSharedOff"),
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  /**
+   * Answer a tap on one of the two history cards.
+   *
+   * Confirmed rather than immediate, for the reason the door is: these two
+   * cards look alike, and one of them opens everything the room has ever said
+   * to everybody in it. That is not a thing to do to a room with a stray thumb.
+   */
+  const choosePast = (share: boolean) => {
+    if (share === group.share_history) return
+    setChangingPast(share)
   }
 
   const saveName = async () => {
@@ -490,6 +542,36 @@ export function GroupSheet({
                     {group.join_price_luna > 0
                       ? t("groupSheet.openDoorPaid")
                       : t("groupSheet.openDoorFree")}
+                  </p>
+                )}
+              </section>
+            )}
+
+            {mine && (
+              <section>
+                <h3 className="text-sm font-semibold">{t("groupSheet.pastTitle")}</h3>
+                <div className="mt-2 flex gap-2">
+                  {[false, true].map((share) => (
+                    <button
+                      key={String(share)}
+                      type="button"
+                      onClick={() => choosePast(share)}
+                      aria-pressed={group.share_history === share}
+                      className={cn(
+                        "flex-1 rounded-2xl border px-3 py-2.5 text-left text-[13px] transition-colors",
+                        group.share_history === share && "border-primary text-primary",
+                      )}
+                    >
+                      <span className="block font-semibold">{pastFor(share).label}</span>
+                      <span className="text-muted-foreground block text-[11px] leading-snug">
+                        {pastFor(share).hint}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {group.share_history && (
+                  <p className="text-warning mt-2 text-[12px] leading-snug">
+                    {t("groupSheet.pastSharedWarning")}
                   </p>
                 )}
               </section>
@@ -804,6 +886,42 @@ export function GroupSheet({
               onClick={() => changing !== null && void setApproval(changing)}
             >
               {saving === "door" && <Loader2 className="animate-spin" />}
+              {t("groupSheet.confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmed the way the door is, and in the same words as the card. The
+          off direction gets a sentence of its own: shutting the past stops it
+          being handed out from here on, and cannot reach what somebody has
+          already read onto their own device. Better said than implied. */}
+      <Dialog
+        open={changingPast !== null}
+        onOpenChange={(open) => !open && setChangingPast(null)}
+      >
+        <DialogContent className="max-w-[20rem] rounded-3xl">
+          <DialogHeader className="items-center text-center sm:text-center">
+            <DialogTitle>{changingPast !== null && pastFor(changingPast).label}</DialogTitle>
+            <DialogDescription className="text-balance">
+              {changingPast !== null && pastFor(changingPast).means}
+              {changingPast === false && <> {t("groupSheet.pastNoRecall")}</>}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="ghost"
+              className="h-11 rounded-2xl"
+              onClick={() => setChangingPast(null)}
+            >
+              {t("groupSheet.cancel")}
+            </Button>
+            <Button
+              disabled={saving === "past"}
+              className="h-11 rounded-2xl"
+              onClick={() => changingPast !== null && void setPast(changingPast)}
+            >
+              {saving === "past" && <Loader2 className="animate-spin" />}
               {t("groupSheet.confirm")}
             </Button>
           </DialogFooter>

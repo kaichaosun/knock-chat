@@ -235,6 +235,15 @@ export type Group = {
   join_price_luna: number
   /** Whether the owner still has to say yes after they have paid. */
   requires_approval: boolean
+  /**
+   * Whether somebody joining can read what the room said before they arrived.
+   *
+   * Off by default: a room is heard from the moment you are in it. The past
+   * does not arrive through the message feed even when this is on — that feed
+   * is a queue whose cursor only goes forward, so it is asked for separately.
+   * See [`groupHistory`].
+   */
+  share_history: boolean
   created_at: string
   /**
    * The earliest few members, when the relay sent them.
@@ -308,6 +317,7 @@ export function createGroup(input: {
   name: string
   join_price_luna?: number
   requires_approval?: boolean
+  share_history?: boolean
 }): Promise<Group> {
   return request<Group>("/v1/groups", { method: "POST", body: JSON.stringify(input) })
 }
@@ -330,12 +340,52 @@ export function getGroup(id: string): Promise<GroupDetail> {
 
 export function updateGroup(
   id: string,
-  changes: { name?: string; join_price_luna?: number; requires_approval?: boolean },
+  changes: {
+    name?: string
+    join_price_luna?: number
+    requires_approval?: boolean
+    share_history?: boolean
+  },
 ): Promise<Group> {
   return request<Group>(`/v1/groups/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(changes),
   })
+}
+
+/** One page of a room's past, oldest first. */
+export type RoomHistory = {
+  messages: Envelope[]
+  /** Pass as `before` for the page before this one, or null at the beginning. */
+  next: number | null
+}
+
+/**
+ * What a room said before you got here.
+ *
+ * Empty unless the owner has turned the room's history on, which is checked at
+ * the relay — a client asking anyway is answered, not trusted.
+ *
+ * Deliberately not part of the message feed. That feed is a queue drained by a
+ * cursor that only goes forward, so by the time somebody joins a room their
+ * cursor is already past everything older than their membership and no amount
+ * of polling would ever reach it. This asks the other question, and pages
+ * backwards: `before` is the `next` from the page before it.
+ *
+ * Your own past messages are not returned, exactly as the feed does not return
+ * them — a sender keeps their own copy, and it is the only one that knows it
+ * was theirs.
+ */
+export function groupHistory(
+  id: string,
+  options: { before?: number | null } = {},
+): Promise<RoomHistory> {
+  const params = new URLSearchParams()
+  if (options.before) params.set("before", String(options.before))
+  const query = params.toString()
+  return request<RoomHistory>(
+    `/v1/groups/${encodeURIComponent(id)}/messages${query ? `?${query}` : ""}`,
+  )
 }
 
 /** Walk in, or ask to. `postage` is omitted only when the door is free. */
