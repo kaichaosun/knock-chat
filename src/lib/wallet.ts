@@ -21,6 +21,7 @@ import { init, getHostLanguage, type NimiqProvider } from "@nimiq/mini-app-sdk"
 import type HubApi from "@nimiq/hub-api"
 
 import { addressFromPublicKey } from "./address"
+import { loadSession } from "./auth"
 import { unwrapTransaction } from "./payments"
 import { signedMessageDigest } from "./signed-message"
 
@@ -37,6 +38,9 @@ const HUB_ENDPOINT = "https://hub.nimiq.com"
 
 /** What the Hub tells the user they are signing for. */
 const HUB_APP_NAME = "Knock"
+
+/** The scope a Hub session is stored under, and the one the gate below reads. */
+const HUB_SCOPE = "hub"
 
 /**
  * Whether Nimiq Pay is the thing we are running in.
@@ -324,7 +328,15 @@ export async function connect(): Promise<ConnectResult> {
     // Guessing would not be neutral either. Wrong about a phone and its owner
     // loses the app entirely; wrong about a desktop and somebody sees one
     // button that does nothing. Asking is wrong in neither direction.
-    if (!wantsHub()) {
+    //
+    // Except of somebody already signed in through it. A stored Hub session is
+    // that choice, made and still standing — asking again would be asking them
+    // to re-answer, on every launch, a question they answered by signing in.
+    //
+    // Read from the session rather than kept as a preference of its own, which
+    // is what keeps it reversible: signing out clears the session, and the
+    // choice comes back with it. There is nothing to be stuck in.
+    if (!wantsHub() && !loadSession(HUB_SCOPE)) {
       return {
         ok: false,
         reason: "no-host",
@@ -353,7 +365,7 @@ export async function connect(): Promise<ConnectResult> {
           provider: null,
           sign: hubSigner(hub),
           pay: hubPayer(hub),
-          scope: "hub",
+          scope: HUB_SCOPE,
           language: language(),
         },
       }
