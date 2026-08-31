@@ -94,8 +94,10 @@ export function useMessages(
       // A hidden tab reads on only for the sake of saying something about what
       // it finds. Without that it is asking a question nobody will hear the
       // answer to.
-      const hidden = document.hidden
-      if (hidden && !watchRef.current?.on) return
+      // A tab can remain visible while its browser window is behind another
+      // desktop app. `document.hidden` does not cover that case; hasFocus does.
+      const away = document.hidden || !document.hasFocus()
+      if (away && !watchRef.current?.on) return
       try {
         // What is already written down here, the relay can let go of.
         //
@@ -141,7 +143,7 @@ export function useMessages(
         // else. Announcing the backlog that lands on the first read after a
         // reconnect would be a dozen notifications for a conversation already
         // over.
-        if (hidden && watchRef.current?.on) {
+        if (away && watchRef.current?.on) {
           const arrived = opened.filter(
             (envelope) => !known.has(envelope.id) && envelope.from !== owner,
           )
@@ -163,24 +165,29 @@ export function useMessages(
 
     polling.current = poll
     void poll()
-    // Two rates, swapped as the tab comes and goes: reading at three seconds
-    // into a tab nobody is looking at is a cost with no reader.
+    // Two rates, swapped as the tab, browser window, or desktop focus comes
+    // and goes: reading at three seconds when nobody is looking is a cost with
+    // no reader.
     let timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS)
-    const onVisible = () => {
+    const onAttentionChange = () => {
       window.clearInterval(timer)
       timer = window.setInterval(
         () => void poll(),
-        document.hidden ? HIDDEN_POLL_INTERVAL_MS : POLL_INTERVAL_MS,
+        document.hidden || !document.hasFocus() ? HIDDEN_POLL_INTERVAL_MS : POLL_INTERVAL_MS,
       )
       void poll()
     }
-    document.addEventListener("visibilitychange", onVisible)
+    document.addEventListener("visibilitychange", onAttentionChange)
+    window.addEventListener("blur", onAttentionChange)
+    window.addEventListener("focus", onAttentionChange)
 
     return () => {
       cancelled = true
       polling.current = null
       window.clearInterval(timer)
-      document.removeEventListener("visibilitychange", onVisible)
+      document.removeEventListener("visibilitychange", onAttentionChange)
+      window.removeEventListener("blur", onAttentionChange)
+      window.removeEventListener("focus", onAttentionChange)
     }
   }, [owner, update, onUnauthorized, deviceSecretKey])
 

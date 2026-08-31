@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react"
 import { askToNotify, canNotify, notifyPermission } from "@/lib/notify"
 import { update } from "@/lib/prefs"
 import { usePrefs } from "@/hooks/use-prefs"
+import { subscribeToPush, unsubscribeFromPush } from "@/lib/push"
 
 /**
  * Whether this device is set up to be told about messages, and how to set it up.
@@ -34,10 +35,14 @@ export function useNotifications() {
     // Remembered either way. A refusal is the browser's to reverse, and
     // forgetting the request would make the row snap back with no explanation.
     update({ notify: true })
+    if (settled === "granted") await subscribeToPush()
     return settled
   }, [])
 
-  const disable = useCallback(() => update({ notify: false }), [])
+  const disable = useCallback(() => {
+    update({ notify: false })
+    void unsubscribeFromPush()
+  }, [])
 
   return {
     /** False where there is no such thing — inside Nimiq Pay, for one. */
