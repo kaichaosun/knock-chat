@@ -208,6 +208,7 @@ export const en = {
     addressCopied: "Address copied",
     copyFailed: "Couldn't copy that",
     emptyRoom: "Nothing said here yet. Anyone in the room sees what you write.",
+    pullForEarlier: "Pull down to look for earlier messages.",
   },
   members: {
     inTheRoom: "In the room",

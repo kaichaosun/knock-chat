@@ -189,6 +189,7 @@ export const zh: Dictionary = {
     addressCopied: "地址已复制",
     copyFailed: "复制失败",
     emptyRoom: "这里还没有人说话。群里的每个人都能看到你写的内容。",
+    pullForEarlier: "下拉查找更早的消息。",
   },
   members: {
     inTheRoom: "群成员",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useState } from "react"
 
 import { groupHistory, type Envelope } from "@/lib/relay"
 
@@ -10,24 +10,19 @@ import { groupHistory, type Envelope } from "@/lib/relay"
  * by definition past everything older than their membership — see
  * `groupHistory`. It is asked for instead, newest page first, walking backwards.
  *
- * Held per room and only for this session. Reopening a room asks for its newest
- * page again, which costs one request and cannot duplicate anything: the merge
- * is keyed on message id and leaves the feed's cursor alone.
+ * Nothing is fetched on opening a room — only on being asked, by pulling the
+ * top of the list down. A room therefore opens showing what this device already
+ * holds, and somebody who deleted a chat does not find it quietly restored.
+ *
+ * Held per room and only for this session. The merge is keyed on message id and
+ * leaves the feed's cursor alone, so pulling for a page already held costs a
+ * request and changes nothing.
  */
 export function useRoomHistory(
   room: string | null,
   /** Whether this room shares its past at all. A room that does not has none. */
   shares: boolean,
   absorb: (envelopes: Envelope[]) => void,
-  /**
-   * Changes every time somebody opens a room, including the one already open.
-   *
-   * The room's id cannot carry that on its own. Delete a chat in the two-pane
-   * layout and the room never closes, so picking it from the list again leaves
-   * the id exactly as it was — and asking for it back is precisely what that
-   * tap means.
-   */
-  opened: number,
 ) {
   /**
    * Where each room's next page back starts.
@@ -37,15 +32,6 @@ export function useRoomHistory(
    * and a number is somewhere left to go.
    */
   const [pages, setPages] = useState<Record<string, { next: number | null; loading: boolean }>>({})
-
-  /**
-   * Rooms whose first page has been asked for.
-   *
-   * A ref rather than derived from `pages`, because the request is in flight
-   * long before any state lands — two renders in that window would both see no
-   * entry and both fetch.
-   */
-  const asked = useRef<Set<string>>(new Set())
 
   const fetchPage = useCallback(
     async (id: string, before: number | null) => {
@@ -58,20 +44,11 @@ export function useRoomHistory(
         // Nothing to say out loud: the room still works from here on, which is
         // what it did before there was any history to fetch. The cursor is left
         // where it was and the room forgotten, so asking again retries.
-        asked.current.delete(id)
         setPages((current) => ({ ...current, [id]: { next: current[id]?.next ?? null, loading: false } }))
       }
     },
     [absorb],
   )
-
-  // The newest page, once per room per session. Only for rooms that share their
-  // past, so an ordinary room costs no request at all.
-  useEffect(() => {
-    if (!room || !shares || asked.current.has(room)) return
-    asked.current.add(room)
-    void fetchPage(room, null)
-  }, [room, shares, fetchPage, opened])
 
   /**
    * Forget what is known about a room's past, so opening it asks again.
@@ -82,7 +59,6 @@ export function useRoomHistory(
    * strange thing for "delete" to have done.
    */
   const forget = useCallback((id: string) => {
-    asked.current.delete(id)
     setPages((current) => {
       if (!(id in current)) return current
       const { [id]: _gone, ...rest } = current
@@ -93,15 +69,25 @@ export function useRoomHistory(
   const state = room ? pages[room] : undefined
 
   const loadEarlier = useCallback(() => {
-    if (!room) return
+    if (!room || !shares) return
     const here = pages[room]
-    if (!here || here.loading || here.next === null) return
-    void fetchPage(room, here.next)
-  }, [room, pages, fetchPage])
+    if (here?.loading) return
+    // The beginning of the room, already reached.
+    if (here && here.next === null) return
+    // `null` on the first pull, which asks for the newest page; after that,
+    // wherever the last one ran out.
+    void fetchPage(room, here?.next ?? null)
+  }, [room, shares, pages, fetchPage])
 
   return {
-    /** Whether there is anything older to fetch. False before the first page lands. */
-    hasEarlier: state?.next != null,
+    /**
+     * Whether pulling would fetch anything — true before the first page too.
+     *
+     * That is the point of it. Nothing is fetched until it is asked for, so a
+     * room opens holding only what this device already had, and reopening a
+     * chat somebody deleted does not quietly hand back what they deleted.
+     */
+    hasEarlier: shares && (state === undefined || state.next !== null),
     /** A page is in flight, so the list should say so rather than look stuck. */
     loadingEarlier: state?.loading ?? false,
     loadEarlier,

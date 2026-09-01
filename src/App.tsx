@@ -319,16 +319,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    * "one thread at a time" is a fact about the state rather than a habit of
    * whoever wrote the call.
    */
-  /**
-   * Counts opens rather than naming rooms, so that opening the room already on
-   * screen still registers as having happened. See `useRoomHistory`.
-   */
-  const [roomOpens, setRoomOpens] = useState(0)
-
   const openRoom = useCallback((group: string) => {
     setOpenPeer(null)
     setOpenGroup(group)
-    setRoomOpens((count) => count + 1)
   }, [])
 
   // Opening a chat is the moment worth re-checking who you are writing to.
@@ -352,7 +345,6 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     openGroup,
     Boolean(groups.find((group) => group.id === openGroup)?.share_history),
     absorbHistory,
-    roomOpens,
   )
 
   /**

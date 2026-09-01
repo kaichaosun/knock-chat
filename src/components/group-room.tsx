@@ -372,7 +372,9 @@ export function GroupRoom({
           }}
         >
           <PullIndicator pull={pullEarlier} />
-          {messages.length === 0 && <RoomIntro group={group} members={faces} />}
+          {messages.length === 0 && (
+            <RoomIntro group={group} members={faces} canPull={hasEarlier} />
+          )}
 
           {groups.map((day) => (
             <section key={day.label} className="mb-1">
@@ -583,7 +585,16 @@ export function GroupRoom({
   )
 }
 
-function RoomIntro({ group, members }: { group: Group; members?: string[] }) {
+function RoomIntro({
+  group,
+  members,
+  /** Whether the room has a past that could still be asked for. */
+  canPull,
+}: {
+  group: Group
+  members?: string[]
+  canPull?: boolean
+}) {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center px-8 py-14 text-center">
@@ -592,6 +603,16 @@ function RoomIntro({ group, members }: { group: Group; members?: string[] }) {
       <p className="text-muted-foreground mt-2 text-sm text-balance">
         {t("room.emptyRoom")}
       </p>
+      {/* Said only where it is true. A room that shares its past is not empty
+          just because nothing has been fetched yet, and leaving the line above
+          to stand alone would tell a new member that a room full of history had
+          never been spoken in. "Look for" rather than "read", because whether
+          there is anything back there is the room's answer to give, not ours. */}
+      {canPull && (
+        <p className="text-muted-foreground/80 mt-2 text-[13px] text-balance">
+          {t("room.pullForEarlier")}
+        </p>
+      )}
     </div>
   )
 }
