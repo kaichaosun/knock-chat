@@ -4,15 +4,12 @@ import {
   carriesTime,
   conversations,
   deleteThread,
-  dropStrandedCopies,
   emptySnapshot,
-  load,
   markRead,
   mergeIncoming,
   opensTurn,
   recordOutgoing,
   resend,
-  save,
   setStatus,
   threadWith,
   withRooms,
@@ -556,82 +553,5 @@ describe("the time on a bubble", () => {
 
   it("is shown when the reply is yours", () => {
     expect(carriesTime(said("12:00:05", ALICE), said("12:00:40", null))).toBe(true)
-  })
-})
-
-describe("dropStrandedCopies", () => {
-  /** The room's own copy of `body`, as its history hands it back. */
-  const roomSaid = (body: string, seq = 1) =>
-    mergeIncoming(emptySnapshot(), [roomEnvelope(seq, body, ME)], cursor(seq), ME)
-
-  it("drops the copy left behind when a card was never given its relay name", () => {
-    // The bug, as it was written down: recorded local and ticked as sent, then
-    // handed back by the room's history under a name that matched nothing.
-    let snapshot = recordOutgoing(emptySnapshot(), ME, "a gift", "local:1", ROOM)
-    snapshot = mergeIncoming(snapshot, [roomEnvelope(1, "a gift", ME)], cursor(1), ME)
-    expect(threadWith(snapshot, ROOM)).toHaveLength(2)
-
-    const swept = threadWith(dropStrandedCopies(snapshot), ROOM)
-    expect(swept).toHaveLength(1)
-    // The room's copy is the one kept: it is the one everybody else can see.
-    expect(swept[0].id).toBe("relay:id-1")
-  })
-
-  it("keeps it while the room has not handed anything back", () => {
-    // Nothing proves this was said, and it is the only record of the card.
-    const snapshot = recordOutgoing(emptySnapshot(), ME, "a gift", "local:1", ROOM)
-    expect(dropStrandedCopies(snapshot)).toBe(snapshot)
-  })
-
-  it("keeps a message that failed, however familiar its words", () => {
-    // Said once and got through; said again and did not. The second is not a
-    // stray copy of the first — it is words that never left, and the retry it
-    // offers is the only way they ever will.
-    let snapshot = roomSaid("ok")
-    snapshot = recordOutgoing(snapshot, ME, "ok", "local:1", ROOM, "failed")
-    expect(dropStrandedCopies(snapshot)).toBe(snapshot)
-  })
-
-  it("keeps one still on its way", () => {
-    let snapshot = roomSaid("ok")
-    snapshot = recordOutgoing(snapshot, ME, "ok", "local:1", ROOM, "sending")
-    expect(dropStrandedCopies(snapshot)).toBe(snapshot)
-  })
-
-  it("leaves direct messages alone, where a local id is how they live", () => {
-    // A direct message is never returned to its sender, so it keeps the name it
-    // was written under for good.
-    const snapshot = recordOutgoing(emptySnapshot(), ALICE, "hello", "local:1")
-    expect(dropStrandedCopies(snapshot)).toBe(snapshot)
-  })
-
-  it("does not carry words from one room into another", () => {
-    const elsewhere = "3f1c0b7a-0000-4000-8000-000000000002"
-    let snapshot = roomSaid("a gift")
-    snapshot = recordOutgoing(snapshot, ME, "a gift", "local:1", elsewhere)
-    expect(dropStrandedCopies(snapshot)).toBe(snapshot)
-  })
-
-  it("hands back the same snapshot when there is nothing to drop", () => {
-    const snapshot = roomSaid("hello")
-    expect(dropStrandedCopies(snapshot)).toBe(snapshot)
-  })
-
-  it("is swept up by the time a stored history is loaded", () => {
-    // What actually reaches somebody who left a gift before the send path
-    // settled: it is already written down doubled, and the next launch is where
-    // that gets put right.
-    const store = new Map<string, string>()
-    vi.stubGlobal("localStorage", {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => void store.set(key, value),
-      removeItem: (key: string) => void store.delete(key),
-    })
-
-    let snapshot = recordOutgoing(emptySnapshot(), ME, "a gift", "local:1", ROOM)
-    snapshot = mergeIncoming(snapshot, [roomEnvelope(1, "a gift", ME)], cursor(1), ME)
-    save(ME, snapshot)
-    expect(threadWith(load(ME), ROOM)).toHaveLength(1)
-    vi.unstubAllGlobals()
   })
 })

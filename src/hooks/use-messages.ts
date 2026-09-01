@@ -268,14 +268,7 @@ export function useMessages(
       // signed in, and the merge needs to know whose words are whose.
       const mine = owner
       if (!mine) return
-      update((current) =>
-        // Swept here as well as on load, because this is the moment the room's
-        // own copy of a stranded card arrives — without it, a gift left on a
-        // build that could not settle would sit doubled until the next launch.
-        history.dropStrandedCopies(
-          history.mergeIncoming(current, envelopes, current.cursor, mine),
-        ),
-      )
+      update((current) => history.mergeIncoming(current, envelopes, current.cursor, mine))
     },
     [update, owner],
   )
