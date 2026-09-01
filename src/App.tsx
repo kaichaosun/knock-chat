@@ -65,7 +65,6 @@ import { deviceKeyPair } from "@/lib/keys"
 import {
   RelayError,
   getGiftTerms,
-  groupHistory,
   type GiftTerms,
   type Group,
   type GroupDetail,
@@ -73,6 +72,7 @@ import {
 } from "@/lib/relay"
 import { devIdentities } from "@/lib/wallet"
 import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
+import { useRoomHistory } from "@/hooks/use-room-history"
 import { useSession } from "@/hooks/use-session"
 import { ProbeScreen } from "@/probe/probe-screen"
 import { probeRequested, useSecretTap } from "@/probe/entry"
@@ -318,9 +318,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    * "one thread at a time" is a fact about the state rather than a habit of
    * whoever wrote the call.
    */
+  /**
+   * Counts opens rather than naming rooms, so that opening the room already on
+   * screen still registers as having happened. See `useRoomHistory`.
+   */
+  const [roomOpens, setRoomOpens] = useState(0)
+
   const openRoom = useCallback((group: string) => {
     setOpenPeer(null)
     setOpenGroup(group)
+    setRoomOpens((count) => count + 1)
   }, [])
 
   // Opening a chat is the moment worth re-checking who you are writing to.
@@ -334,35 +341,35 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     if (openPeer) forgetPeerKey(openPeer)
   }, [openPeer])
 
-  /** Rooms whose past has already been asked for, so it is asked for once. */
-  const backfilled = useRef<Set<string>>(new Set())
+  /**
+   * What the open room said before you got here, a page at a time.
+   *
+   * Only rooms whose owner shares their past have any, so an ordinary room
+   * costs no request at all — the check is on the group already in hand.
+   */
+  const { hasEarlier, loadingEarlier, loadEarlier, forget: forgetHistory } = useRoomHistory(
+    openGroup,
+    Boolean(groups.find((group) => group.id === openGroup)?.share_history),
+    absorbHistory,
+    roomOpens,
+  )
 
   /**
-   * Fill in what a room said before you got here.
+   * Delete a chat, and everything this session remembers about it.
    *
-   * Only for rooms whose owner shares their history, so an ordinary room costs
-   * nothing — the check is on the group we already hold, not a request.
-   *
-   * It has to be asked for. The message feed is a queue drained by a cursor
-   * that only moves forward, so a member who is up to date is by definition
-   * past every message older than their membership, and no amount of polling
-   * would ever reach one. Keyed on `openGroup` for the same reason the effect
-   * above is keyed on `openPeer`: every way into a room goes through it.
+   * The two have to go together. `deleteThread` throws away the messages;
+   * `forgetHistory` throws away the memory of having fetched them, which is
+   * what would otherwise stop the room refetching and leave it opening empty
+   * for the rest of the session. Wrapped rather than paired at each call site,
+   * because there are four of those and a fifth would forget.
    */
-  useEffect(() => {
-    if (!openGroup) return
-    const room = groups.find((group) => group.id === openGroup)
-    if (!room?.share_history || backfilled.current.has(openGroup)) return
-    backfilled.current.add(openGroup)
-    void groupHistory(openGroup)
-      .then((page) => absorbHistory(page.messages))
-      .catch(() => {
-        // Nothing to say out loud: the room works from here on, which is
-        // exactly what it did before there was any history to fetch. Forgotten
-        // rather than remembered, so opening it again tries once more.
-        backfilled.current.delete(openGroup)
-      })
-  }, [openGroup, groups, absorbHistory])
+  const deleteChat = useCallback(
+    (thread: string) => {
+      deleteThread(thread)
+      forgetHistory(thread)
+    },
+    [deleteThread, forgetHistory],
+  )
 
   /**
    * The chat list: threads that have messages, plus rooms that do not yet.
@@ -1094,6 +1101,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         gone={roomGone}
         owner={address}
         messages={roomMessages}
+        hasEarlier={hasEarlier}
+        loadingEarlier={loadingEarlier}
+        onLoadEarlier={loadEarlier}
         onBack={closeThreadView}
         onDeleteChat={() => {
           if (!openGroup) return
@@ -1101,7 +1111,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           // Out of the room first: what is being deleted is what is on
           // screen, and there is nothing left to come back to.
           closeThreadView()
-          deleteThread(thread)
+          deleteChat(thread)
           forgetRoom(thread)
           unpin(thread)
           toast.success(t("app.chatDeleted"))
@@ -1306,7 +1316,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               floating={compose === "floating"}
               onCompose={() => setComposing(true)}
               onDelete={(thread) => {
-                deleteThread(thread)
+                deleteChat(thread)
                 // And what was remembered of the room, if it was one. Nothing
                 // is left to put a name on.
                 forgetRoom(thread)
@@ -1331,7 +1341,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             setContacts={setContacts}
             error={contactsError}
             onOpen={openThread}
-            onRemoved={deleteThread}
+            onRemoved={deleteChat}
             selectedAddress={wide ? openPeer : null}
           />
         ) : (
@@ -1345,7 +1355,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               onLeft={(id) => {
                 // The room goes, and its chat with it — the same shape as
                 // removing a contact, which also takes the conversation.
-                deleteThread(id)
+                deleteChat(id)
                 void refreshGroups()
               }}
               selectedId={wide ? openGroup : null}

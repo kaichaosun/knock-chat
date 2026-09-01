@@ -18,6 +18,16 @@ const FOLLOW = 0.55
 const AXIS_PX = 5
 
 /**
+ * How long a wheel has to stop before letting go counts as letting go.
+ *
+ * A wheel has no end event — a trackpad simply stops sending — so the end of
+ * the gesture has to be inferred from the quiet after it. Long enough to ride
+ * out the gaps between events in one continuous swipe, short enough that the
+ * pull does not sit there wondering.
+ */
+const WHEEL_SETTLE_MS = 140
+
+/**
  * The shortest a refresh is allowed to look like it took.
  *
  * A read that answers in eighty milliseconds is a spinner that blinks, which
@@ -54,6 +64,15 @@ export type Pull = {
 export function usePullToRefresh(
   scroller: HTMLElement | null,
   onRefresh: () => Promise<void> | void,
+  /**
+   * Also accept the gesture from a wheel or trackpad.
+   *
+   * Off by default, because on a list that reloads by itself a stray scroll at
+   * the top would refresh it for no reason. Worth turning on where the gesture
+   * is the *only* way to ask for something — a room's older messages, which
+   * otherwise cannot be reached with a pointer at all.
+   */
+  options: { wheel?: boolean } = {},
 ): Pull {
   const [distance, setDistance] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
@@ -68,6 +87,8 @@ export function usePullToRefresh(
   const busy = useRef(false)
   const refresh = useRef(onRefresh)
   refresh.current = onRefresh
+  const wheelEnabled = useRef(options.wheel ?? false)
+  wheelEnabled.current = options.wheel ?? false
 
   useEffect(() => {
     const element = scroller
@@ -118,12 +139,9 @@ export function usePullToRefresh(
       hold(Math.min(MAX_PULL_PX, dy * FOLLOW))
     }
 
-    const onEnd = () => {
-      if (!pulling.current) return
-      const far = held.current >= THRESHOLD_PX
-      stop()
-
-      if (!far || busy.current) {
+    /** Let go: take the pull if it came far enough, and let it back up if not. */
+    const settle = () => {
+      if (held.current < THRESHOLD_PX || busy.current) {
         hold(0)
         return
       }
@@ -143,16 +161,51 @@ export function usePullToRefresh(
       })
     }
 
+    const onEnd = () => {
+      if (!pulling.current) return
+      stop()
+      settle()
+    }
+
+    // The same gesture made with a trackpad: keep scrolling up where there is
+    // nothing left above, and the gap opens exactly as a finger would open it.
+    let quiet: number | undefined
+    const onWheel = (event: WheelEvent) => {
+      if (!wheelEnabled.current || busy.current) return
+
+      // Off the top, or heading down: this is the list being scrolled.
+      if (element.scrollTop > 0 || event.deltaY >= 0) {
+        if (held.current) {
+          setDragging(false)
+          hold(0)
+        }
+        return
+      }
+
+      if (event.cancelable) event.preventDefault()
+      setDragging(true)
+      hold(Math.min(MAX_PULL_PX, held.current + -event.deltaY * FOLLOW))
+
+      window.clearTimeout(quiet)
+      quiet = window.setTimeout(() => {
+        setDragging(false)
+        settle()
+      }, WHEEL_SETTLE_MS)
+    }
+
     element.addEventListener("touchstart", onStart, { passive: true })
     element.addEventListener("touchmove", onMove, { passive: false })
     element.addEventListener("touchend", onEnd)
     element.addEventListener("touchcancel", onEnd)
+    element.addEventListener("wheel", onWheel, { passive: false })
 
     return () => {
+      window.clearTimeout(quiet)
       element.removeEventListener("touchstart", onStart)
       element.removeEventListener("touchmove", onMove)
       element.removeEventListener("touchend", onEnd)
       element.removeEventListener("touchcancel", onEnd)
+      element.removeEventListener("wheel", onWheel)
     }
   }, [scroller])
 
