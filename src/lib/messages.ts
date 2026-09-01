@@ -204,7 +204,12 @@ export function save(owner: string, snapshot: Snapshot): void {
 export function mergeIncoming(
   snapshot: Snapshot,
   envelopes: OpenedEnvelope[],
-  cursor: string,
+  /**
+   * Where the feed has reached. Nullable because a snapshot's cursor is —
+   * nothing has been fetched yet on a fresh device — and because folding in a
+   * room's past hands the current one straight back rather than moving it.
+   */
+  cursor: string | null,
 ): Snapshot {
   const known = new Set(snapshot.messages.map((m) => m.id))
   const added: Message[] = []

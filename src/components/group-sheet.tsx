@@ -192,6 +192,17 @@ export function GroupSheet({
   const [changing, setChanging] = useState<boolean | null>(null)
   /** The history setting being moved to, while it is still only being offered. */
   const [changingPast, setChangingPast] = useState<boolean | null>(null)
+
+  /**
+   * Whether this room shares its past, read as a boolean rather than compared
+   * to one.
+   *
+   * A relay too old to know the field leaves it undefined, and `undefined`
+   * equals neither `true` nor `false` — so both cards went dark and the room
+   * looked as though it had no setting at all. Absent means off, which is
+   * exactly what such a relay does.
+   */
+  const sharesHistory = Boolean(group.share_history)
   // Held until confirmed. It is a small icon in a list of faces, and getting
   // somebody back in can cost them money — or be up to the owner entirely.
   const [removing, setRemoving] = useState<string | null>(null)
@@ -316,7 +327,7 @@ export function GroupSheet({
    * to everybody in it. That is not a thing to do to a room with a stray thumb.
    */
   const choosePast = (share: boolean) => {
-    if (share === group.share_history) return
+    if (share === sharesHistory) return
     setChangingPast(share)
   }
 
@@ -556,10 +567,10 @@ export function GroupSheet({
                       key={String(share)}
                       type="button"
                       onClick={() => choosePast(share)}
-                      aria-pressed={group.share_history === share}
+                      aria-pressed={sharesHistory === share}
                       className={cn(
                         "flex-1 rounded-2xl border px-3 py-2.5 text-left text-[13px] transition-colors",
-                        group.share_history === share && "border-primary text-primary",
+                        sharesHistory === share && "border-primary text-primary",
                       )}
                     >
                       <span className="block font-semibold">{pastFor(share).label}</span>
@@ -569,7 +580,7 @@ export function GroupSheet({
                     </button>
                   ))}
                 </div>
-                {group.share_history && (
+                {sharesHistory && (
                   <p className="text-warning mt-2 text-[12px] leading-snug">
                     {t("groupSheet.pastSharedWarning")}
                   </p>

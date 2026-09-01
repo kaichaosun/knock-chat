@@ -32,12 +32,14 @@ export function CreateGroupSheet({
     name: string
     join_price_luna: number
     requires_approval: boolean
+    share_history: boolean
   }) => Promise<Group>
 }) {
   const { t } = useTranslation()
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [approval, setApproval] = useState(false)
+  const [shareHistory, setShareHistory] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState("")
 
@@ -46,6 +48,7 @@ export function CreateGroupSheet({
       setName("")
       setPrice("")
       setApproval(false)
+      setShareHistory(false)
       setError("")
     }
   }, [open])
@@ -63,7 +66,12 @@ export function CreateGroupSheet({
     setCreating(true)
     setError("")
     try {
-      await onCreate({ name: trimmed, join_price_luna: luna, requires_approval: approval })
+      await onCreate({
+        name: trimmed,
+        join_price_luna: luna,
+        requires_approval: approval,
+        share_history: shareHistory,
+      })
       onOpenChange(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : t("newGroup.failed"))
@@ -109,7 +117,6 @@ export function CreateGroupSheet({
             <h3 className="px-1 text-sm font-semibold">{t("newGroup.costTitle")}</h3>
             <p className="text-muted-foreground mt-1 px-1 text-[13px] leading-snug">
               {t("newGroup.costNote")}
-              link walks in.
             </p>
             <div className="relative mt-2">
               <input
@@ -163,6 +170,34 @@ export function CreateGroupSheet({
                 {t("misc.freeAskingWarning")}
               </p>
             )}
+          </div>
+
+          {/* Set here as well as in the room's settings, so a room that is meant
+              to be readable is readable from its first message rather than from
+              whenever the owner remembers to go and change it. */}
+          <div>
+            <h3 className="px-1 text-sm font-semibold">{t("newGroup.historyTitle")}</h3>
+            <div className="mt-2 flex gap-2">
+              {[false, true].map((value) => (
+                <button
+                  key={String(value)}
+                  type="button"
+                  disabled={creating}
+                  onClick={() => setShareHistory(value)}
+                  className={cn(
+                    "flex-1 rounded-2xl border px-3 py-2.5 text-left text-[13px] transition-colors",
+                    shareHistory === value && "border-primary text-primary",
+                  )}
+                >
+                  <span className="block font-semibold">
+                    {t(value ? "newGroup.historyVisible" : "newGroup.historyHidden")}
+                  </span>
+                  <span className="text-muted-foreground block text-[11px] leading-snug">
+                    {t(value ? "newGroup.historyVisibleNote" : "newGroup.historyHiddenNote")}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && <p className="text-destructive px-1 text-[13px]">{error}</p>}
