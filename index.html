@@ -58,6 +58,22 @@
       document.documentElement.classList.toggle("dark", dark)
       document.documentElement.style.colorScheme = dark ? "dark" : "light"
     </script>
+
+    <!-- Analytics. Our own swa instance rather than somebody's service, which
+         is what makes it tellable in a privacy policy: it records the path, the
+         referrer, browser and operating system by name, the screen size, and a
+         visitor number re-derived from the browser and the date every day. No
+         cookie, and no IP address kept. It never sees a Nimiq address, so
+         nothing it collects can be tied back to an account.
+
+         It is a script from another origin, so it runs with everything this
+         page has — the device key in storage included. That is a trust
+         decision, not an oversight: the origin is ours and is effectively part
+         of the app. Anything else pointed at here would have the same reach.
+
+         lib/legal.ts tells the user exactly what is collected, and they agree
+         to it. Changing what is sent means changing that document too. -->
+    <script defer data-api="https://swa-monitor.movedone.ai" src="https://swa-monitor.movedone.ai/tracker.js"></script>
   </head>
   <body>
     <div id="root"></div>

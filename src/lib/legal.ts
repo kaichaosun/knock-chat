@@ -24,7 +24,7 @@ const COMPANY = "KEYRING Pte. Ltd."
 const CONTACT = "support@keyring.so"
 const JURISDICTION = "Singapore"
 const MINIMUM_AGE = 18
-const UPDATED = "26 August 2026"
+const UPDATED = "1 September 2026"
 
 export type LegalSection = {
   heading: string
@@ -173,7 +173,15 @@ export const PRIVACY: LegalDoc = {
         "Nimiq Pay hosts the app and tells it which language you have chosen. We do not ask it for a device identifier.",
         "The app loads its typeface from Google Fonts, which means Google's servers see your IP address when it starts.",
         "Our hosting provider, and the Nimiq network itself, necessarily see traffic in the ordinary course of carrying it.",
-        "There is no analytics in Knock, no advertising, and no third party we sell or share anything with.",
+        "There is no advertising in Knock, and no third party we sell or share anything with.",
+      ],
+    },
+    {
+      heading: "What we count",
+      body: [
+        "We keep a count of how many times Knock is opened, and how often people come back. It runs on a server of ours rather than a service somebody else operates, so nothing about your visit is handed to anyone.",
+        "It records the page, where you arrived from, your browser and operating system by name, your screen size, and the time. It sets no cookie and keeps no IP address.",
+        "It never sees your Nimiq address. Nothing it records can be joined to your account, your messages or your assets.",
       ],
     },
     {
