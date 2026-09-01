@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 
 import { GiftDetailSheet } from "@/components/gift-detail-sheet"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useGift } from "@/hooks/use-gift"
 import type { GiftNote } from "@/lib/payload"
 import { formatNim } from "@/lib/postage"
@@ -30,7 +31,7 @@ export function GiftCard({
   owner: string | null
 }) {
   const { t } = useTranslation()
-  const { detail, claiming, error, claim, refresh } = useGift(note.gift)
+  const { detail, known, claiming, error, claim, refresh } = useGift(note.gift)
   const [showing, setShowing] = useState(false)
 
   const gift = detail?.gift
@@ -88,7 +89,15 @@ export function GiftCard({
         <div className="space-y-2 px-3.5 py-2.5">
           {note.note && <p className="text-[13px] leading-snug">{note.note}</p>}
 
-          {yours !== null ? (
+          {/* Nothing is drawn here until the relay has answered. The message
+              says what the pot *was*; it cannot say whether you already took a
+              share, and the branch below it falls into by default is the one
+              with a button in it — so an already-taken pot would offer to be
+              taken, for as long as the round trip lasts. A shape of the right
+              height instead, so nothing moves when the answer lands. */}
+          {!known ? (
+            <Skeleton className="h-9 w-full rounded-xl" />
+          ) : yours !== null ? (
             // Taken. What it says next depends on whether the money actually
             // moved, which is a different question from whether the share is
             // yours — and the one people care about.
@@ -105,7 +114,7 @@ export function GiftCard({
               {t("gift.over")}
             </p>
           ) : left === 0 ? (
-            <p className="text-muted-foreground text-[12px]">All gone.</p>
+            <p className="text-muted-foreground text-[12px]">{t("gift.allGone")}</p>
           ) : (
             <Button
               size="sm"
@@ -124,9 +133,11 @@ export function GiftCard({
           )}
 
           {/* The count doubles as the way in — a line that was already there,
-              now saying it can be opened. */}
+              now saying it can be opened. How many have been taken is the
+              relay's to say too, so until it has, the line holds its place
+              without claiming a number. */}
           <p className="text-muted-foreground flex items-center gap-0.5 text-[11px] tabular-nums">
-            {claimed} of {shares} taken
+            {known ? t("gift.taken", { claimed, shares }) : t("gift.sharesInPot", { shares })}
             <ChevronRight className="size-3" />
           </p>
 

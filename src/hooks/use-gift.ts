@@ -15,6 +15,16 @@ export function useGift(id: string) {
   const [detail, setDetail] = useState<GiftDetail | null>(null)
   const [claiming, setClaiming] = useState(false)
   const [error, setError] = useState("")
+  /**
+   * Whether the relay has answered about this pot even once.
+   *
+   * Not the same as having a `detail`: an answer that failed still settles the
+   * question of whether anything is on its way. Until this is true the card
+   * knows nothing about the pot beyond what the message said — and what the
+   * message said does not include whether *you* already took a share, which is
+   * the one thing the card would otherwise guess at.
+   */
+  const [known, setKnown] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -24,6 +34,8 @@ export function useGift(id: string) {
     } catch {
       // The card falls back to what the message said, which is enough to draw
       // it. Nothing here is worth an error in front of somebody.
+    } finally {
+      setKnown(true)
     }
   }, [id])
 
@@ -56,5 +68,5 @@ export function useGift(id: string) {
     }
   }, [id, refresh])
 
-  return { detail, claiming, error, claim, refresh }
+  return { detail, known, claiming, error, claim, refresh }
 }
