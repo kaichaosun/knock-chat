@@ -8,6 +8,7 @@ import {
   Loader2,
   MoreVertical,
   PanelLeftOpen,
+  Reply,
   Trash2,
   UserRound,
 } from "lucide-react"
@@ -29,8 +30,11 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
 import { useMentionSearch } from "@/hooks/use-mention-search"
 import { useNames } from "@/hooks/use-names"
 import { copyText } from "@/lib/clipboard"
+import { shortenAddress } from "@/lib/address"
+import { preview } from "@/lib/payload"
+import { type Quote } from "@/lib/quote"
 import { cn } from "@/lib/utils"
-import { labelIn } from "@/lib/names"
+import { givenNameIn, labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
 import { deleteSaid, removeGroupMember, type Group, type GroupDetail } from "@/lib/relay"
 import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
@@ -267,6 +271,13 @@ export function GroupRoom({
 
   /** The message a held finger has opened the menu on. */
   const [held, setHeld] = useState<Message | null>(null)
+  /** What the next message answers, until it is sent or dropped. */
+  const [answering, setAnswering] = useState<Quote | null>(null)
+
+  // Dropped on the way out of a room. This screen is not remounted between
+  // rooms, so without it an answer begun in one would be waiting in the next,
+  // quoting somebody who is not in it.
+  useEffect(() => setAnswering(null), [group.id])
   const holding = useRef<number | undefined>(undefined)
 
   /**
@@ -286,6 +297,24 @@ export function GroupRoom({
   const inWindow = (message: Message) =>
     group.delete_window_secs > 0 &&
     Date.now() - Date.parse(message.at) < group.delete_window_secs * 1000
+
+  /**
+   * Answer a message: hold on to what it said, for the composer to send with
+   * whatever is written next.
+   *
+   * The author is the name they *publish*, never the one you gave them —
+   * `lib/names` promises a private name stays on this device, and a quote goes
+   * to everybody in the room. `preview` does the rest, so answering a payment
+   * or a gift quotes what it was rather than a line of JSON.
+   */
+  const answer = (message: Message) => {
+    setHeld(null)
+    const who = message.direction === "out" ? owner : message.peer
+    setAnswering({
+      author: givenNameIn(names, who) ?? shortenAddress(who),
+      said: preview(message.body, "in"),
+    })
+  }
 
   const copy = async (message: Message) => {
     setHeld(null)
@@ -654,16 +683,50 @@ export function GroupRoom({
                             {who}
                           </button>
                         )}
-                        <MessageBubble
-                          message={message}
-                          onRetry={onRetrySay}
-                          onOpenInvite={onOpenInvite}
-                          onOpenContact={onOpenContact}
-                          onOpenMention={setShowing}
-                          channelOpen
-                          owner={owner}
-                          stamped={stamped}
-                        />
+                        {/* The same gesture a message of your own has, and now
+                            for the same reason: there is something to do with
+                            somebody else's message too. Answering it, and
+                            copying it — never deleting it, which stays the
+                            author's to do. */}
+                        <div
+                          className="group/msg relative flex items-start"
+                          onPointerDown={(event) => holdStart(() => openFor(message), event)}
+                          onPointerMove={holdMove}
+                          onPointerUp={holdCancel}
+                          onPointerCancel={holdCancel}
+                          onPointerLeave={holdCancel}
+                        >
+                          <div className="min-w-0 flex-1 [-webkit-touch-callout:none] select-none">
+                            <MessageBubble
+                              message={message}
+                              onRetry={onRetrySay}
+                              onOpenInvite={onOpenInvite}
+                              onOpenContact={onOpenContact}
+                              onOpenMention={setShowing}
+                              channelOpen
+                              owner={owner}
+                              stamped={stamped}
+                              // The press is the room's now, so the browser's own
+                              // long press — a selection, and on iOS a callout over
+                              // whatever opens next — has to stand aside. Copy moved
+                              // into the menu in exchange.
+                              selectable={false}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => openFor(message)}
+                            aria-label={t("room.messageMenu")}
+                            className={cn(
+                              "text-muted-foreground hover:bg-muted hover:text-foreground",
+                              "absolute top-1 right-0 hidden rounded-lg p-1 opacity-0 transition-opacity lg:block",
+                              "focus-visible:opacity-100 group-hover/msg:opacity-100",
+                            )}
+                          >
+                            <MoreVertical className="size-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -681,9 +744,14 @@ export function GroupRoom({
            no button. */
         <Composer
           ref={composer}
-          onSend={onSay}
+          onSend={(body) => {
+            onSay(body)
+            setAnswering(null)
+          }}
           onAttach={onGift && (() => setAttaching(true))}
           onMentionSearch={searchMembers}
+          replyingTo={answering}
+          onCancelReply={() => setAnswering(null)}
         />
       ) : (
         /* Read-only rather than gone: what was said is still yours to read, and
@@ -711,6 +779,12 @@ export function GroupRoom({
         actions={
           held
             ? [
+                {
+                  icon: Reply,
+                  label: t("room.replyMessage"),
+                  description: t("room.replyMessageNote"),
+                  onSelect: () => answer(held),
+                },
                 {
                   icon: Copy,
                   label: t("room.copyMessage"),

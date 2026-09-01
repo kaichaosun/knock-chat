@@ -19,6 +19,7 @@ import type { Message } from "@/lib/messages"
 import { segments } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
 import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
+import { unquote, type Quote } from "@/lib/quote"
 import { shortenAddress } from "@/lib/address"
 import { formatNim } from "@/lib/postage"
 import { clockTime } from "@/lib/time"
@@ -132,7 +133,7 @@ export function MessageBubble({
             )}
           >
             {payload.kind === "text" ? (
-              <Words text={payload.text} outgoing={outgoing} onOpen={onOpenMention} />
+              <Answering text={payload.text} outgoing={outgoing} onOpen={onOpenMention} />
             ) : (
               // Something a newer build sent that this one has no way to draw.
               // Shown as a gap on purpose: silently dropping it would leave the
@@ -160,6 +161,51 @@ export function MessageBubble({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * What somebody wrote, with whatever it answers above it.
+ *
+ * The quote is drawn from the message itself rather than looked up — see
+ * `lib/quote`. It is a snapshot, so it stays readable whether or not the room
+ * has the original loaded, and whether or not the original still exists.
+ */
+function Answering({
+  text,
+  outgoing,
+  onOpen,
+}: {
+  text: string
+  outgoing: boolean
+  onOpen?: (address: string) => void
+}) {
+  const { quote, body } = unquote(text)
+  return (
+    <>
+      {quote && <Quoted quote={quote} outgoing={outgoing} />}
+      <Words text={body} outgoing={outgoing} onOpen={onOpen} />
+    </>
+  )
+}
+
+/**
+ * What is being answered.
+ *
+ * A rule down the side rather than a filled card: a bubble is already a shape,
+ * and the reply is what somebody came here to read.
+ */
+function Quoted({ quote, outgoing }: { quote: Quote; outgoing: boolean }) {
+  return (
+    <span
+      className={cn(
+        "mb-1.5 flex flex-col border-l-2 pl-2 text-[13px] leading-snug",
+        outgoing ? "border-white/40 text-white/80" : "border-border text-muted-foreground",
+      )}
+    >
+      <span className="truncate font-semibold">{quote.author}</span>
+      <span className="line-clamp-2 wrap-anywhere">{quote.said}</span>
+    </span>
   )
 }
 

@@ -34,6 +34,7 @@ import { addressFrom, shortenAddress } from "./address"
 import { groupIdFrom } from "./group-link"
 import { segments } from "./mentions"
 import { labelIn, snapshot } from "./names"
+import { unquote } from "./quote"
 import { formatNim } from "./postage"
 
 const FRAME = "\u001fknock1\n"
@@ -229,7 +230,9 @@ export function preview(plain: string, direction: "in" | "out"): string {
   const payload = decode(plain)
   switch (payload.kind) {
     case "text": {
-      const text = spoken(payload.text)
+      // The words, not what they answer. A list of threads showing every reply
+      // as the message before it would be a list of the wrong messages.
+      const text = spoken(unquote(payload.text).body)
       return direction === "out" ? t("preview.youSaid", { text }) : text
     }
     case "payment": {

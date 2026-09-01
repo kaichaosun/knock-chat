@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react"
 import { useTranslation } from "react-i18next"
-import { ArrowUp, Plus } from "lucide-react"
+import { ArrowUp, Plus, X } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
 import { mentionOf } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
+import { quoted, type Quote } from "@/lib/quote"
 import { cn } from "@/lib/utils"
 
 /** Matches the relay's `max_body_len`, so the UI stops before the server does. */
@@ -53,6 +54,8 @@ export function Composer({
   onSend,
   onAttach,
   onMentionSearch,
+  replyingTo,
+  onCancelReply,
   disabled,
 }: {
   ref?: Ref<ComposerHandle>
@@ -75,6 +78,15 @@ export function Composer({
    * Must be stable, or every keystroke starts the search over.
    */
   onMentionSearch?: (query: string) => Promise<string[]>
+  /**
+   * What this message answers, shown above the box until it is sent or dropped.
+   *
+   * Held outside because the message being answered is the room's to know, not
+   * the box's — but composed in here, so that the quote counts against the
+   * length like any other part of what is being sent.
+   */
+  replyingTo?: Quote | null
+  onCancelReply?: () => void
   disabled?: boolean
 }) {
   const { t } = useTranslation()
@@ -240,15 +252,18 @@ export function Composer({
     },
   }))
 
-  const bytes = new TextEncoder().encode(body).length
-  const overLimit = bytes > MAX_BODY_BYTES
   const text = body.trim()
+  // What would actually be sent, quote and all — which is what the relay's
+  // limit applies to, so it is what the count has to be of.
+  const sending = replyingTo ? quoted(replyingTo, text) : text
+  const bytes = new TextEncoder().encode(sending).length
+  const overLimit = bytes > MAX_BODY_BYTES
   const canSend = text.length > 0 && !overLimit && !disabled
   const picking = query !== null && found.length > 0
 
   const submit = () => {
     if (!canSend) return
-    onSend(text)
+    onSend(sending)
     if (box.current) box.current.innerHTML = ""
     caret.current = null
     setBody("")
@@ -287,20 +302,32 @@ export function Composer({
                   )}
                 >
                   <AddressAvatar address={address} size="sm" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold">
-                      {labelIn(names, address)}
-                    </span>
-                    {/* Not decoration. Two members can call themselves the same
-                        thing, and this is the line that says which is which. */}
-                    <span className="text-muted-foreground block truncate font-mono text-[11px]">
-                      {shortenAddress(address)}
-                    </span>
-                  </span>
+                  <MemberLine address={address} />
                 </button>
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {replyingTo && (
+        <div className="flex items-center gap-2 border-b px-4 py-2">
+          <span className="border-primary/60 flex min-w-0 flex-1 flex-col border-l-2 pl-2 text-[13px] leading-snug">
+            <span className="text-primary truncate font-semibold">
+              {t("room.replyingTo", { name: replyingTo.author })}
+            </span>
+            <span className="text-muted-foreground truncate">{replyingTo.said}</span>
+          </span>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={onCancelReply}
+            aria-label={t("room.stopReplying")}
+            className="text-muted-foreground size-8 shrink-0 rounded-full"
+          >
+            <X className="size-4" />
+          </Button>
         </div>
       )}
 
@@ -440,6 +467,29 @@ export function Composer({
  * reading as two people.
  */
 const CHIP = "text-mention font-semibold whitespace-nowrap"
+
+/**
+ * One member, as a row in the picker.
+ *
+ * The address is not decoration: two members can call themselves the same
+ * thing, and it is the line that says which is which. But it is only shown when
+ * there is a name for it to tell apart from — somebody with no name is already
+ * *being* drawn as their address, and repeating it underneath says the same
+ * thing twice and reads as a bug.
+ */
+function MemberLine({ address }: { address: string }) {
+  const names = useNames()
+  const short = shortenAddress(address)
+  const label = labelIn(names, address)
+  return (
+    <span className="min-w-0 flex-1">
+      <span className="block truncate text-[14px] font-semibold">{label}</span>
+      {label !== short && (
+        <span className="text-muted-foreground block truncate font-mono text-[11px]">{short}</span>
+      )}
+    </span>
+  )
+}
 
 /** Tags a browser wraps a line in when Enter is pressed. Each one starts a line. */
 const BLOCK = new Set(["DIV", "P", "LI"])
