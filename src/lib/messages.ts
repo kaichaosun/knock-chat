@@ -179,10 +179,7 @@ export function load(owner: string): Snapshot {
     const parsed = JSON.parse(raw) as Snapshot
     // Storage is user-writable; treat anything malformed as absent.
     if (!Array.isArray(parsed.messages)) return EMPTY
-    // Swept on the way in rather than migrated once and marked done: it is a
-    // filter over what is there, so running it every launch costs one pass and
-    // needs no record of having run. What it cleans up is explained on it.
-    return dropStrandedCopies({ ...EMPTY, ...parsed })
+    return { ...EMPTY, ...parsed }
   } catch {
     return EMPTY
   }
@@ -269,62 +266,6 @@ export function settle(snapshot: Snapshot, id: string, name: string): Snapshot {
       m.id === id ? { ...m, id: name, status: "sent" as MessageStatus } : m,
     ),
   }
-}
-
-/**
- * Drop a room message this device is still holding under a local id, when the
- * room's own copy of it is already here.
- *
- * Cleaning up after a bug rather than guarding against one. A gift card used to
- * be written down and sent without ever being given the name the relay
- * answered with, so when the room's history handed it back — a room returns
- * everything said in it, this device's words included — [`mergeIncoming`] found
- * nothing matching and filed it a second time. The sender saw two of a pot they
- * had left once; everybody else saw the one that was really there. The send
- * path settles now, but the doubled card is already written down on every phone
- * that left a gift before it did, and nothing on the relay will take it back:
- * the stray is this device's own note to itself.
- *
- * Three things have to agree before anything is dropped, and each rules out a
- * different way of being wrong:
- *
- * - **It is in a room.** A direct message is never returned to its sender, so
- *   it keeps its local id for life and one is no evidence of anything.
- * - **The room's copy is here**, carrying the same words. That copy is the
- *   proof this was said and reached the room. Without it the local one is the
- *   only record there is — of a card whose message the relay has since let go,
- *   say — and dropping it would erase the gift from the sender's history.
- * - **It says it was sent.** The only writer that ever left a room message
- *   local and `sent` was the gift path; [`recordOutgoing`] defaults to `sent`
- *   and that is what it took. Anything said the ordinary way is `sending` until
- *   it settles, and a message that genuinely failed keeps `failed` and its
- *   offer to try again — an offer that must survive somebody having said the
- *   same words earlier and got through.
- */
-export function dropStrandedCopies(snapshot: Snapshot): Snapshot {
-  // What the room has said back, as room-and-words. A body is compared whole:
-  // a card is a fixed line of JSON and the relay stores a room's messages as
-  // they were written, so the two copies are the same string or they are not
-  // the same message.
-  const held = new Set(
-    snapshot.messages
-      .filter((m) => m.group && m.id.startsWith("relay:"))
-      .map((m) => `${m.group}\u0000${m.body}`),
-  )
-  if (held.size === 0) return snapshot
-
-  const messages = snapshot.messages.filter(
-    (m) =>
-      !(
-        m.group &&
-        m.direction === "out" &&
-        m.status === "sent" &&
-        m.id.startsWith("local:") &&
-        held.has(`${m.group}\u0000${m.body}`)
-      ),
-  )
-  if (messages.length === snapshot.messages.length) return snapshot
-  return { ...snapshot, messages }
 }
 
 /**
