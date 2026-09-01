@@ -31,6 +31,13 @@ export type Envelope = {
 
 export type FetchResult = {
   messages: Envelope[]
+  /**
+   * Messages taken back since this device last asked, by id alone.
+   *
+   * Not envelopes with the body emptied: a deletion is not a message. An id for
+   * one this device never held is a harmless no-op.
+   */
+  deleted?: string[]
   /** Opaque — hand it straight back next time and never interpret it. */
   next: string
 }
@@ -81,6 +88,11 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
       .catch(() => undefined)
     throw new RelayError(detail ?? `Relay returned ${response.status}`, response.status)
   }
+
+  // Nothing to parse, and `.json()` on an empty body throws a SyntaxError —
+  // which is not a `RelayError` and would surface as though the network had
+  // failed. The relay answers 204 wherever the outcome is the whole message.
+  if (response.status === 204) return undefined as T
 
   return response.json() as Promise<T>
 }
@@ -247,6 +259,14 @@ export type Group = {
    * See [`groupHistory`].
    */
   share_history: boolean
+  /**
+   * How long somebody has to take back what they said here, in seconds.
+   *
+   * `0` means never. Only the values the app offers — see [`DELETE_WINDOWS`] —
+   * and the relay refuses anything else rather than storing a number no screen
+   * could have produced.
+   */
+  delete_window_secs: number
   created_at: string
   /**
    * The earliest few members, when the relay sent them.
@@ -348,6 +368,7 @@ export function updateGroup(
     join_price_luna?: number
     requires_approval?: boolean
     share_history?: boolean
+    delete_window_secs?: number
   },
 ): Promise<Group> {
   return request<Group>(`/v1/groups/${encodeURIComponent(id)}`, {
@@ -388,6 +409,29 @@ export function groupHistory(
   const query = params.toString()
   return request<RoomHistory>(
     `/v1/groups/${encodeURIComponent(id)}/messages${query ? `?${query}` : ""}`,
+  )
+}
+
+/**
+ * The windows a room may set, in seconds, longest last. `0` is never.
+ *
+ * Mirrors the relay's own list, which refuses anything outside it — so this is
+ * the whole of what a room can be set to, not a convenient subset.
+ */
+export const DELETE_WINDOWS = [0, 60, 3600, 86_400, 604_800] as const
+
+/**
+ * Take back something said in a room.
+ *
+ * Allowed only to whoever said it, and only while the room's window is still
+ * open; both are decided at the relay, which is why this can be offered
+ * hopefully and refused honestly. The deletion then reaches everyone else
+ * through the message feed.
+ */
+export function deleteSaid(group: string, message: string): Promise<void> {
+  return request<void>(
+    `/v1/groups/${encodeURIComponent(group)}/messages/${encodeURIComponent(message)}`,
+    { method: "DELETE" },
   )
 }
 

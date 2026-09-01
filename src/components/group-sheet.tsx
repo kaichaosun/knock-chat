@@ -44,6 +44,7 @@ import { labelIn, nameIn, remember } from "@/lib/names"
 import { parseNim } from "@/lib/payments"
 import { formatNim } from "@/lib/postage"
 import {
+  DELETE_WINDOWS,
   MAX_AMOUNT_LUNA,
   MAX_AMOUNT_NIM,
   answerJoinRequest,
@@ -83,6 +84,21 @@ import { cn } from "@/lib/utils"
  * confirms it both read from here, so the dialog is the choice restated rather
  * than a second thing to read and reconcile.
  */
+/**
+ * What each window is called, by its length in seconds.
+ *
+ * Keyed by the value rather than ordered alongside it, so the list and its
+ * labels cannot drift apart when the list changes — and the relay owns that
+ * list, not this file.
+ */
+const WINDOW_LABELS: Record<number, string> = {
+  0: "roomSettings.takeBackNever",
+  60: "roomSettings.takeBackMinute",
+  3600: "roomSettings.takeBackHour",
+  86400: "roomSettings.takeBackDay",
+  604800: "roomSettings.takeBackWeek",
+}
+
 function pastFor(shares: boolean) {
   if (shares) {
     return {
@@ -187,7 +203,7 @@ export function GroupSheet({
   // value after the owner changed it on another device.
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
-  const [saving, setSaving] = useState<"name" | "price" | "door" | "past" | null>(null)
+  const [saving, setSaving] = useState<"name" | "price" | "door" | "past" | "window" | null>(null)
   /** The door being changed to, while it is being confirmed. Null when nothing is. */
   const [changing, setChanging] = useState<boolean | null>(null)
   /** The history setting being moved to, while it is still only being offered. */
@@ -301,6 +317,28 @@ export function GroupSheet({
     // used to save the setting it already had.
     if (approval === group.requires_approval) return
     setChanging(approval)
+  }
+
+  /**
+   * How long a sender has to take something back.
+   *
+   * Saved on the tap, unlike the door and the history: those two decide who can
+   * get in and what they can read, and a stray thumb on either is somebody
+   * else's privacy. This one only changes how long a person has to correct
+   * themselves, which is a smaller thing to undo than to confirm.
+   */
+  const setWindow = async (delete_window_secs: number) => {
+    if (delete_window_secs === group.delete_window_secs) return
+    setSaving("window")
+    try {
+      await updateGroup(group.id, { delete_window_secs })
+      onChanged()
+      toast.success(t("groupSheet.takeBackSaved"))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
+    } finally {
+      setSaving(null)
+    }
   }
 
   const setPast = async (share_history: boolean) => {
@@ -585,6 +623,34 @@ export function GroupSheet({
                     {t("groupSheet.pastSharedWarning")}
                   </p>
                 )}
+              </section>
+            )}
+
+            {mine && (
+              <section>
+                <h3 className="text-sm font-semibold">{t("roomSettings.takeBackTitle")}</h3>
+                <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
+                  {t("roomSettings.takeBackNote")}
+                </p>
+                {/* A row rather than the two-card shape the settings above use:
+                    five choices are a scale, and a scale reads along a line. */}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {DELETE_WINDOWS.map((secs) => (
+                    <button
+                      key={secs}
+                      type="button"
+                      disabled={saving === "window"}
+                      onClick={() => void setWindow(secs)}
+                      aria-pressed={group.delete_window_secs === secs}
+                      className={cn(
+                        "rounded-2xl border px-3 py-2 text-[13px] font-medium transition-colors",
+                        group.delete_window_secs === secs && "border-primary text-primary",
+                      )}
+                    >
+                      {t(WINDOW_LABELS[secs])}
+                    </button>
+                  ))}
+                </div>
               </section>
             )}
 

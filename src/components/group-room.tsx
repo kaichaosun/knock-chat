@@ -3,9 +3,12 @@ import {
   ChevronLeft,
   DoorClosed,
   Gift as GiftIcon,
+  Copy,
   Info,
   Loader2,
+  MoreVertical,
   PanelLeftOpen,
+  Trash2,
   UserRound,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -25,9 +28,10 @@ import { PullIndicator } from "@/components/pull-indicator"
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
 import { useNames } from "@/hooks/use-names"
 import { copyText } from "@/lib/clipboard"
+import { cn } from "@/lib/utils"
 import { labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
-import { removeGroupMember, type Group, type GroupDetail } from "@/lib/relay"
+import { deleteSaid, removeGroupMember, type Group, type GroupDetail } from "@/lib/relay"
 import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
 import { dayLabel } from "@/lib/time"
 
@@ -60,6 +64,7 @@ export function GroupRoom({
   hasEarlier = false,
   loadingEarlier = false,
   onLoadEarlier,
+  onForget,
 }: {
   group: Group
   /** Members and settings; null until the first read lands. */
@@ -96,6 +101,8 @@ export function GroupRoom({
   /** A page is on its way, so the top can say so instead of looking stuck. */
   loadingEarlier?: boolean
   onLoadEarlier?: () => void
+  /** Drop messages the room has taken back, by relay id. */
+  onForget: (ids: string[]) => void
 }) {
   const { t } = useTranslation()
   const names = useNames()
@@ -252,6 +259,93 @@ export function GroupRoom({
     const element = scroller.current
     if (!element) return
     atEnd.current = element.scrollHeight - element.clientHeight - element.scrollTop < 32
+  }
+
+  /** The message a held finger has opened the menu on. */
+  const [held, setHeld] = useState<Message | null>(null)
+  const holding = useRef<number | undefined>(undefined)
+
+  /**
+   * Whether this message is still yours to take back.
+   *
+   * Three conditions, and the relay checks all three again — this only decides
+   * whether to offer the thing. A message still on its way has no name at the
+   * relay yet, which is why the id has to have been settled.
+   */
+  const isMine = (message: Message) =>
+    message.direction === "out" &&
+    message.status === "sent" &&
+    // Nothing to delete at the relay until it has said what it calls this.
+    message.id.startsWith("relay:")
+
+  /** …and the room's window has not closed on it. */
+  const inWindow = (message: Message) =>
+    group.delete_window_secs > 0 &&
+    Date.now() - Date.parse(message.at) < group.delete_window_secs * 1000
+
+  const copy = async (message: Message) => {
+    setHeld(null)
+    if (await copyText(message.body)) toast.success(t("room.messageCopied"))
+  }
+
+  /** Where the press began, so a drag can be told from a hold. */
+  const pressed = useRef<{ x: number; y: number } | null>(null)
+
+  /**
+   * Long press, which is the only way into a menu on a touch screen — a bubble
+   * has no room for a button, and a room full of them would have nothing else.
+   * A mouse gets the dots instead, so this arms for touch alone.
+   *
+   * A drag calls it off, because the same finger scrolls the list. Judged
+   * against a threshold rather than any movement at all: a finger is never
+   * still, and cancelling on the first stray pixel made the gesture nearly
+   * impossible to complete on a real screen.
+   */
+  const HOLD_SLOP_PX = 10
+
+  /**
+   * Open the menu for a message, leaving nothing selected behind it.
+   *
+   * Belt and braces: `selectable={false}` stops a selection starting, but a
+   * press that began on something else — a name, a timestamp — can still leave
+   * a range highlighted underneath the sheet.
+   */
+  const openFor = (message: Message) => {
+    document.getSelection()?.removeAllRanges()
+    setHeld(message)
+  }
+
+  const holdStart = (
+    message: Message,
+    at: { clientX: number; clientY: number; button: number; pointerType: string },
+  ) => {
+    if (at.pointerType !== "touch" || at.button !== 0) return
+    pressed.current = { x: at.clientX, y: at.clientY }
+    window.clearTimeout(holding.current)
+    holding.current = window.setTimeout(() => openFor(message), 500)
+  }
+
+  const holdMove = (at: { clientX: number; clientY: number }) => {
+    const from = pressed.current
+    if (!from) return
+    if (Math.abs(at.clientX - from.x) > HOLD_SLOP_PX || Math.abs(at.clientY - from.y) > HOLD_SLOP_PX) {
+      holdCancel()
+    }
+  }
+
+  const holdCancel = () => {
+    window.clearTimeout(holding.current)
+    pressed.current = null
+  }
+
+  const takeBack = async (message: Message) => {
+    setHeld(null)
+    try {
+      await deleteSaid(group.id, message.id.replace(/^relay:/, ""))
+      onForget([message.id.replace(/^relay:/, "")])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("room.deleteMessageFailed"))
+    }
   }
 
   const groups = useMemo(() => groupByDay(messages), [messages])
@@ -418,15 +512,57 @@ export function GroupRoom({
                               You
                             </button>
                           )}
-                          <MessageBubble
-                            message={message}
-                            onRetry={onRetrySay}
-                            onOpenInvite={onOpenInvite}
-                            onOpenContact={onOpenContact}
-                            channelOpen
-                            owner={owner}
-                            stamped={stamped}
-                          />
+                          <div
+                            className="group/msg relative flex items-start"
+                            // The browser's own long press is a text selection
+                            // and, on iOS, a Copy/Share callout over the top of
+                            // it. Both arrive before a 500ms timer can, so the
+                            // gesture has to be claimed rather than shared.
+                            onPointerDown={(event) => holdStart(message, event)}
+                            onPointerMove={holdMove}
+                            onPointerUp={holdCancel}
+                            onPointerCancel={holdCancel}
+                            onPointerLeave={holdCancel}
+                          >
+                            {/* `flex-1`, not merely `min-w-0`: the bubble sizes
+                                itself to a share of whatever it sits in, so a
+                                wrapper that shrinks to its own content makes a
+                                short line wrap for no reason. */}
+                            <div className="min-w-0 flex-1 [-webkit-touch-callout:none] select-none">
+                              <MessageBubble
+                                message={message}
+                                onRetry={onRetrySay}
+                                onOpenInvite={onOpenInvite}
+                                onOpenContact={onOpenContact}
+                                channelOpen
+                                owner={owner}
+                                stamped={stamped}
+                                selectable={false}
+                              />
+                            </div>
+
+                            {/* Beside the bubble on a pointer, where a finger
+                                has a long press instead. Hidden until the row
+                                is hovered, and only on a wide window: a control
+                                that is always there would sit on every message
+                                in the room. */}
+                            <button
+                              type="button"
+                              onClick={() => openFor(message)}
+                              aria-label={t("room.messageMenu")}
+                              // Laid over the gutter the bubble's own 92% cap
+                              // leaves, rather than taking a place in the row:
+                              // a control that appears on hover must not move
+                              // the thing it appeared next to.
+                              className={cn(
+                                "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                "absolute top-1 right-0 hidden rounded-lg p-1 opacity-0 transition-opacity lg:block",
+                                "focus-visible:opacity-100 group-hover/msg:opacity-100",
+                              )}
+                            >
+                              <MoreVertical className="size-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )
@@ -503,6 +639,41 @@ export function GroupRoom({
           <div className="pb-safe" />
         </div>
       )}
+
+      {/* What a held finger opens on your own message. One row today; edit is
+          meant to join it, and a menu has somewhere to put a second thing where
+          a gesture that does exactly one does not. */}
+      <AttachMenu
+        open={held !== null}
+        onOpenChange={(open) => !open && setHeld(null)}
+        title={t("room.messageMenu")}
+        actions={
+          held
+            ? [
+                {
+                  icon: Copy,
+                  label: t("room.copyMessage"),
+                  description: t("room.copyMessageNote"),
+                  onSelect: () => void copy(held),
+                },
+                // Absent rather than greyed out when the room's window has
+                // closed — this menu lists what can be done, and Copy is what
+                // keeps it worth opening when Delete cannot be.
+                ...(isMine(held) && inWindow(held)
+                  ? [
+                      {
+                        icon: Trash2,
+                        label: t("room.deleteMessage"),
+                        description: t("room.deleteMessageNote"),
+                        tone: "destructive" as const,
+                        onSelect: () => void takeBack(held),
+                      },
+                    ]
+                  : []),
+              ]
+            : []
+        }
+      />
 
       {onGift && (
         <AttachMenu

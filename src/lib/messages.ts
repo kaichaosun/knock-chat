@@ -268,6 +268,24 @@ export function settle(snapshot: Snapshot, id: string, name: string): Snapshot {
   }
 }
 
+/**
+ * Forget messages the room took back.
+ *
+ * Ids only, and ids for messages this device never held are simply not found —
+ * a deletion is delivered to everyone in the room, including people who joined
+ * after the message or never fetched it, so most of them are no-ops by design.
+ *
+ * Returns the same snapshot when nothing matched, so a poll that carries a
+ * tombstone for somebody else costs no render and no write.
+ */
+export function removeMessages(snapshot: Snapshot, ids: string[]): Snapshot {
+  if (ids.length === 0) return snapshot
+  const gone = new Set(ids.map((id) => `relay:${id}`))
+  const messages = snapshot.messages.filter((m) => !gone.has(m.id))
+  if (messages.length === snapshot.messages.length) return snapshot
+  return { ...snapshot, messages }
+}
+
 /** Record something this device sent, so the sender sees their own words. */
 export function recordOutgoing(
   snapshot: Snapshot,

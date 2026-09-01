@@ -97,7 +97,16 @@ export function useMessages(
           : result.messages
         if (cancelled) return
 
-        update((current) => history.mergeIncoming(current, opened, result.next, owner))
+        update((current) =>
+          // Taken back before taken in, so a message deleted in the same breath
+          // it was sent does not land and then vanish a frame later.
+          history.mergeIncoming(
+            history.removeMessages(current, result.deleted ?? []),
+            opened,
+            result.next,
+            owner,
+          ),
+        )
       } catch (error) {
         if (cancelled) return
         if (error instanceof RelayError && error.status === 401) {
@@ -224,6 +233,18 @@ export function useMessages(
     [update],
   )
 
+  /**
+   * Forget a message, because the room did.
+   *
+   * Used both by the device that asked for the deletion and by every other one,
+   * which hears about it through the feed — the same removal either way, so
+   * there is one path and not two that could disagree.
+   */
+  const forgetMessages = useCallback(
+    (ids: string[]) => update((current) => history.removeMessages(current, ids)),
+    [update],
+  )
+
   /** Put a message back on its way, timed for when it is actually resent. */
   const resend = useCallback(
     (id: string) => update((current) => history.resend(current, id)),
@@ -279,6 +300,7 @@ export function useMessages(
     recordOutgoing,
     absorbHistory,
     settle,
+    forgetMessages,
     setStatus,
     resend,
     relayStatus,

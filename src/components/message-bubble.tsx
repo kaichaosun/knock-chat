@@ -28,6 +28,7 @@ export function MessageBubble({
   channelOpen,
   owner = null,
   stamped = true,
+  selectable = true,
 }: {
   message: Message
   onRetry: (message: Message) => void
@@ -39,6 +40,14 @@ export function MessageBubble({
   channelOpen: boolean
   /** Your address. Only a gift card needs it, and gifts live in rooms. */
   owner?: string | null
+  /**
+   * Whether the text may be selected by hand.
+   *
+   * False where a long press is a gesture of its own. The two cannot share the
+   * press: the browser begins selecting long before a timer could fire, and on
+   * iOS puts a Copy / Look Up / Translate callout over whatever opens next.
+   */
+  selectable?: boolean
   /**
    * Whether this bubble shows the time. False for one the next message follows
    * within the same minute, which then carries the stamp for both. See
@@ -97,8 +106,13 @@ export function MessageBubble({
             className={cn(
               "rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug whitespace-pre-wrap",
               // What someone wrote is worth lifting out of the page, so it opts
-              // back in to the selection the body switched off.
-              "wrap-anywhere select-text",
+              // back in to the selection the body switched off — unless a long
+              // press on it means something, in which case the browser's own
+              // selection gets there first and this has to stand aside. An
+              // ancestor cannot decide that: this class is the more specific
+              // one and would win.
+              "wrap-anywhere",
+              selectable ? "select-text" : "select-none",
               outgoing
                 ? "brand-gradient rounded-br-md text-white shadow-sm"
                 : "bg-muted text-foreground rounded-bl-md",

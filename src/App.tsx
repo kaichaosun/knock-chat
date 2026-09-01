@@ -136,6 +136,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     recordOutgoing,
     absorbHistory,
     settle,
+    forgetMessages,
     setStatus,
     resend,
     dismissed,
@@ -1128,6 +1129,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         hasEarlier={hasEarlier}
         loadingEarlier={loadingEarlier}
         onLoadEarlier={loadEarlier}
+        onForget={forgetMessages}
         onBack={closeThreadView}
         onDeleteChat={() => {
           if (!openGroup) return
