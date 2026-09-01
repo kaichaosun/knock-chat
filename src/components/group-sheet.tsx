@@ -86,14 +86,14 @@ import { cn } from "@/lib/utils"
 function pastFor(shares: boolean) {
   if (shares) {
     return {
-      label: translate("groupSheet.pastShared"),
-      hint: translate("groupSheet.pastSharedHint"),
+      label: translate("roomSettings.historyVisible"),
+      hint: translate("roomSettings.historyVisibleHint"),
       means: translate("groupSheet.pastSharedMeans"),
     }
   }
   return {
-    label: translate("groupSheet.pastPrivate"),
-    hint: translate("groupSheet.pastPrivateHint"),
+    label: translate("roomSettings.historyHidden"),
+    hint: translate("roomSettings.historyHiddenHint"),
     means: translate("groupSheet.pastPrivateMeans"),
   }
 }
@@ -103,8 +103,8 @@ function doorFor(requiresApproval: boolean, priceLuna: number) {
 
   if (requiresApproval) {
     return {
-      label: translate("groupSheet.doorApprove"),
-      hint: translate(price ? "groupSheet.doorApproveHintPaid" : "groupSheet.doorApproveHint"),
+      label: translate("roomSettings.doorApprove"),
+      hint: translate(price ? "roomSettings.doorApproveHintPaid" : "roomSettings.doorApproveHint"),
       means: price
         ? translate("groupSheet.doorApproveMeansPaid", { price })
         : translate("groupSheet.doorApproveMeans"),
@@ -112,8 +112,8 @@ function doorFor(requiresApproval: boolean, priceLuna: number) {
   }
 
   return {
-    label: translate("groupSheet.doorOpen"),
-    hint: translate(price ? "groupSheet.doorOpenHintPaid" : "groupSheet.doorOpenHint"),
+    label: translate("roomSettings.doorOpen"),
+    hint: translate(price ? "roomSettings.doorOpenHintPaid" : "roomSettings.doorOpenHint"),
     means: price
       ? translate("groupSheet.doorOpenMeansPaid", { price })
       : translate("groupSheet.doorOpenMeans"),
@@ -460,7 +460,7 @@ export function GroupSheet({
                     value={name}
                     disabled={saving !== null}
                     onChange={(event) => setName(event.target.value)}
-                    aria-label={t("groupSheet.nameLabel")}
+                    aria-label={t("roomSettings.nameLabel")}
                     className={cn(
                       "bg-muted min-w-0 flex-1 rounded-2xl px-4 py-3 font-medium outline-none",
                       "focus-visible:ring-ring/60 focus-visible:ring-2",
@@ -480,7 +480,7 @@ export function GroupSheet({
 
             {mine && (
               <section>
-                <h3 className="text-sm font-semibold">{t("groupSheet.costTitle")}</h3>
+                <h3 className="text-sm font-semibold">{t("roomSettings.costTitle")}</h3>
                 <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
                   {t("groupSheet.costNote")}
                 </p>
@@ -526,7 +526,7 @@ export function GroupSheet({
 
             {mine && (
               <section>
-                <h3 className="text-sm font-semibold">{t("groupSheet.doorTitle")}</h3>
+                <h3 className="text-sm font-semibold">{t("roomSettings.doorTitle")}</h3>
                 <div className="mt-2 flex gap-2">
                   {[false, true].map((approval) => (
                     <button
@@ -560,7 +560,7 @@ export function GroupSheet({
 
             {mine && (
               <section>
-                <h3 className="text-sm font-semibold">{t("groupSheet.pastTitle")}</h3>
+                <h3 className="text-sm font-semibold">{t("roomSettings.historyTitle")}</h3>
                 <div className="mt-2 flex gap-2">
                   {[false, true].map((share) => (
                     <button

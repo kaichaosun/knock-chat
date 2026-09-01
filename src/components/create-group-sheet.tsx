@@ -96,8 +96,8 @@ export function CreateGroupSheet({
               value={name}
               disabled={creating}
               onChange={(event) => setName(event.target.value)}
-              placeholder={t("newGroup.namePlaceholder")}
-              aria-label={t("newGroup.namePlaceholder")}
+              placeholder={t("roomSettings.nameLabel")}
+              aria-label={t("roomSettings.nameLabel")}
               aria-invalid={nameTooLong}
               className={cn(
                 "bg-muted w-full rounded-2xl px-4 py-3.5 font-medium outline-none",
@@ -114,7 +114,7 @@ export function CreateGroupSheet({
           </div>
 
           <div>
-            <h3 className="px-1 text-sm font-semibold">{t("newGroup.costTitle")}</h3>
+            <h3 className="px-1 text-sm font-semibold">{t("roomSettings.costTitle")}</h3>
             <p className="text-muted-foreground mt-1 px-1 text-[13px] leading-snug">
               {t("newGroup.costNote")}
             </p>
@@ -141,7 +141,7 @@ export function CreateGroupSheet({
           </div>
 
           <div>
-            <h3 className="px-1 text-sm font-semibold">{t("newGroup.doorTitle")}</h3>
+            <h3 className="px-1 text-sm font-semibold">{t("roomSettings.doorTitle")}</h3>
             <div className="mt-2 flex gap-2">
               {[false, true].map((value) => (
                 <button
@@ -155,10 +155,10 @@ export function CreateGroupSheet({
                   )}
                 >
                   <span className="block font-semibold">
-                    {t(value ? "newGroup.youApprove" : "newGroup.anyoneWithLink")}
+                    {t(value ? "roomSettings.doorApprove" : "roomSettings.doorOpen")}
                   </span>
                   <span className="text-muted-foreground block text-[11px] leading-snug">
-                    {t(value ? "newGroup.youApproveNote" : "newGroup.anyoneWithLinkNote")}
+                    {t(value ? "roomSettings.doorApproveHint" : "roomSettings.doorOpenHint")}
                   </span>
                 </button>
               ))}
@@ -176,7 +176,7 @@ export function CreateGroupSheet({
               to be readable is readable from its first message rather than from
               whenever the owner remembers to go and change it. */}
           <div>
-            <h3 className="px-1 text-sm font-semibold">{t("newGroup.historyTitle")}</h3>
+            <h3 className="px-1 text-sm font-semibold">{t("roomSettings.historyTitle")}</h3>
             <div className="mt-2 flex gap-2">
               {[false, true].map((value) => (
                 <button
@@ -190,10 +190,10 @@ export function CreateGroupSheet({
                   )}
                 >
                   <span className="block font-semibold">
-                    {t(value ? "newGroup.historyVisible" : "newGroup.historyHidden")}
+                    {t(value ? "roomSettings.historyVisible" : "roomSettings.historyHidden")}
                   </span>
                   <span className="text-muted-foreground block text-[11px] leading-snug">
-                    {t(value ? "newGroup.historyVisibleNote" : "newGroup.historyHiddenNote")}
+                    {t(value ? "roomSettings.historyVisibleHint" : "roomSettings.historyHiddenHint")}
                   </span>
                 </button>
               ))}
