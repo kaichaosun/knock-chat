@@ -26,19 +26,13 @@ import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { PullIndicator } from "@/components/pull-indicator"
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
+import { useMentionSearch } from "@/hooks/use-mention-search"
 import { useNames } from "@/hooks/use-names"
 import { copyText } from "@/lib/clipboard"
 import { cn } from "@/lib/utils"
-import { labelIn, remember } from "@/lib/names"
+import { labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
-import { sameAddress } from "@/lib/mentions"
-import {
-  deleteSaid,
-  listGroupMembers,
-  removeGroupMember,
-  type Group,
-  type GroupDetail,
-} from "@/lib/relay"
+import { deleteSaid, removeGroupMember, type Group, type GroupDetail } from "@/lib/relay"
 import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
 import { dayLabel } from "@/lib/time"
 
@@ -113,6 +107,8 @@ export function GroupRoom({
 }) {
   const { t } = useTranslation()
   const names = useNames()
+  /** Who the composer's `@` can reach, by published name or by one of yours. */
+  const searchMembers = useMentionSearch(group.id, owner)
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement | null>(null)
   /**
@@ -344,26 +340,6 @@ export function GroupRoom({
     window.clearTimeout(holding.current)
     pressed.current = null
   }
-
-  /**
-   * Who can be named in this room, for the composer's `@`.
-   *
-   * The room itself rather than a list held here: a room can hold ten thousand
-   * people, and the relay already searches them by name or by whole address.
-   * Names arriving this way are kept, so the picker teaches the room its faces
-   * on the way past.
-   *
-   * You are left out. Naming yourself in your own message points at the one
-   * person who already knows they wrote it.
-   */
-  const searchMembers = useCallback(
-    async (query: string) => {
-      const page = await listGroupMembers(group.id, { q: query })
-      remember(page.names)
-      return page.members.filter((address) => !sameAddress(address, owner))
-    },
-    [group.id, owner],
-  )
 
   const takeBack = async (message: Message) => {
     setHeld(null)

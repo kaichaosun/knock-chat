@@ -16,7 +16,7 @@ import { AddressAvatar } from "@/components/address-avatar"
 import { GiftCard } from "@/components/gift-card"
 import { useNames } from "@/hooks/use-names"
 import type { Message } from "@/lib/messages"
-import { sameAddress, segments } from "@/lib/mentions"
+import { segments } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
 import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
 import { shortenAddress } from "@/lib/address"
@@ -132,12 +132,7 @@ export function MessageBubble({
             )}
           >
             {payload.kind === "text" ? (
-              <Words
-                text={payload.text}
-                you={owner}
-                outgoing={outgoing}
-                onOpen={onOpenMention}
-              />
+              <Words text={payload.text} outgoing={outgoing} onOpen={onOpenMention} />
             ) : (
               // Something a newer build sent that this one has no way to draw.
               // Shown as a gap on purpose: silently dropping it would leave the
@@ -178,13 +173,10 @@ export function MessageBubble({
  */
 function Words({
   text,
-  you,
   outgoing,
   onOpen,
 }: {
   text: string
-  /** Your address, so a mention of you can say so louder. */
-  you: string | null
   outgoing: boolean
   onOpen?: (address: string) => void
 }) {
@@ -195,13 +187,7 @@ function Words({
         part.kind === "text" ? (
           <Fragment key={index}>{part.text}</Fragment>
         ) : (
-          <Mention
-            key={index}
-            address={part.address}
-            mine={you !== null && sameAddress(part.address, you)}
-            outgoing={outgoing}
-            onOpen={onOpen}
-          />
+          <Mention key={index} address={part.address} outgoing={outgoing} onOpen={onOpen} />
         ),
       )}
     </>
@@ -217,13 +203,10 @@ const HOLD_MS = 500
 /** Somebody, named inside a message. */
 function Mention({
   address,
-  mine,
   outgoing,
   onOpen,
 }: {
   address: string
-  /** You are the one being named. The whole point of noticing a mention. */
-  mine: boolean
   outgoing: boolean
   onOpen?: (address: string) => void
 }) {
@@ -231,13 +214,16 @@ function Mention({
   const pressed = useRef<number | null>(null)
   const label = `@${labelIn(names, address)}`
 
+  // A bubble is already a shape, so a mention does not get one of its own: a
+  // filled pill inside a bubble is a container inside a container, and a room
+  // of them reads as clutter rather than as people. Weight and colour only.
+  // One colour in two strengths, picked by what it has to be legible against
+  // rather than by whose message it is. Typing a name, reading it back in your
+  // own bubble and reading it in somebody else's are the same thing happening,
+  // and looked like three before.
   const className = cn(
-    "rounded-md px-1 font-semibold",
-    outgoing
-      ? "bg-white/25 text-white"
-      : mine
-        ? "bg-primary text-primary-foreground"
-        : "bg-primary/12 text-primary",
+    "font-semibold",
+    outgoing ? "text-mention-on-brand" : "text-mention",
   )
 
   // Drawn either way, tappable only where there is somebody to open. A mention
@@ -260,7 +246,7 @@ function Mention({
         if (began !== null && Date.now() - began >= HOLD_MS) return
         onOpen(address)
       }}
-      className={className}
+      className={cn(className, "active:opacity-60")}
     >
       {label}
     </button>

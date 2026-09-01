@@ -365,9 +365,16 @@ export function Composer({
   )
 }
 
-/** How a person looks while a message about them is still being written. */
-const CHIP =
-  "bg-primary/12 text-primary rounded-md px-1 py-0.5 font-medium whitespace-nowrap"
+/**
+ * How a person looks while a message about them is still being written: the
+ * same weight and colour the sent message will draw them in, so what is typed
+ * and what is read are the same thing.
+ *
+ * `whitespace-nowrap` stays because it is not decoration — it keeps a name, or
+ * the address a nameless one falls back to, from breaking across two lines and
+ * reading as two people.
+ */
+const CHIP = "text-mention font-semibold whitespace-nowrap"
 
 /** Tags a browser wraps a line in when Enter is pressed. Each one starts a line. */
 const BLOCK = new Set(["DIV", "P", "LI"])

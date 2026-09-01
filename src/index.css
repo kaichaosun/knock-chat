@@ -44,6 +44,18 @@
   /* Brand gradient, used for the mark and outgoing bubbles. */
   --brand-from: #265dd7;
   --brand-to: #0582ca;
+  /* A mention, in the two places one can land. Both are the same hue — what is
+     typed and what is read should not look like different things — and they
+     differ only by what they have to stay legible against.
+
+     `--mention` sits on a pale surface: the composer, and somebody else's
+     bubble. `--mention-on-brand` sits on the gradient, where the only move
+     left from white is *down* in lightness — `text-white/85` and the rest —
+     which reads as quieter, the opposite of what a mention wants. Warm is the
+     one direction that reads as louder there, and it holds at both ends of a
+     gradient running indigo to cyan. */
+  --mention: #a16c12;
+  --mention-on-brand: #efcd8f;
 }
 
 .dark {
@@ -79,6 +91,12 @@
 
   --brand-from: #3b6ee0;
   --brand-to: #1f97dc;
+  /* One value serves both here: the dark theme's pale surface is navy, so the
+     tint that reads on the gradient reads on the composer too. Deeper and
+     calmer than the light theme's — on a dark screen the eye is adapted down,
+     so the same colour arrives much louder. */
+  --mention: #ddb677;
+  --mention-on-brand: #ddb677;
 }
 
 @theme inline {
@@ -103,6 +121,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-mention: var(--mention);
+  --color-mention-on-brand: var(--mention-on-brand);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
