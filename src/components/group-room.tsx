@@ -32,7 +32,7 @@ import { useNames } from "@/hooks/use-names"
 import { copyText } from "@/lib/clipboard"
 import { shortenAddress } from "@/lib/address"
 import { preview } from "@/lib/payload"
-import { type Quote } from "@/lib/quote"
+import { QUOTE_ID_LEN, unquote, type Quote } from "@/lib/quote"
 import { cn } from "@/lib/utils"
 import { givenNameIn, labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
@@ -273,6 +273,48 @@ export function GroupRoom({
   const [held, setHeld] = useState<Message | null>(null)
   /** What the next message answers, until it is sent or dropped. */
   const [answering, setAnswering] = useState<Quote | null>(null)
+  /** A message just jumped to, marked for a moment so the eye can find it. */
+  const [landed, setLanded] = useState<string | null>(null)
+  /**
+   * Where each message was drawn, so one can be scrolled back to.
+   *
+   * Keyed off `data-said` rather than a closure per message, which would detach
+   * and reattach every row on every render. Rows that have gone leave an entry
+   * behind pointing at a node no longer in the page — cheap, and `isConnected`
+   * is what the jump checks anyway.
+   */
+  const rows = useRef(new Map<string, HTMLElement>())
+  const holdRow = useCallback((node: HTMLDivElement | null) => {
+    const id = node?.dataset.said
+    if (id) rows.current.set(id, node)
+  }, [])
+
+  /**
+   * Go to the message a reply answers.
+   *
+   * By id and by nothing else. Matching on the quoted words would look like it
+   * worked and be quietly wrong wherever two messages read alike — the same
+   * thing said twice, a card whose summary reads differently in another
+   * language, a mention two devices know by different names. An id is right or
+   * it is missing, and missing is a thing that can be said out loud.
+   *
+   * It misses when the room has not pulled back far enough to hold the original
+   * yet, which is the ordinary case and worth a word rather than a tap that
+   * appears to do nothing.
+   */
+  const jumpTo = (from: Message) => {
+    const { quote } = unquote(from.body)
+    if (!quote?.id) return
+    const found = messages.find((message) => tagOf(message) === quote.id)
+    const node = found && rows.current.get(found.id)
+    if (!found || !node?.isConnected) {
+      toast(t("room.quotedNotHere"))
+      return
+    }
+    node.scrollIntoView({ block: "center", behavior: "smooth" })
+    setLanded(found.id)
+    window.setTimeout(() => setLanded((held) => (held === found.id ? null : held)), 1600)
+  }
 
   // Dropped on the way out of a room. This screen is not remounted between
   // rooms, so without it an answer begun in one would be waiting in the next,
@@ -313,8 +355,21 @@ export function GroupRoom({
     setAnswering({
       author: givenNameIn(names, who) ?? shortenAddress(who),
       said: preview(message.body, "in"),
+      id: tagOf(message),
     })
   }
+
+  /**
+   * The piece of a message's id that a quote carries, or nothing.
+   *
+   * Only a message the relay has named has one. A message still on its way is
+   * called `local:` something this device made up, which would mean nothing to
+   * whoever read the reply.
+   */
+  const tagOf = (message: Message): string | undefined =>
+    message.id.startsWith("relay:")
+      ? message.id.slice("relay:".length).replace(/-/g, "").slice(0, QUOTE_ID_LEN).toLowerCase()
+      : undefined
 
   const copy = async (message: Message) => {
     setHeld(null)
@@ -555,7 +610,18 @@ export function GroupRoom({
                     // was the one break in that column.
                     const opens = opensTurn(day.messages[index - 1], message)
                     return (
-                      <div key={message.id} className="flex items-start gap-2">
+                      <div
+                        key={message.id}
+                        ref={holdRow}
+                        data-said={message.id}
+                        className={cn(
+                          "flex items-start gap-2 rounded-2xl transition-shadow",
+                          // Long enough to catch the eye after a scroll, and gone on
+                          // its own: a mark that stayed would become a second kind of
+                          // message.
+                          landed === message.id && "ring-primary/40 ring-2",
+                        )}
+                      >
                         <div className="w-8 shrink-0">
                           {opens && (
                             <button
@@ -601,6 +667,7 @@ export function GroupRoom({
                                 onOpenInvite={onOpenInvite}
                                 onOpenContact={onOpenContact}
                                 onOpenMention={setShowing}
+                                onOpenQuote={() => jumpTo(message)}
                                 channelOpen
                                 owner={owner}
                                 stamped={stamped}
@@ -637,7 +704,18 @@ export function GroupRoom({
                   const opens = opensTurn(day.messages[index - 1], message)
                   const who = labelIn(names, message.peer)
                   return (
-                    <div key={message.id} className="flex items-start gap-2">
+                    <div
+                      key={message.id}
+                      ref={holdRow}
+                      data-said={message.id}
+                      className={cn(
+                        "flex items-start gap-2 rounded-2xl transition-shadow",
+                        // Long enough to catch the eye after a scroll, and gone on
+                        // its own: a mark that stayed would become a second kind of
+                        // message.
+                        landed === message.id && "ring-primary/40 ring-2",
+                      )}
+                    >
                       {/* A gutter, held open for the whole run rather than only
                           where the face is drawn: without it the rest of what
                           somebody says steps left out from under them. */}
@@ -703,6 +781,7 @@ export function GroupRoom({
                               onOpenInvite={onOpenInvite}
                               onOpenContact={onOpenContact}
                               onOpenMention={setShowing}
+                              onOpenQuote={() => jumpTo(message)}
                               channelOpen
                               owner={owner}
                               stamped={stamped}

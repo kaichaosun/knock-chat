@@ -34,6 +34,39 @@ describe("quoted", () => {
   })
 })
 
+describe("the message id a quote carries", () => {
+  it("writes it, and reads it back", () => {
+    const written = quoted({ ...ALICE, id: "4f2a91c3" }, "ok")
+    expect(written).toBe("> Alice #4f2a91c3: are we still on for six\nok")
+    expect(unquote(written).quote).toEqual({ ...ALICE, id: "4f2a91c3" })
+  })
+
+  it("still reads a quote from before there were ids", () => {
+    const { quote, body } = unquote("> Alice: are we still on for six\nok")
+    expect(quote).toEqual(ALICE)
+    expect(quote?.id).toBeUndefined()
+    expect(body).toBe("ok")
+  })
+
+  it("leaves it out rather than writing one nothing could find", () => {
+    for (const id of ["", "nothex!!", "4F2A91C3", "4f2a91", "4f2a91c3d4"]) {
+      const { quote } = unquote(quoted({ ...ALICE, id }, "ok"))
+      expect(quote?.id, id).toBeUndefined()
+    }
+  })
+
+  it("loses nothing from an author who ends in something id-shaped", () => {
+    // A name may contain anything, so one can be read as carrying an id it does
+    // not have. Nothing is lost — the two halves still add up — and the worst
+    // that follows is a lookup for an id no message has, which falls through to
+    // matching on the snippet.
+    const { quote } = unquote(quoted({ ...ALICE, author: "Bob #12345678" }, "ok"))
+    expect(quote?.author).toBe("Bob")
+    expect(quote?.id).toBe("12345678")
+    expect(`${quote?.author} #${quote?.id}`).toBe("Bob #12345678")
+  })
+})
+
 describe("unquote", () => {
   it("reads back what was written", () => {
     expect(unquote(quoted(ALICE, "yes, see you there"))).toEqual({

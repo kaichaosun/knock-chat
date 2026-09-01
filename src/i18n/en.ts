@@ -223,6 +223,7 @@ export const en = {
     replyMessage: "Reply",
     replyMessageNote: "Answer it, quoting what it said.",
     replyingTo: "Replying to {{name}}",
+    quotedNotHere: "That message isn't loaded here. Pull down to look further back.",
     stopReplying: "Stop replying",
     deleteMessage: "Delete message",
     deleteMessageNote: "Removed for everyone in the room.",

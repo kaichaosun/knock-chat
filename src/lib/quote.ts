@@ -17,19 +17,32 @@
  * older build still shows the whole sentence and only an address in place of a
  * name.
  *
- * ## Why there is no message id in here
+ * ## Both a snapshot and a reference
  *
- * An id would buy tapping a reply to jump to what it answers. It would also
- * have to be written into the text, where it is 36 characters of noise to
- * anything that cannot read it. And the jump would miss often enough to be a
- * broken promise: a room holds only what has been pulled into it, so what is
- * being answered is frequently not loaded at all. A quote that is always right
- * beats a link that is sometimes there.
+ * Two independent things travel, and they do different jobs.
  *
- * The cost is that the quote is a snapshot. It does not change when the
- * original is edited, and it survives the original being deleted — which is
- * worth knowing, because it means deleting a message does not unsay it where
- * somebody has already quoted it.
+ * The **snippet** is what the quote *says*. It is a snapshot, so it reads the
+ * same whether or not the room has pulled back far enough to hold the original,
+ * and whether or not the original still exists — which is worth knowing,
+ * because it means deleting a message does not unsay it where somebody has
+ * already quoted it. It never changes when the original is edited.
+ *
+ * The **id** is what the quote *points at*: [`QUOTE_ID_LEN`] characters of the
+ * answered message's relay id, and the only thing consulted when a reply is
+ * tapped. Nothing is ever matched by its text — the same words said twice, a
+ * card whose one-line summary reads differently in another language, a mention
+ * two devices know by different names: each of those is one message, and
+ * guessing from the words gets it wrong quietly. An id is right or it is
+ * absent, and absent is a thing that can be said out loud.
+ *
+ * A prefix rather than the whole id because the whole id is 36 characters of
+ * noise to anything that cannot read it, and the point of living in the text is
+ * that the text stays readable. A room would need billions of messages loaded
+ * at once for two prefixes to collide.
+ *
+ * A quote can carry no id at all — a reply written before quotes had them, or
+ * one answering a message the relay had not yet named. Such a quote is drawn
+ * like any other and simply does not offer to go anywhere.
  *
  * ## What the author is
  *
@@ -45,7 +58,23 @@ export type Quote = {
   author: string
   /** One line of what was being answered, cut short. */
   said: string
+  /**
+   * The first [`QUOTE_ID_LEN`] characters of the answered message's relay id,
+   * and the whole of how a tapped reply finds what it answers.
+   *
+   * Absent on a reply written before quotes carried one, and on one answering a
+   * message the relay had not yet named. Such a quote offers nowhere to go.
+   */
+  id?: string
 }
+
+/**
+ * How much of a message's id a quote carries.
+ *
+ * Whoever builds a `Quote` has to cut the id to the same length the pattern
+ * below looks for, so both read it from here.
+ */
+export const QUOTE_ID_LEN = 8
 
 /** Long enough for a name or a shortened address, and no longer. */
 const MAX_AUTHOR = 48
@@ -55,13 +84,16 @@ const MAX_AUTHOR = 48
  */
 const MAX_SAID = 120
 
+/** What a written id has to look like, so a stray `#word` is not read as one. */
+const ID = /^[0-9a-f]{8}$/
+
 /**
  * `said` must not be empty, which is most of what stops an ordinary message
  * that happens to begin with "> " from being read as a reply. Neither part can
  * span a line, and there has to be something after the quote for it to be a
  * reply to.
  */
-const QUOTE = /^> (.{1,48}?): (.{1,120})\n([\s\S]+)$/
+const QUOTE = /^> (.{1,48}?)(?: #([0-9a-f]{8}))?: (.{1,120})\n([\s\S]+)$/
 
 /** A reply: the quote line, then the words. */
 export function quoted(quote: Quote, body: string): string {
@@ -70,7 +102,10 @@ export function quoted(quote: Quote, body: string): string {
   const author = oneLine(quote.author.replace(/:/g, " "), MAX_AUTHOR)
   const said = oneLine(quote.said, MAX_SAID)
   if (!author || !said) return body
-  return `> ${author}: ${said}\n${body}`
+  // Only a well-formed one is written. A malformed id would not be found by
+  // anything, and would sit in the text looking like it meant something.
+  const tag = quote.id && ID.test(quote.id) ? ` #${quote.id}` : ""
+  return `> ${author}${tag}: ${said}\n${body}`
 }
 
 /**
@@ -82,7 +117,9 @@ export function quoted(quote: Quote, body: string): string {
 export function unquote(text: string): { quote: Quote | null; body: string } {
   const found = QUOTE.exec(text)
   if (!found) return { quote: null, body: text }
-  return { quote: { author: found[1], said: found[2] }, body: found[3] }
+  const quote: Quote = { author: found[1], said: found[3] }
+  if (found[2]) quote.id = found[2]
+  return { quote, body: found[4] }
 }
 
 /** Collapse to a single line and cut to `cap` characters. */

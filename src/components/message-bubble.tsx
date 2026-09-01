@@ -31,6 +31,7 @@ export function MessageBubble({
   onOpenInvite,
   onOpenContact,
   onOpenMention,
+  onOpenQuote,
   channelOpen,
   owner = null,
   stamped = true,
@@ -49,6 +50,13 @@ export function MessageBubble({
    * members to name — and a mention there is then drawn but not tappable.
    */
   onOpenMention?: (address: string) => void
+  /**
+   * Go to whatever this message answers.
+   *
+   * Absent where there is nothing to go to — a thread with no room to scroll
+   * back through — and the quote is then drawn but not tappable.
+   */
+  onOpenQuote?: () => void
   /** Whether messages can get through at all right now. */
   channelOpen: boolean
   /** Your address: what a gift card is drawn against, and who a mention of you is. */
@@ -133,7 +141,12 @@ export function MessageBubble({
             )}
           >
             {payload.kind === "text" ? (
-              <Answering text={payload.text} outgoing={outgoing} onOpen={onOpenMention} />
+              <Answering
+                text={payload.text}
+                outgoing={outgoing}
+                onOpen={onOpenMention}
+                onOpenQuote={onOpenQuote}
+              />
             ) : (
               // Something a newer build sent that this one has no way to draw.
               // Shown as a gap on purpose: silently dropping it would leave the
@@ -175,15 +188,22 @@ function Answering({
   text,
   outgoing,
   onOpen,
+  onOpenQuote,
 }: {
   text: string
   outgoing: boolean
   onOpen?: (address: string) => void
+  onOpenQuote?: () => void
 }) {
   const { quote, body } = unquote(text)
   return (
     <>
-      {quote && <Quoted quote={quote} outgoing={outgoing} />}
+      {quote && (
+        // Only a quote carrying an id offers to go anywhere. Without one there
+        // is nothing to find, and a control that can only ever fail is worse
+        // than no control.
+        <Quoted quote={quote} outgoing={outgoing} onOpen={quote.id ? onOpenQuote : undefined} />
+      )}
       <Words text={body} outgoing={outgoing} onOpen={onOpen} />
     </>
   )
@@ -195,17 +215,34 @@ function Answering({
  * A rule down the side rather than a filled card: a bubble is already a shape,
  * and the reply is what somebody came here to read.
  */
-function Quoted({ quote, outgoing }: { quote: Quote; outgoing: boolean }) {
-  return (
-    <span
-      className={cn(
-        "mb-1.5 flex flex-col border-l-2 pl-2 text-[13px] leading-snug",
-        outgoing ? "border-white/40 text-white/80" : "border-border text-muted-foreground",
-      )}
-    >
+function Quoted({
+  quote,
+  outgoing,
+  onOpen,
+}: {
+  quote: Quote
+  outgoing: boolean
+  onOpen?: () => void
+}) {
+  const tap = useTap(onOpen)
+  const className = cn(
+    "mb-1.5 flex w-full flex-col border-l-2 pl-2 text-left text-[13px] leading-snug",
+    outgoing ? "border-white/40 text-white/80" : "border-border text-muted-foreground",
+  )
+  const inside = (
+    <>
       <span className="truncate font-semibold">{quote.author}</span>
       <span className="line-clamp-2 wrap-anywhere">{quote.said}</span>
-    </span>
+    </>
+  )
+
+  // Drawn either way, tappable only where there is somewhere to go — a
+  // one-to-one thread has no room to scroll back through.
+  if (!onOpen) return <span className={className}>{inside}</span>
+  return (
+    <button type="button" {...tap} className={cn(className, "active:opacity-60")}>
+      {inside}
+    </button>
   )
 }
 
@@ -246,6 +283,32 @@ function Words({
  */
 const HOLD_MS = 500
 
+/**
+ * A tap that stands aside for the message's own long press.
+ *
+ * Everything tappable inside a bubble sits inside a press that means something
+ * else: in a room, holding a message opens its menu. A long press ends in a
+ * click like any other, so without this the room would open its menu on the
+ * timer and this would open a second thing over the top of it on release.
+ *
+ * Deliberately does not stop the press reaching the row — the message's gesture
+ * belongs to the whole message, wherever on it a finger lands.
+ */
+function useTap(act?: () => void) {
+  const pressed = useRef<number | null>(null)
+  return {
+    onPointerDown: (event: { pointerType: string }) => {
+      pressed.current = event.pointerType === "touch" ? Date.now() : null
+    },
+    onClick: () => {
+      const began = pressed.current
+      pressed.current = null
+      if (began !== null && Date.now() - began >= HOLD_MS) return
+      act?.()
+    },
+  }
+}
+
 /** Somebody, named inside a message. */
 function Mention({
   address,
@@ -257,43 +320,22 @@ function Mention({
   onOpen?: (address: string) => void
 }) {
   const names = useNames()
-  const pressed = useRef<number | null>(null)
+  const tap = useTap(onOpen && (() => onOpen(address)))
   const label = `@${labelIn(names, address)}`
 
   // A bubble is already a shape, so a mention does not get one of its own: a
   // filled pill inside a bubble is a container inside a container, and a room
-  // of them reads as clutter rather than as people. Weight and colour only.
-  // One colour in two strengths, picked by what it has to be legible against
-  // rather than by whose message it is. Typing a name, reading it back in your
-  // own bubble and reading it in somebody else's are the same thing happening,
-  // and looked like three before.
-  const className = cn(
-    "font-semibold",
-    outgoing ? "text-mention-on-brand" : "text-mention",
-  )
+  // of them reads as clutter rather than as people. Weight and colour only,
+  // in two strengths picked by what the mention has to stay legible against
+  // rather than by whose message it is.
+  const className = cn("font-semibold", outgoing ? "text-mention-on-brand" : "text-mention")
 
   // Drawn either way, tappable only where there is somebody to open. A mention
   // still says who it means in a thread that has no members list.
   if (!onOpen) return <span className={className}>{label}</span>
 
   return (
-    <button
-      type="button"
-      // Deliberately not stopping the press from reaching the row: a long press
-      // on a message is the message's own gesture wherever on it it lands. What
-      // must not happen is both — the room opening its menu on the timer and
-      // this opening a second sheet over the top of it on release.
-      onPointerDown={(event) => {
-        pressed.current = event.pointerType === "touch" ? Date.now() : null
-      }}
-      onClick={() => {
-        const began = pressed.current
-        pressed.current = null
-        if (began !== null && Date.now() - began >= HOLD_MS) return
-        onOpen(address)
-      }}
-      className={cn(className, "active:opacity-60")}
-    >
+    <button type="button" {...tap} className={cn(className, "active:opacity-60")}>
       {label}
     </button>
   )

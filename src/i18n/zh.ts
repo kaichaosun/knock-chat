@@ -204,6 +204,7 @@ export const zh: Dictionary = {
     replyMessage: "回复",
     replyMessageNote: "引用这条消息来回复。",
     replyingTo: "回复 {{name}}",
+    quotedNotHere: "这条消息还没有加载。下拉查看更早的消息。",
     stopReplying: "取消回复",
     deleteMessage: "删除消息",
     deleteMessageNote: "群里所有人都会看不到。",
