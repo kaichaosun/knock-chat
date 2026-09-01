@@ -44,7 +44,7 @@ import { labelIn, nameIn, remember } from "@/lib/names"
 import { parseNim } from "@/lib/payments"
 import { formatNim } from "@/lib/postage"
 import {
-  DELETE_WINDOWS,
+  MAX_DELETE_WINDOW_SECS,
   MAX_AMOUNT_LUNA,
   MAX_AMOUNT_NIM,
   answerJoinRequest,
@@ -85,18 +85,66 @@ import { cn } from "@/lib/utils"
  * than a second thing to read and reconcile.
  */
 /**
- * What each window is called, by its length in seconds.
+ * Save, with the spinner in the word's place rather than beside it.
  *
- * Keyed by the value rather than ordered alongside it, so the list and its
- * labels cannot drift apart when the list changes — and the relay owns that
- * list, not this file.
+ * The word stays in the layout while it works — invisible, but still holding
+ * the width it had. A spinner *added* alongside grew the button at the very
+ * moment it was pressed, moving it out from under the thumb that pressed it;
+ * one that simply replaced the word would shrink it for the same reason.
+ *
+ * Wrapped in a span, and that is not decoration. `Button` carries
+ * `has-[>svg]:px-3`, which trims its own padding whenever an svg is a *direct*
+ * child — so a bare spinner narrowed the button from the outside even while the
+ * label held its width from the inside. Nested, the selector no longer matches.
  */
-const WINDOW_LABELS: Record<number, string> = {
-  0: "roomSettings.takeBackNever",
-  60: "roomSettings.takeBackMinute",
-  3600: "roomSettings.takeBackHour",
-  86400: "roomSettings.takeBackDay",
-  604800: "roomSettings.takeBackWeek",
+function SaveButton({
+  busy,
+  disabled,
+  onClick,
+}: {
+  busy: boolean
+  disabled: boolean
+  onClick: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <Button disabled={disabled} onClick={onClick} className="relative h-12 rounded-2xl px-5">
+      <span className={cn(busy && "invisible")}>{t("groupSheet.save")}</span>
+      {busy && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <Loader2 className="size-4 animate-spin" />
+        </span>
+      )}
+    </Button>
+  )
+}
+
+/** The units a window can be written in, shortest first. */
+const WINDOW_UNITS = [
+  { secs: 1, label: "roomSettings.unitSeconds" },
+  { secs: 60, label: "roomSettings.unitMinutes" },
+  { secs: 3600, label: "roomSettings.unitHours" },
+] as const
+
+/** The lengths worth one tap. They fill the box; saving is still yours to do. */
+const WINDOW_PRESETS = [
+  { secs: 0, label: "roomSettings.takeBackNever" },
+  { secs: 60, label: "roomSettings.takeBackMinute" },
+  { secs: 600, label: "roomSettings.takeBackTenMinutes" },
+  { secs: 3600, label: "roomSettings.takeBackHour" },
+] as const
+
+/**
+ * A number of seconds as the largest unit it divides into cleanly.
+ *
+ * So an hour reads as `1 hour` rather than `3600 seconds`, and ninety seconds
+ * stays in seconds rather than becoming one and a half of anything.
+ */
+function inLargestUnit(secs: number): { value: number; unit: number } {
+  for (const { secs: size } of [...WINDOW_UNITS].reverse()) {
+    if (secs >= size && secs % size === 0) return { value: secs / size, unit: size }
+  }
+  return { value: secs, unit: 1 }
 }
 
 function pastFor(shares: boolean) {
@@ -320,18 +368,48 @@ export function GroupSheet({
   }
 
   /**
-   * How long a sender has to take something back.
+   * How long a sender has to take something back: a number and a unit.
    *
-   * Saved on the tap, unlike the door and the history: those two decide who can
-   * get in and what they can read, and a stray thumb on either is somebody
-   * else's privacy. This one only changes how long a person has to correct
-   * themselves, which is a smaller thing to undo than to confirm.
+   * Typed rather than picked, so a room can say ninety seconds if that is what
+   * it means. The presets fill the box and stop there — a length is a thing you
+   * decide on and then commit to, and one tap doing both would make a stray
+   * thumb the room's new rule.
    */
-  const setWindow = async (delete_window_secs: number) => {
-    if (delete_window_secs === group.delete_window_secs) return
+  const started = inLargestUnit(group.delete_window_secs)
+  const [windowValue, setWindowValue] = useState(String(started.value))
+  const [windowUnit, setWindowUnit] = useState<number>(started.unit)
+
+  // Whatever the room says now wins over whatever was typed before it said so —
+  // another device, or another tab, is allowed to have changed it.
+  useEffect(() => {
+    const now = inLargestUnit(group.delete_window_secs)
+    setWindowValue(String(now.value))
+    setWindowUnit(now.unit)
+  }, [group.delete_window_secs])
+
+  const windowTyped = windowValue.trim() === "" ? null : Number(windowValue)
+  const windowSecs =
+    windowTyped === null ||
+    !Number.isFinite(windowTyped) ||
+    windowTyped < 0 ||
+    !Number.isInteger(windowTyped)
+      ? null
+      : windowTyped * windowUnit
+  const windowTooLong = windowSecs !== null && windowSecs > MAX_DELETE_WINDOW_SECS
+  const windowSavable =
+    windowSecs !== null && !windowTooLong && windowSecs !== group.delete_window_secs
+
+  /** Round the unit, keeping the number: this names the unit, it does not convert. */
+  const cycleUnit = () => {
+    const at = WINDOW_UNITS.findIndex((u) => u.secs === windowUnit)
+    setWindowUnit(WINDOW_UNITS[(at + 1) % WINDOW_UNITS.length].secs)
+  }
+
+  const saveWindow = async () => {
+    if (windowSecs === null || !windowSavable) return
     setSaving("window")
     try {
-      await updateGroup(group.id, { delete_window_secs })
+      await updateGroup(group.id, { delete_window_secs: windowSecs })
       onChanged()
       toast.success(t("groupSheet.takeBackSaved"))
     } catch (error) {
@@ -504,14 +582,11 @@ export function GroupSheet({
                       "focus-visible:ring-ring/60 focus-visible:ring-2",
                     )}
                   />
-                  <Button
+                  <SaveButton
+                    busy={saving === "name"}
                     disabled={saving !== null || name.trim() === "" || name.trim() === group.name}
                     onClick={() => void saveName()}
-                    className="h-12 rounded-2xl px-5"
-                  >
-                    {saving === "name" && <Loader2 className="animate-spin" />}
-                    Save
-                  </Button>
+                  />
                 </div>
               </section>
             )}
@@ -544,14 +619,11 @@ export function GroupSheet({
                       NIM
                     </span>
                   </div>
-                  <Button
+                  <SaveButton
+                    busy={saving === "price"}
                     disabled={saving !== null || luna === null || luna === group.join_price_luna}
                     onClick={() => luna !== null && void savePrice(luna)}
-                    className="h-12 rounded-2xl px-5"
-                  >
-                    {saving === "price" && <Loader2 className="animate-spin" />}
-                    Save
-                  </Button>
+                  />
                 </div>
 
                 {overMax && (
@@ -632,24 +704,88 @@ export function GroupSheet({
                 <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
                   {t("roomSettings.takeBackNote")}
                 </p>
-                {/* A row rather than the two-card shape the settings above use:
-                    five choices are a scale, and a scale reads along a line. */}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {DELETE_WINDOWS.map((secs) => (
-                    <button
-                      key={secs}
-                      type="button"
+                <div className="mt-2 flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      value={windowValue}
+                      inputMode="numeric"
                       disabled={saving === "window"}
-                      onClick={() => void setWindow(secs)}
-                      aria-pressed={group.delete_window_secs === secs}
+                      onChange={(event) => setWindowValue(event.target.value.replace(/[^\d]/g, ""))}
+                      aria-label={t("roomSettings.takeBackTitle")}
+                      aria-invalid={windowSecs === null || windowTooLong}
                       className={cn(
-                        "rounded-2xl border px-3 py-2 text-[13px] font-medium transition-colors",
-                        group.delete_window_secs === secs && "border-primary text-primary",
+                        "bg-muted w-full rounded-2xl py-3 pr-30 pl-4 font-semibold tabular-nums outline-none",
+                        "focus-visible:ring-ring/60 focus-visible:ring-2",
+                        (windowSecs === null || windowTooLong) && "ring-destructive ring-2",
+                      )}
+                    />
+                    {/* The unit is a control, not a caption, and has to look
+                        like one: a pill with an edge of its own, because
+                        plain text inside a field reads as a label and nobody
+                        taps a label. The edge is enough to say so — an arrow
+                        as well was one hint too many in a field this small.
+
+                        Held to one width, and the words always plural. A pill
+                        that resized as it cycled would move under the thumb
+                        that was cycling it, and "hours" is shorter than the
+                        other two.
+
+                        It names what the number means and rounds to the next
+                        one on a tap. It never converts — 60 seconds becomes 60
+                        minutes — since rewriting what somebody typed while they
+                        are typing it is the more surprising of the two. */}
+                    <button
+                      type="button"
+                      onClick={cycleUnit}
+                      disabled={saving === "window"}
+                      aria-label={t("roomSettings.unitSwitch")}
+                      className={cn(
+                        "bg-card text-foreground absolute top-1/2 right-1.5 -translate-y-1/2",
+                        "min-w-24 rounded-full border px-3.5 py-1.5 shadow-sm",
+                        "text-center text-sm font-medium transition-colors",
+                        "hover:border-primary hover:text-primary active:scale-[0.97]",
                       )}
                     >
-                      {t(WINDOW_LABELS[secs])}
+                      {t(WINDOW_UNITS.find((u) => u.secs === windowUnit)!.label)}
                     </button>
-                  ))}
+                  </div>
+                  <SaveButton
+                    busy={saving === "window"}
+                    disabled={saving !== null || !windowSavable}
+                    onClick={() => void saveWindow()}
+                  />
+                </div>
+
+                {windowTooLong && (
+                  <p className="text-destructive mt-2 px-1 text-[12px] leading-snug">
+                    {t("roomSettings.takeBackTooLong")}
+                  </p>
+                )}
+
+                {/* Filling the box, not setting the room. The Save above is
+                    still the moment anything changes. */}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {WINDOW_PRESETS.map((preset) => {
+                    const as = inLargestUnit(preset.secs)
+                    return (
+                      <button
+                        key={preset.secs}
+                        type="button"
+                        disabled={saving === "window"}
+                        onClick={() => {
+                          setWindowValue(String(as.value))
+                          setWindowUnit(as.unit)
+                        }}
+                        aria-pressed={windowSecs === preset.secs}
+                        className={cn(
+                          "rounded-2xl border px-3 py-2 text-[13px] font-medium transition-colors",
+                          windowSecs === preset.secs && "border-primary text-primary",
+                        )}
+                      >
+                        {t(preset.label)}
+                      </button>
+                    )
+                  })}
                 </div>
               </section>
             )}

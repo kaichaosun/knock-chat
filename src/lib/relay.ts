@@ -262,9 +262,9 @@ export type Group = {
   /**
    * How long somebody has to take back what they said here, in seconds.
    *
-   * `0` means never. Only the values the app offers — see [`DELETE_WINDOWS`] —
-   * and the relay refuses anything else rather than storing a number no screen
-   * could have produced.
+   * `0` means never, and the relay refuses anything past
+   * [`MAX_DELETE_WINDOW_SECS`] — a day, beyond which a room where last week can
+   * be quietly rewritten stops being a record of anything.
    */
   delete_window_secs: number
   created_at: string
@@ -413,12 +413,12 @@ export function groupHistory(
 }
 
 /**
- * The windows a room may set, in seconds, longest last. `0` is never.
+ * The longest a room may leave a message open to being taken back: one day.
  *
- * Mirrors the relay's own list, which refuses anything outside it — so this is
- * the whole of what a room can be set to, not a convenient subset.
+ * Mirrors the relay's own ceiling, which refuses anything past it. Anything
+ * from `0` — never — up to this is a length somebody may choose.
  */
-export const DELETE_WINDOWS = [0, 60, 3600, 86_400, 604_800] as const
+export const MAX_DELETE_WINDOW_SECS = 86_400
 
 /**
  * Take back something said in a room.
