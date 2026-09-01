@@ -730,18 +730,30 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
       // The card is a pointer at the pot, carrying only what cannot change.
       const card = encodePayload(giftNote(gift.id, gift.total_luna, gift.shares, gift.note))
-      recordOutgoing(mine, card, `local:${messageId()}`, group)
+      const id = `local:${messageId()}`
+      // On its way, not arrived — the card is written down before it is sent,
+      // exactly as anything else said in a room is.
+      recordOutgoing(mine, card, id, group, "sending")
 
       // The gift exists whether or not this lands. Saying it failed would be a
       // lie about where the money is, and would invite a second payment for a
       // pot that is already sitting there.
       try {
-        await say(group, card)
+        const sent = await say(group, card)
+        // Under the relay's name from here. A room's history hands back this
+        // device's own words too, so a card still wearing a local id returns as
+        // a stranger and lands a second time — the person who left the pot sees
+        // two of it, and everybody else sees the one that is really there.
+        settle(id, `relay:${sent.id}`)
       } catch {
+        // Left as failed rather than quietly ticked, so the bubble offers to
+        // send it again. Re-announcing a gift costs nothing; the money is
+        // already with the relay and no retry here can spend it twice.
+        setStatus(id, "failed")
         toast.error(t("app.giftNoCard"))
       }
     },
-    [say, recordOutgoing],
+    [say, recordOutgoing, settle, setStatus],
   )
 
   // Funding that outlived the attempt meant to redeem it. Tried whenever the
