@@ -19,7 +19,7 @@ import { MemberSheet } from "@/components/member-sheet"
 import { PickContactSheet } from "@/components/pick-contact-sheet"
 import { RemoveMemberDialog } from "@/components/remove-member-dialog"
 import { AttachMenu } from "@/components/attach-menu"
-import { Composer } from "@/components/composer"
+import { Composer, type ComposerHandle } from "@/components/composer"
 import { GroupAvatar } from "@/components/group-avatar"
 import { GroupSheet } from "@/components/group-sheet"
 import { MessageBubble } from "@/components/message-bubble"
@@ -109,6 +109,7 @@ export function GroupRoom({
   const names = useNames()
   /** Who the composer's `@` can reach, by published name or by one of yours. */
   const searchMembers = useMentionSearch(group.id, owner)
+  const composer = useRef<ComposerHandle>(null)
   const bottom = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement | null>(null)
   /**
@@ -293,6 +294,8 @@ export function GroupRoom({
 
   /** Where the press began, so a drag can be told from a hold. */
   const pressed = useRef<{ x: number; y: number } | null>(null)
+  /** The hold went off, so the click that ends it is not a tap. */
+  const fired = useRef(false)
 
   /**
    * Long press, which is the only way into a menu on a touch screen — a bubble
@@ -318,14 +321,45 @@ export function GroupRoom({
     setHeld(message)
   }
 
+  /**
+   * Begin a press-and-hold, which on release must not also read as a tap.
+   *
+   * Touch only, as it has been: on a pointer the browser starts selecting long
+   * before a timer could fire, and every gesture here has something of its own
+   * on a wide window — the message menu has its `⋮`, and a face has a click.
+   */
   const holdStart = (
-    message: Message,
+    fire: () => void,
     at: { clientX: number; clientY: number; button: number; pointerType: string },
   ) => {
     if (at.pointerType !== "touch" || at.button !== 0) return
     pressed.current = { x: at.clientX, y: at.clientY }
     window.clearTimeout(holding.current)
-    holding.current = window.setTimeout(() => openFor(message), 500)
+    fired.current = false
+    holding.current = window.setTimeout(() => {
+      fired.current = true
+      fire()
+    }, 500)
+  }
+
+  /**
+   * Wrap a tap so that it does nothing when the hold already went off.
+   *
+   * A long press ends in a click like any other press, and without this a face
+   * held down would put the name in the box *and* open the sheet over it.
+   */
+  const onTap = (act: () => void) => () => {
+    if (fired.current) {
+      fired.current = false
+      return
+    }
+    act()
+  }
+
+  /** Name somebody in whatever is half-written, rather than opening them. */
+  const nameInBox = (address: string) => {
+    document.getSelection()?.removeAllRanges()
+    composer.current?.mention(address)
   }
 
   const holdMove = (at: { clientX: number; clientY: number }) => {
@@ -521,7 +555,7 @@ export function GroupRoom({
                             // and, on iOS, a Copy/Share callout over the top of
                             // it. Both arrive before a 500ms timer can, so the
                             // gesture has to be claimed rather than shared.
-                            onPointerDown={(event) => holdStart(message, event)}
+                            onPointerDown={(event) => holdStart(() => openFor(message), event)}
                             onPointerMove={holdMove}
                             onPointerUp={holdCancel}
                             onPointerCancel={holdCancel}
@@ -582,7 +616,14 @@ export function GroupRoom({
                         {opens && (
                           <button
                             type="button"
-                            onClick={() => setShowing(message.peer)}
+                            onClick={onTap(() => setShowing(message.peer))}
+                            onPointerDown={(event) =>
+                              holdStart(() => nameInBox(message.peer), event)
+                            }
+                            onPointerMove={holdMove}
+                            onPointerUp={holdCancel}
+                            onPointerCancel={holdCancel}
+                            onPointerLeave={holdCancel}
                             aria-label={`About ${who}`}
                             className="block active:opacity-60"
                           >
@@ -597,8 +638,18 @@ export function GroupRoom({
                         {opens && (
                           <button
                             type="button"
-                            onClick={() => setShowing(message.peer)}
-                            className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold"
+                            onClick={onTap(() => setShowing(message.peer))}
+                            onPointerDown={(event) =>
+                              holdStart(() => nameInBox(message.peer), event)
+                            }
+                            onPointerMove={holdMove}
+                            onPointerUp={holdCancel}
+                            onPointerCancel={holdCancel}
+                            onPointerLeave={holdCancel}
+                            // A held name must not also become a selection with a
+                            // Copy / Look Up callout over whatever opens next —
+                            // the same reason a message bubble gives up its own.
+                            className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold select-none [-webkit-touch-callout:none]"
                           >
                             {who}
                           </button>
@@ -629,6 +680,7 @@ export function GroupRoom({
            without a wallet holds no gifts, and an empty menu is worse than
            no button. */
         <Composer
+          ref={composer}
           onSend={onSay}
           onAttach={onGift && (() => setAttaching(true))}
           onMentionSearch={searchMembers}

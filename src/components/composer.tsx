@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react"
 import { useTranslation } from "react-i18next"
 import { ArrowUp, Plus } from "lucide-react"
 
@@ -26,6 +26,18 @@ const MENTION_LIMIT = 4
  */
 const MAX_QUERY = 40
 
+/** What the room outside can ask of the box. */
+export type ComposerHandle = {
+  /**
+   * Put somebody in at the caret, as though they had been picked from the list.
+   *
+   * For the shortcuts that name a person somewhere other than the box — a long
+   * press on a face in the room. It lands where the caret was left, so it joins
+   * a half-written sentence rather than displacing it.
+   */
+  mention: (address: string) => void
+}
+
 /**
  * Where a message is written.
  *
@@ -37,11 +49,13 @@ const MAX_QUERY = 40
  * about that trade lives in this file; nothing outside it sees a chip.
  */
 export function Composer({
+  ref,
   onSend,
   onAttach,
   onMentionSearch,
   disabled,
 }: {
+  ref?: Ref<ComposerHandle>
   onSend: (body: string) => void
   /**
    * Opens the menu of things a message can be other than text.
@@ -95,9 +109,23 @@ export function Composer({
     setBody(box.current ? serialize(box.current) : "")
   }, [])
 
-  /** Notice whether the caret is sitting in a name being typed. */
+  /**
+   * Where the caret was, last time it was anywhere in the box.
+   *
+   * Kept because the box does not have it when it is needed: naming somebody by
+   * long-pressing their face in the room happens with the focus, and the live
+   * selection, somewhere else.
+   */
+  const caret = useRef<Range | null>(null)
+
+  /** Notice whether the caret is sitting in a name being typed, and where. */
   const scan = useCallback(() => {
     const root = box.current
+    if (root) {
+      const selection = document.getSelection()
+      const at = selection?.rangeCount ? selection.getRangeAt(0) : null
+      if (at && root.contains(at.startContainer)) caret.current = at.cloneRange()
+    }
     const here = root && onMentionSearch ? queryAt(root) : null
     if (!here) hushed.current = false
     setQuery(here && !hushed.current ? here.text : null)
@@ -138,6 +166,54 @@ export function Composer({
    * thing: a backspace takes the whole person out rather than a letter off the
    * end of their name, which would leave a mention pointing at nobody.
    */
+  /**
+   * Drop somebody into the box over `range`, and leave the caret after them.
+   *
+   * The name written into the chip is the name as it reads *here*, and only
+   * here: this is a draft, and what travels is the address on `data-mention`.
+   * A reader who calls them something else sees their own name for them.
+   */
+  const put = (address: string, range: Range) => {
+    const root = box.current
+    if (!root) return
+
+    range.deleteContents()
+    const chip = document.createElement("span")
+    chip.dataset.mention = address
+    chip.contentEditable = "false"
+    chip.className = CHIP
+    chip.textContent = `@${labelIn(names, address)}`
+    range.insertNode(chip)
+
+    // A space in front where the words run straight up to it, so a name
+    // dropped into the middle of a sentence does not weld itself to the last
+    // one. Nothing is added at the start of the box, or after a space already
+    // typed.
+    const before = chip.previousSibling
+    if (before && !(before.nodeType === Node.TEXT_NODE && /\s$/.test(before.nodeValue ?? ""))) {
+      chip.before(document.createTextNode(" "))
+    }
+
+    // Somewhere to put the caret that is outside the chip, and a space nobody
+    // has to type before the next word.
+    const after = document.createTextNode(" ")
+    chip.after(after)
+    const landed = document.createRange()
+    landed.setStart(after, after.length)
+    landed.collapse(true)
+    const selection = document.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(landed)
+    // Remembered as well as set, so that naming a second person without
+    // touching the box in between puts them after the first rather than back
+    // where the caret was before either of them.
+    caret.current = landed.cloneRange()
+
+    root.focus()
+    close()
+    read()
+  }
+
   const pick = (address: string) => {
     const root = box.current
     if (!root) return
@@ -148,33 +224,21 @@ export function Composer({
     // The `@` as well as what follows it — the chip carries its own.
     range.setStart(here.node, here.start)
     range.setEnd(here.node, here.start + here.text.length + 1)
-    range.deleteContents()
-
-    const chip = document.createElement("span")
-    chip.dataset.mention = address
-    chip.contentEditable = "false"
-    chip.className = CHIP
-    // The name as it reads *here*, and only here: this is a draft, and what
-    // travels is the address on `data-mention`. A reader who calls them
-    // something else will see their own name for them.
-    chip.textContent = `@${labelIn(names, address)}`
-    range.insertNode(chip)
-
-    // Somewhere to put the caret that is outside the chip, and a space nobody
-    // has to type before the next word.
-    const after = document.createTextNode(" ")
-    chip.after(after)
-    const caret = document.createRange()
-    caret.setStart(after, after.length)
-    caret.collapse(true)
-    const selection = document.getSelection()
-    selection?.removeAllRanges()
-    selection?.addRange(caret)
-
-    root.focus()
-    close()
-    read()
+    put(address, range)
   }
+
+  useImperativeHandle(ref, () => ({
+    mention: (address: string) => {
+      const root = box.current
+      if (!root) return
+      // Where the caret was left, if it is still somewhere in the box. A long
+      // press on a face happens with the box unfocused, so the live selection
+      // is somewhere else entirely by the time this runs.
+      const kept = caret.current
+      const range = kept && root.contains(kept.startContainer) ? kept.cloneRange() : atEnd(root)
+      put(address, range)
+    },
+  }))
 
   const bytes = new TextEncoder().encode(body).length
   const overLimit = bytes > MAX_BODY_BYTES
@@ -186,6 +250,7 @@ export function Composer({
     if (!canSend) return
     onSend(text)
     if (box.current) box.current.innerHTML = ""
+    caret.current = null
     setBody("")
     close()
   }
@@ -417,6 +482,14 @@ function serialize(root: HTMLElement): string {
 
   walk(root)
   return out
+}
+
+/** A collapsed range at the very end of `root`, for when nothing better is known. */
+function atEnd(root: HTMLElement): Range {
+  const range = document.createRange()
+  range.selectNodeContents(root)
+  range.collapse(false)
+  return range
 }
 
 /** Put plain text in at the caret, replacing whatever was selected. */
