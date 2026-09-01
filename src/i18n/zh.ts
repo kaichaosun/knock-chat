@@ -139,9 +139,9 @@ export const zh: Dictionary = {
     doorApproveHintPaid: "他们付款，你来决定",
     historyTitle: "聊天记录",
     historyHidden: "不可见",
-    historyHiddenHint: "新成员从这里开始",
+    historyHiddenHint: "新成员看不到",
     historyVisible: "可见",
-    historyVisibleHint: "新成员可以读全部",
+    historyVisibleHint: "新成员可以全部看到",
   },
   newGroup: {
     title: "新建群组",

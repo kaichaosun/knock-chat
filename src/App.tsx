@@ -319,9 +319,21 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    * "one thread at a time" is a fact about the state rather than a habit of
    * whoever wrote the call.
    */
+  /**
+   * Counts opens rather than naming rooms.
+   *
+   * The room's id cannot carry this: in the two-pane layout the room never
+   * closes, so picking the one already on screen changes nothing about the id —
+   * and asking for it again is exactly what that tap means. The detail fetched
+   * below is where a room's current terms come from, so this is how a member
+   * sees a setting its owner changed a moment ago.
+   */
+  const [roomOpens, setRoomOpens] = useState(0)
+
   const openRoom = useCallback((group: string) => {
     setOpenPeer(null)
     setOpenGroup(group)
+    setRoomOpens((count) => count + 1)
   }, [])
 
   // Opening a chat is the moment worth re-checking who you are writing to.
@@ -343,7 +355,21 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    */
   const { hasEarlier, loadingEarlier, loadEarlier, forget: forgetHistory } = useRoomHistory(
     openGroup,
-    Boolean(groups.find((group) => group.id === openGroup)?.share_history),
+    // The room's own answer in preference to the list's, because they are not
+    // equally fresh: the detail is refetched every time a room is opened, while
+    // the list is polled every half minute. An owner turning history on and a
+    // member walking in a moment later would otherwise find the room still
+    // refusing to give up its past, with nothing to do but wait or reload.
+    //
+    // Note this is the opposite order to `room` further down, which prefers the
+    // list — that chain is about whether the room still *exists*, and the list
+    // is the better authority on that. This one is about what it currently says.
+    Boolean(
+      (groupDetail?.group.id === openGroup
+        ? groupDetail.group
+        : groups.find((group) => group.id === openGroup)
+      )?.share_history,
+    ),
     absorbHistory,
   )
 
@@ -423,10 +449,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   }, [openGroup, inspect])
 
   useEffect(() => {
-    setGroupDetail(null)
     setRoomGone(false)
+    // Cleared only when moving to a *different* room. Re-opening the one on
+    // screen should refresh its terms, not blank out its faces and member count
+    // while it does — that flicker is what the mark-caching work went to fix.
+    setGroupDetail((current) => (current?.group.id === openGroup ? current : null))
     void refreshGroupDetail()
-  }, [openGroup, refreshGroupDetail])
+  }, [openGroup, refreshGroupDetail, roomOpens])
 
   /**
    * Show the door a room id leads to.

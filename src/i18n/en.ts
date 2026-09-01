@@ -156,7 +156,7 @@ export const en = {
     doorApproveHintPaid: "They pay, you answer",
     historyTitle: "Chat history",
     historyHidden: "Hidden",
-    historyHiddenHint: "New members start here",
+    historyHiddenHint: "New members can't read it",
     historyVisible: "Visible",
     historyVisibleHint: "New members can read it all",
   },
