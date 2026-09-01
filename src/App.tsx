@@ -72,6 +72,7 @@ import {
 } from "@/lib/relay"
 import { devIdentities } from "@/lib/wallet"
 import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
+import { useRoomHistory } from "@/hooks/use-room-history"
 import { useSession } from "@/hooks/use-session"
 import { ProbeScreen } from "@/probe/probe-screen"
 import { probeRequested, useSecretTap } from "@/probe/entry"
@@ -133,6 +134,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     markRead,
     deleteThread,
     recordOutgoing,
+    absorbHistory,
+    settle,
     setStatus,
     resend,
     dismissed,
@@ -331,6 +334,35 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   useEffect(() => {
     if (openPeer) forgetPeerKey(openPeer)
   }, [openPeer])
+
+  /**
+   * What the open room said before you got here, a page at a time.
+   *
+   * Only rooms whose owner shares their past have any, so an ordinary room
+   * costs no request at all — the check is on the group already in hand.
+   */
+  const { hasEarlier, loadingEarlier, loadEarlier, forget: forgetHistory } = useRoomHistory(
+    openGroup,
+    Boolean(groups.find((group) => group.id === openGroup)?.share_history),
+    absorbHistory,
+  )
+
+  /**
+   * Delete a chat, and everything this session remembers about it.
+   *
+   * The two have to go together. `deleteThread` throws away the messages;
+   * `forgetHistory` throws away the memory of having fetched them, which is
+   * what would otherwise stop the room refetching and leave it opening empty
+   * for the rest of the session. Wrapped rather than paired at each call site,
+   * because there are four of those and a fifth would forget.
+   */
+  const deleteChat = useCallback(
+    (thread: string) => {
+      deleteThread(thread)
+      forgetHistory(thread)
+    },
+    [deleteThread, forgetHistory],
+  )
 
   /**
    * The chat list: threads that have messages, plus rooms that do not yet.
@@ -835,14 +867,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       // toast is missed or dismissed and the tick is what is left behind.
       recordOutgoing(owner, body, id, openGroup, "sending")
       try {
-        await say(openGroup, body)
-        setStatus(id, "sent")
+        const sent = await say(openGroup, body)
+        // Under the relay's name from here, so the room's history recognises it
+        // as one already held rather than delivering it back a second time.
+        settle(id, `relay:${sent.id}`)
       } catch (error) {
         setStatus(id, "failed")
         toast.error(error instanceof Error ? error.message : t("app.sendThatFailed"))
       }
     },
-    [openGroup, owner, say, recordOutgoing, setStatus],
+    [openGroup, owner, say, recordOutgoing, settle, setStatus],
   )
 
   /**
@@ -857,14 +891,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       if (!message.group) return
       resend(message.id)
       try {
-        await say(message.group, message.body)
-        setStatus(message.id, "sent")
+        const sent = await say(message.group, message.body)
+        settle(message.id, `relay:${sent.id}`)
       } catch (error) {
         setStatus(message.id, "failed")
         toast.error(error instanceof Error ? error.message : t("app.sendThatFailed"))
       }
     },
-    [say, resend, setStatus],
+    [say, resend, settle, setStatus],
   )
 
   if (session.state.status !== "active") {
@@ -1062,6 +1096,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         gone={roomGone}
         owner={address}
         messages={roomMessages}
+        hasEarlier={hasEarlier}
+        loadingEarlier={loadingEarlier}
+        onLoadEarlier={loadEarlier}
         onBack={closeThreadView}
         onDeleteChat={() => {
           if (!openGroup) return
@@ -1069,7 +1106,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           // Out of the room first: what is being deleted is what is on
           // screen, and there is nothing left to come back to.
           closeThreadView()
-          deleteThread(thread)
+          deleteChat(thread)
           forgetRoom(thread)
           unpin(thread)
           toast.success(t("app.chatDeleted"))
@@ -1274,7 +1311,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               floating={compose === "floating"}
               onCompose={() => setComposing(true)}
               onDelete={(thread) => {
-                deleteThread(thread)
+                deleteChat(thread)
                 // And what was remembered of the room, if it was one. Nothing
                 // is left to put a name on.
                 forgetRoom(thread)
@@ -1299,7 +1336,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
             setContacts={setContacts}
             error={contactsError}
             onOpen={openThread}
-            onRemoved={deleteThread}
+            onRemoved={deleteChat}
             selectedAddress={wide ? openPeer : null}
           />
         ) : (
@@ -1313,7 +1350,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               onLeft={(id) => {
                 // The room goes, and its chat with it — the same shape as
                 // removing a contact, which also takes the conversation.
-                deleteThread(id)
+                deleteChat(id)
                 void refreshGroups()
               }}
               selectedId={wide ? openGroup : null}

@@ -97,7 +97,7 @@ export function useMessages(
           : result.messages
         if (cancelled) return
 
-        update((current) => history.mergeIncoming(current, opened, result.next))
+        update((current) => history.mergeIncoming(current, opened, result.next, owner))
       } catch (error) {
         if (cancelled) return
         if (error instanceof RelayError && error.status === 401) {
@@ -210,10 +210,46 @@ export function useMessages(
     [update],
   )
 
+  /**
+   * Take the name the relay gave a message this device sent.
+   *
+   * Only rooms need it. A room's history returns everything said in it, this
+   * device's words included, and a message still under its local id would come
+   * back unrecognised and land a second time. A direct message is never handed
+   * back — the relay holds one copy, addressed to the recipient — so its local
+   * id is the only id it will ever need.
+   */
+  const settle = useCallback(
+    (id: string, name: string) => update((current) => history.settle(current, id, name)),
+    [update],
+  )
+
   /** Put a message back on its way, timed for when it is actually resent. */
   const resend = useCallback(
     (id: string) => update((current) => history.resend(current, id)),
     [update],
+  )
+
+  /**
+   * Fold a room's past into the history, leaving the feed's cursor alone.
+   *
+   * The same merge the feed uses — keyed on message id, so anything already
+   * here is not added twice — but the cursor is passed back unchanged. That
+   * cursor is the feed's position, and a room's past is not the feed: moving it
+   * to a `seq` from before the room was joined would tell the relay this device
+   * is behind and replay everything since.
+   *
+   * Room bodies are plain text, so there is nothing to decrypt on the way in.
+   */
+  const absorbHistory = useCallback(
+    (envelopes: Envelope[]) => {
+      // Bound before the closure: nothing arrives for a device with nobody
+      // signed in, and the merge needs to know whose words are whose.
+      const mine = owner
+      if (!mine) return
+      update((current) => history.mergeIncoming(current, envelopes, current.cursor, mine))
+    },
+    [update, owner],
   )
 
   /** Record a message this device sent outside the normal send path — a knock. */
@@ -241,6 +277,8 @@ export function useMessages(
     deleteThread,
     dismissed,
     recordOutgoing,
+    absorbHistory,
+    settle,
     setStatus,
     resend,
     relayStatus,

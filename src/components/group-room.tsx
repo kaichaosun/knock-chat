@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, DoorClosed, Gift as GiftIcon, Info, PanelLeftOpen, UserRound } from "lucide-react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import {
+  ChevronLeft,
+  DoorClosed,
+  Gift as GiftIcon,
+  Info,
+  Loader2,
+  PanelLeftOpen,
+  UserRound,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -13,6 +21,8 @@ import { GroupAvatar } from "@/components/group-avatar"
 import { GroupSheet } from "@/components/group-sheet"
 import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
+import { PullIndicator } from "@/components/pull-indicator"
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
 import { useNames } from "@/hooks/use-names"
 import { copyText } from "@/lib/clipboard"
 import { labelIn } from "@/lib/names"
@@ -47,6 +57,9 @@ export function GroupRoom({
   onInvite,
   onGift,
   onShowSidebar,
+  hasEarlier = false,
+  loadingEarlier = false,
+  onLoadEarlier,
 }: {
   group: Group
   /** Members and settings; null until the first read lands. */
@@ -78,11 +91,28 @@ export function GroupRoom({
   onGift?: () => void
   /** Restore the desktop thread list after it has been hidden. */
   onShowSidebar?: () => void
+  /** Whether the room has older messages left to fetch. */
+  hasEarlier?: boolean
+  /** A page is on its way, so the top can say so instead of looking stuck. */
+  loadingEarlier?: boolean
+  onLoadEarlier?: () => void
 }) {
   const { t } = useTranslation()
   const names = useNames()
   const bottom = useRef<HTMLDivElement>(null)
-  const scroller = useRef<HTMLDivElement>(null)
+  const scroller = useRef<HTMLDivElement | null>(null)
+  /**
+   * The same node again, as state.
+   *
+   * `usePullToRefresh` binds to the element rather than a ref to it, so that
+   * binding follows the element — and the anchoring below needs it
+   * imperatively. One callback ref keeps both honest.
+   */
+  const [scrollerEl, setScrollerEl] = useState<HTMLDivElement | null>(null)
+  const holdScroller = useCallback((node: HTMLDivElement | null) => {
+    scroller.current = node
+    setScrollerEl(node)
+  }, [])
   const [details, setDetails] = useState(false)
   /** Whose details are open. A name over a message says who somebody is; it
    *  does not start a conversation, which in a room is never free. */
@@ -111,17 +141,118 @@ export function GroupRoom({
   const [attaching, setAttaching] = useState(false)
   const [sharing, setSharing] = useState(false)
 
-  useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" })
-  }, [messages.length])
+  /**
+   * What the list looked like last render, so this one can tell which end grew.
+   *
+   * The first message's id is the tell: a new message at the bottom leaves it
+   * alone, and a page of older ones spliced in above replaces it.
+   */
+  const anchor = useRef<{ first?: string; last?: string; count: number; height: number }>({
+    count: 0,
+    height: 0,
+  })
 
+  /**
+   * Follow the bottom, unless the list grew at the top.
+   *
+   * Older messages arriving above the viewport must not move what is under the
+   * reader's eye. The list gets taller by exactly their height, so scrolling
+   * down by that much leaves the same message exactly where it was — the page
+   * appears above, out of sight, which is what scrolling up into it should
+   * feel like.
+   *
+   * A layout effect because it has to happen in the same frame the messages
+   * were painted in. As a plain effect the browser shows one frame of the list
+   * jumped to the wrong place before this corrects it.
+   */
+  useLayoutEffect(() => {
+    const element = scroller.current
+    if (!element) return
+    const first = messages[0]?.id
+    const last = messages[messages.length - 1]?.id
+    const before = anchor.current
+    // Past the padding, because a held pull *is* padding: measuring the raw
+    // scroll height would count the gap the finger is holding open as content
+    // that had arrived, and the list would settle that much out of place.
+    const height = element.scrollHeight - parseFloat(getComputedStyle(element).paddingTop || "0")
+    anchor.current = { first, last, count: messages.length, height }
+
+    // A page of older messages: the list grew, its *end* did not move, and its
+    // start did. Both halves matter — opening a different room also replaces
+    // the first message, and that one should land at the bottom like any other
+    // room rather than holding a position from the room before it.
+    const prepended =
+      messages.length > before.count && last === before.last && first !== before.first
+    if (prepended) {
+      element.scrollTop += height - before.height
+      return
+    }
+
+    // Nothing actually arrived — a re-render with the same messages, which
+    // happens on the render right after a page is merged. Leave the scroll
+    // where the reader put it: following the bottom here is what undid the
+    // anchoring a frame after it was applied.
+    if (messages.length === before.count && last === before.last) return
+
+    bottom.current?.scrollIntoView({ block: "end" })
+  }, [messages])
+
+  /**
+   * Follow the bottom when the list is resized — a keyboard opening, a window
+   * changing shape — but only for a reader who was already there.
+   *
+   * Two corrections, both of which showed up as the room jumping to the newest
+   * message. The box: this list's height is settled by flex, so opening a pull
+   * gap with padding *shrinks* its content box, and watching that box made the
+   * gesture fire the very thing it was supposed to avoid. The guard: somebody
+   * scrolled up into the room's past is reading it, and a keyboard appearing is
+   * not a reason to take them back to the present.
+   */
   useEffect(() => {
     const element = scroller.current
     if (!element) return
-    const observer = new ResizeObserver(() => bottom.current?.scrollIntoView({ block: "end" }))
-    observer.observe(element)
+    const observer = new ResizeObserver(() => {
+      if (!atEnd.current) return
+      bottom.current?.scrollIntoView({ block: "end" })
+    })
+    observer.observe(element, { box: "border-box" })
     return () => observer.disconnect()
   }, [])
+
+  /**
+   * Pull the top of the room down to reach further back.
+   *
+   * The same gesture the inbox refreshes on, asked of the same hook, because it
+   * is the same thing: hold the top of a list down and it fetches. Loading on
+   * approach instead — anywhere within a few hundred pixels of the top — fires
+   * while somebody is still reading, which is a page arriving unasked and the
+   * list growing under them.
+   */
+  const pullEarlier = usePullToRefresh(
+    scrollerEl,
+    () => {
+      if (hasEarlier && !loadingEarlier) onLoadEarlier?.()
+    },
+    // Wheel too, so a pointer has the same gesture rather than a rule of its
+    // own. Reaching the top used to be enough on its own, and that is not a
+    // thing anybody does on purpose: a flick that runs out of list, or a
+    // trackpad overshooting, both fetched a page nobody asked for.
+    { wheel: true },
+  )
+
+  /**
+   * Whether the reader is at the end of the room.
+   *
+   * Read on scroll rather than when it is needed, because the thing that needs
+   * it — the resize below — is told after the size has already changed, and by
+   * then the old position cannot be worked out.
+   */
+  const atEnd = useRef(true)
+  const watchEnd = () => {
+    const element = scroller.current
+    if (!element) return
+    atEnd.current = element.scrollHeight - element.clientHeight - element.scrollTop < 32
+  }
 
   const groups = useMemo(() => groupByDay(messages), [messages])
   // The room, not the handful of members the details carry — those are capped
@@ -209,52 +340,127 @@ export function GroupRoom({
         </div>
       </header>
 
-      <div
-        ref={scroller}
-        className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
-      >
-        {messages.length === 0 && <RoomIntro group={group} members={faces} />}
+      {/* The spinner floats over the list rather than sitting in it, and that
+          is load-bearing rather than decorative. Anchoring a page of older
+          messages works by how much taller the list got; a spinner inside it
+          is counted in that height when it appears and gone when the delta is
+          applied, and the view slides by exactly its size. Out of the flow it
+          cannot be counted at all. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {/* Only where the pull's own mark is not already saying it. A trackpad
+            reaching the top opens no gap, so it needs something of its own. */}
+        {loadingEarlier && !pullEarlier.refreshing && (
+          <div className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center">
+            <span className="bg-card rounded-full p-1.5 shadow-sm">
+              <Loader2 className="text-muted-foreground size-4 animate-spin" />
+            </span>
+          </div>
+        )}
 
-        {groups.map((day) => (
-          <section key={day.label} className="mb-1">
-            {/* Sized and spaced with the one-to-one thread's separator, and
-                scrolling away like it — see the note there. */}
-            <div className="my-3 flex justify-center">
-              <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
-                {day.label}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {day.messages.map((message, index) => {
-                const stamped = carriesTime(message, day.messages[index + 1])
-                if (message.direction !== "in") {
-                  // The same row the incoming messages get: face in the left
-                  // gutter, name above, only the bubble sitting on its own
-                  // side. A room is read down its faces, and a turn of yours
-                  // was the one break in that column.
+        <div
+          ref={holdScroller}
+          onScroll={watchEnd}
+          className="scrollbar-none relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
+          style={{
+            // The gap the pull opens, as padding on the scroller — the same
+            // shape the inbox uses, and for the same reason.
+            paddingTop: pullEarlier.distance || undefined,
+            // Nothing while a finger is on it: the gap is the finger's to move.
+            transition: pullEarlier.dragging
+              ? undefined
+              : "padding-top 260ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+          }}
+        >
+          <PullIndicator pull={pullEarlier} />
+          {messages.length === 0 && (
+            <RoomIntro group={group} members={faces} canPull={hasEarlier} />
+          )}
+
+          {groups.map((day) => (
+            <section key={day.label} className="mb-1">
+              {/* Sized and spaced with the one-to-one thread's separator, and
+                  scrolling away like it — see the note there. */}
+              <div className="my-3 flex justify-center">
+                <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
+                  {day.label}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {day.messages.map((message, index) => {
+                  const stamped = carriesTime(message, day.messages[index + 1])
+                  if (message.direction !== "in") {
+                    // The same row the incoming messages get: face in the left
+                    // gutter, name above, only the bubble sitting on its own
+                    // side. A room is read down its faces, and a turn of yours
+                    // was the one break in that column.
+                    const opens = opensTurn(day.messages[index - 1], message)
+                    return (
+                      <div key={message.id} className="flex items-start gap-2">
+                        <div className="w-8 shrink-0">
+                          {opens && (
+                            <button
+                              type="button"
+                              onClick={() => setShowing(owner)}
+                              aria-label={t("room.aboutYou")}
+                              className="block active:opacity-60"
+                            >
+                              <AddressAvatar address={owner} size="sm" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          {opens && (
+                            <button
+                              type="button"
+                              onClick={() => setShowing(owner)}
+                              className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold"
+                            >
+                              You
+                            </button>
+                          )}
+                          <MessageBubble
+                            message={message}
+                            onRetry={onRetrySay}
+                            onOpenInvite={onOpenInvite}
+                            onOpenContact={onOpenContact}
+                            channelOpen
+                            owner={owner}
+                            stamped={stamped}
+                          />
+                        </div>
+                      </div>
+                    )
+                  }
                   const opens = opensTurn(day.messages[index - 1], message)
+                  const who = labelIn(names, message.peer)
                   return (
                     <div key={message.id} className="flex items-start gap-2">
+                      {/* A gutter, held open for the whole run rather than only
+                          where the face is drawn: without it the rest of what
+                          somebody says steps left out from under them. */}
                       <div className="w-8 shrink-0">
                         {opens && (
                           <button
                             type="button"
-                            onClick={() => setShowing(owner)}
-                            aria-label={t("room.aboutYou")}
+                            onClick={() => setShowing(message.peer)}
+                            aria-label={`About ${who}`}
                             className="block active:opacity-60"
                           >
-                            <AddressAvatar address={owner} size="sm" />
+                            <AddressAvatar address={message.peer} size="sm" />
                           </button>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
+                        {/* Who spoke, over their first bubble. A face is the thing
+                            a room is read by at a glance, so the name no longer
+                            has to repeat itself down a run to carry that. */}
                         {opens && (
                           <button
                             type="button"
-                            onClick={() => setShowing(owner)}
+                            onClick={() => setShowing(message.peer)}
                             className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold"
                           >
-                            You
+                            {who}
                           </button>
                         )}
                         <MessageBubble
@@ -269,56 +475,12 @@ export function GroupRoom({
                       </div>
                     </div>
                   )
-                }
-                const opens = opensTurn(day.messages[index - 1], message)
-                const who = labelIn(names, message.peer)
-                return (
-                  <div key={message.id} className="flex items-start gap-2">
-                    {/* A gutter, held open for the whole run rather than only
-                        where the face is drawn: without it the rest of what
-                        somebody says steps left out from under them. */}
-                    <div className="w-8 shrink-0">
-                      {opens && (
-                        <button
-                          type="button"
-                          onClick={() => setShowing(message.peer)}
-                          aria-label={`About ${who}`}
-                          className="block active:opacity-60"
-                        >
-                          <AddressAvatar address={message.peer} size="sm" />
-                        </button>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      {/* Who spoke, over their first bubble. A face is the thing
-                          a room is read by at a glance, so the name no longer
-                          has to repeat itself down a run to carry that. */}
-                      {opens && (
-                        <button
-                          type="button"
-                          onClick={() => setShowing(message.peer)}
-                          className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold"
-                        >
-                          {who}
-                        </button>
-                      )}
-                      <MessageBubble
-                        message={message}
-                        onRetry={onRetrySay}
-                        onOpenInvite={onOpenInvite}
-                        onOpenContact={onOpenContact}
-                        channelOpen
-                        owner={owner}
-                        stamped={stamped}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        ))}
-        <div ref={bottom} />
+                })}
+              </div>
+            </section>
+          ))}
+          <div ref={bottom} />
+        </div>
       </div>
 
       {member ? (
@@ -423,7 +585,16 @@ export function GroupRoom({
   )
 }
 
-function RoomIntro({ group, members }: { group: Group; members?: string[] }) {
+function RoomIntro({
+  group,
+  members,
+  /** Whether the room has a past that could still be asked for. */
+  canPull,
+}: {
+  group: Group
+  members?: string[]
+  canPull?: boolean
+}) {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center px-8 py-14 text-center">
@@ -432,6 +603,16 @@ function RoomIntro({ group, members }: { group: Group; members?: string[] }) {
       <p className="text-muted-foreground mt-2 text-sm text-balance">
         {t("room.emptyRoom")}
       </p>
+      {/* Said only where it is true. A room that shares its past is not empty
+          just because nothing has been fetched yet, and leaving the line above
+          to stand alone would tell a new member that a room full of history had
+          never been spoken in. "Look for" rather than "read", because whether
+          there is anything back there is the room's answer to give, not ours. */}
+      {canPull && (
+        <p className="text-muted-foreground/80 mt-2 text-[13px] text-balance">
+          {t("room.pullForEarlier")}
+        </p>
+      )}
     </div>
   )
 }

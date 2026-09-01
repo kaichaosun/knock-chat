@@ -204,7 +204,20 @@ export function save(owner: string, snapshot: Snapshot): void {
 export function mergeIncoming(
   snapshot: Snapshot,
   envelopes: OpenedEnvelope[],
-  cursor: string,
+  /**
+   * Where the feed has reached. Nullable because a snapshot's cursor is —
+   * nothing has been fetched yet on a fresh device — and because folding in a
+   * room's past hands the current one straight back rather than moving it.
+   */
+  cursor: string | null,
+  /**
+   * Whose device this is, so a message can be filed on the right side.
+   *
+   * The feed never returns your own messages — it is a queue and holds nothing
+   * for the sender — but a room's history does, because it is the record. Left
+   * to assume, those would come back as though somebody else had said them.
+   */
+  owner: string,
 ): Snapshot {
   const known = new Set(snapshot.messages.map((m) => m.id))
   const added: Message[] = []
@@ -215,7 +228,7 @@ export function mergeIncoming(
       id,
       peer: compact(envelope.from),
       ...(envelope.group_id ? { group: envelope.group_id } : {}),
-      direction: "in",
+      direction: compact(envelope.from) === compact(owner) ? "out" : "in",
       body: envelope.body,
       at: envelope.created_at,
       status: "sent",
@@ -232,6 +245,26 @@ export function mergeIncoming(
     // Something new in a hidden thread brings it back, which is the whole
     // meaning of hidden rather than gone.
     dismissed: without(snapshot.dismissed, added.map(threadKey)),
+  }
+}
+
+/**
+ * Give a message this device sent the name the relay gave it.
+ *
+ * It is written down before it is sent, so at that point there is nothing to
+ * call it but a local id. Once the relay answers it has a real name, and taking
+ * it is what lets the same message be recognised if it ever comes back: a
+ * room's history returns everything said in it, this device's own words
+ * included, and under a local id those would arrive as strangers and land a
+ * second time — once on each side of the conversation.
+ */
+export function settle(snapshot: Snapshot, id: string, name: string): Snapshot {
+  if (!snapshot.messages.some((m) => m.id === id)) return snapshot
+  return {
+    ...snapshot,
+    messages: snapshot.messages.map((m) =>
+      m.id === id ? { ...m, id: name, status: "sent" as MessageStatus } : m,
+    ),
   }
 }
 

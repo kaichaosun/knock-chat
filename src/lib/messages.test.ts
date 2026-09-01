@@ -20,6 +20,16 @@ import type { Envelope } from "./relay"
 const ALICE = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
 const BOB = "NQ05 563U 530Y XDRT L7GQ M6HE YRNU 20FE 4PNR"
 
+/**
+ * Whose device the snapshot belongs to.
+ *
+ * Neither of the two above, because these envelopes arrive *from* them: the
+ * merge files a message as outgoing when its sender is the reader, and a device
+ * that turned out to be one of its own correspondents would put half of this
+ * file's fixtures on the wrong side of the conversation.
+ */
+const ME = "NQ21 2C4Q 8XVH 4T0G 2K1D 7QJ5 3E9M 1RB8 6YAF"
+
 function envelope(seq: number, body: string, from = ALICE, id = `id-${seq}`): Envelope {
   return {
     id,
@@ -48,15 +58,15 @@ describe("mergeIncoming", () => {
       emptySnapshot(),
       [envelope(1, "hi"), envelope(2, "again")],
       cursor(2),
-    )
+     ME)
     expect(next.messages).toHaveLength(2)
     expect(next.cursor).toBe(cursor(2))
     expect(next.messages[0].direction).toBe("in")
   })
 
   it("ignores envelopes it already holds", () => {
-    const once = mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1))
-    const twice = mergeIncoming(once, [envelope(1, "hi")], cursor(1))
+    const once = mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1), ME)
+    const twice = mergeIncoming(once, [envelope(1, "hi")], cursor(1), ME)
     expect(twice.messages).toHaveLength(1)
   })
 
@@ -70,24 +80,24 @@ describe("mergeIncoming", () => {
       emptySnapshot(),
       [envelope(1, "one", ALICE, "stable-a"), envelope(2, "two", ALICE, "stable-b")],
       cursor(2),
-    )
+     ME)
     // Same messages, renumbered from one, under a new instance.
     const after = mergeIncoming(
       before,
       [envelope(1, "one", ALICE, "stable-a"), envelope(2, "two", ALICE, "stable-b")],
       cursor(2, "relay-two"),
-    )
+     ME)
     expect(after.messages).toHaveLength(2)
     expect(after.cursor).toBe(cursor(2, "relay-two"))
   })
 
   it("distinguishes a genuinely new message that reuses a seq", () => {
-    const before = mergeIncoming(emptySnapshot(), [envelope(1, "old", ALICE, "old-id")], cursor(1))
+    const before = mergeIncoming(emptySnapshot(), [envelope(1, "old", ALICE, "old-id")], cursor(1), ME)
     const after = mergeIncoming(
       before,
       [envelope(1, "new", ALICE, "new-id")],
       cursor(1, "relay-two"),
-    )
+     ME)
     expect(after.messages).toHaveLength(2)
   })
 
@@ -96,14 +106,14 @@ describe("mergeIncoming", () => {
    * was replayed to would ask for the same page forever.
    */
   it("advances the cursor even when every envelope was a duplicate", () => {
-    const before = mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1))
-    const after = mergeIncoming(before, [envelope(1, "hi")], cursor(1, "relay-two"))
+    const before = mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1), ME)
+    const after = mergeIncoming(before, [envelope(1, "hi")], cursor(1, "relay-two"), ME)
     expect(after.cursor).toBe(cursor(1, "relay-two"))
   })
 
   it("leaves the snapshot untouched when nothing arrived and the cursor stands", () => {
-    const snapshot: Snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1))
-    expect(mergeIncoming(snapshot, [], cursor(1))).toBe(snapshot)
+    const snapshot: Snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1), ME)
+    expect(mergeIncoming(snapshot, [], cursor(1), ME)).toBe(snapshot)
   })
 })
 
@@ -113,7 +123,7 @@ describe("conversations", () => {
       emptySnapshot(),
       [envelope(1, "from alice", ALICE), envelope(2, "from bob", BOB)],
       cursor(2),
-    )
+     ME)
     const list = conversations(snapshot)
     expect(list).toHaveLength(2)
     expect(list[0].last?.body).toBe("from bob")
@@ -125,7 +135,7 @@ describe("conversations", () => {
       emptySnapshot(),
       [envelope(1, "one", ALICE), envelope(2, "two", BOB)],
       cursor(2),
-    )
+     ME)
     expect(threadWith(snapshot, ALICE)).toHaveLength(1)
   })
 })
@@ -140,7 +150,7 @@ describe("markRead", () => {
       emptySnapshot(),
       [envelope(1, "hi", ALICE), envelope(2, "hey", BOB)],
       cursor(2),
-    )
+     ME)
     snapshot = markRead(snapshot, ALICE)
     expect(unreadFor(snapshot, ALICE)).toBe(0)
     expect(unreadFor(snapshot, BOB)).toBe(1)
@@ -151,11 +161,11 @@ describe("markRead", () => {
    * still looking at it, left the badge showing when you went back.
    */
   it("a message arriving after reading is unread again until re-read", () => {
-    let snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "first", ALICE)], cursor(1))
+    let snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "first", ALICE)], cursor(1), ME)
     snapshot = markRead(snapshot, ALICE)
     expect(unreadFor(snapshot, ALICE)).toBe(0)
 
-    snapshot = mergeIncoming(snapshot, [envelope(2, "second", ALICE, "id-2b")], cursor(2))
+    snapshot = mergeIncoming(snapshot, [envelope(2, "second", ALICE, "id-2b")], cursor(2), ME)
     expect(unreadFor(snapshot, ALICE)).toBe(1)
 
     snapshot = markRead(snapshot, ALICE)
@@ -165,7 +175,7 @@ describe("markRead", () => {
   /** Idempotent, so an open thread can re-run it on every render for free. */
   it("returns the same snapshot when nothing changed", () => {
     const snapshot = markRead(
-      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
+      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1), ME),
       ALICE,
     )
     expect(markRead(snapshot, ALICE)).toBe(snapshot)
@@ -174,12 +184,12 @@ describe("markRead", () => {
   /** Counting incoming messages means the device clock never enters into it. */
   it("ignores your own messages and does not consult a clock", () => {
     const snapshot = markRead(
-      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
+      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1), ME),
       ALICE,
     )
     // An envelope timestamped far in the past still counts as new.
     const backdated = { ...envelope(2, "late arrival", ALICE, "id-old"), created_at: new Date(2000, 0, 1).toISOString() }
-    expect(unreadFor(mergeIncoming(snapshot, [backdated], cursor(2)), ALICE)).toBe(1)
+    expect(unreadFor(mergeIncoming(snapshot, [backdated], cursor(2), ME), ALICE)).toBe(1)
   })
 })
 
@@ -187,7 +197,7 @@ describe("deleting a chat", () => {
   const listed = (snapshot: Snapshot) => conversations(snapshot).map((c) => c.peer)
 
   it("removes the thread and its messages", () => {
-    let snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1))
+    let snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1), ME)
     snapshot = deleteThread(snapshot, ALICE)
 
     expect(listed(snapshot)).toHaveLength(0)
@@ -200,7 +210,7 @@ describe("deleting a chat", () => {
         emptySnapshot(),
         [envelope(1, "from alice", ALICE), envelope(2, "from bob", BOB)],
         cursor(2),
-      ),
+       ME),
       ALICE,
     )
     expect(listed(snapshot)).toEqual([BOB.replace(/\s+/g, "")])
@@ -211,7 +221,7 @@ describe("deleting a chat", () => {
    * resurrects what was just deleted.
    */
   it("keeps the cursor so the relay does not replay what was deleted", () => {
-    const before = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1))
+    const before = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1), ME)
     expect(deleteThread(before, ALICE).cursor).toBe(before.cursor)
   })
 
@@ -219,7 +229,7 @@ describe("deleting a chat", () => {
     // "No messages" stopped meaning "no row" when rooms joined the list: a room
     // you are in is a place whether or not anyone has spoken. So deleting is
     // recorded even when there was nothing to delete.
-    const snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1))
+    const snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1), ME)
     const after = deleteThread(snapshot, BOB)
     expect(after.messages).toEqual(snapshot.messages)
     expect(after.dismissed[BOB.replace(/\s+/g, "")]).toBe(true)
@@ -227,7 +237,7 @@ describe("deleting a chat", () => {
 
   it("stays put when the same thread is deleted twice", () => {
     const snapshot = deleteThread(
-      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1)),
+      mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1), ME),
       BOB,
     )
     expect(deleteThread(snapshot, BOB)).toBe(snapshot)
@@ -237,7 +247,7 @@ describe("deleting a chat", () => {
 describe("a room whose chat was deleted", () => {
   const room = { id: ROOM, created_at: new Date(2026, 0, 1, 9, 0).toISOString() }
   const dismissedRoom = () =>
-    deleteThread(mergeIncoming(emptySnapshot(), [roomEnvelope(1, "hello")], cursor(1)), ROOM)
+    deleteThread(mergeIncoming(emptySnapshot(), [roomEnvelope(1, "hello")], cursor(1), ME), ROOM)
 
   it("goes from the list instead of coming straight back empty", () => {
     // The bug: with the messages gone the room was rebuilt from membership and
@@ -248,7 +258,7 @@ describe("a room whose chat was deleted", () => {
   })
 
   it("comes back when somebody says something", () => {
-    const snapshot = mergeIncoming(dismissedRoom(), [roomEnvelope(2, "still here")], cursor(2))
+    const snapshot = mergeIncoming(dismissedRoom(), [roomEnvelope(2, "still here")], cursor(2), ME)
     const list = withRooms(conversations(snapshot), [room], snapshot.dismissed)
     expect(list).toHaveLength(1)
     expect(list[0].last?.body).toBe("still here")
@@ -391,7 +401,7 @@ describe("rooms are threads of their own", () => {
       emptySnapshot(),
       [roomEnvelope(1, "hello room")],
       cursor(1),
-    )
+     ME)
     expect(threadWith(snapshot, ROOM)).toHaveLength(1)
     // Speaking in a room is not the same as writing to somebody.
     expect(threadWith(snapshot, ALICE)).toHaveLength(0)
@@ -402,7 +412,7 @@ describe("rooms are threads of their own", () => {
       emptySnapshot(),
       [roomEnvelope(1, "from alice", ALICE), roomEnvelope(2, "from bob", BOB)],
       cursor(2),
-    )
+     ME)
     expect(threadWith(snapshot, ROOM)).toHaveLength(2)
     expect(conversations(snapshot)).toHaveLength(1)
   })
@@ -412,7 +422,7 @@ describe("rooms are threads of their own", () => {
       emptySnapshot(),
       [envelope(1, "just you"), roomEnvelope(2, "everyone")],
       cursor(2),
-    )
+     ME)
     const threads = conversations(snapshot)
     expect(threads).toHaveLength(2)
 
@@ -427,7 +437,7 @@ describe("rooms are threads of their own", () => {
       emptySnapshot(),
       [envelope(1, "just you"), roomEnvelope(2, "everyone")],
       cursor(2),
-    )
+     ME)
     const unread = (key: string) =>
       conversations(snapshot).find((c) => c.key === key)?.unread ?? 0
 
@@ -449,7 +459,7 @@ describe("rooms are threads of their own", () => {
       emptySnapshot(),
       [envelope(1, "just you"), roomEnvelope(2, "everyone")],
       cursor(2),
-    )
+     ME)
     snapshot = deleteThread(snapshot, ROOM)
     expect(threadWith(snapshot, ROOM)).toHaveLength(0)
     expect(threadWith(snapshot, ALICE)).toHaveLength(1)
@@ -468,7 +478,7 @@ describe("a room with nothing said in it", () => {
   })
 
   it("is not added twice once somebody speaks", () => {
-    const snapshot = mergeIncoming(emptySnapshot(), [roomEnvelope(1, "hello")], cursor(1))
+    const snapshot = mergeIncoming(emptySnapshot(), [roomEnvelope(1, "hello")], cursor(1), ME)
     const list = withRooms(conversations(snapshot), [room])
     expect(list).toHaveLength(1)
     expect(list[0].last?.body).toBe("hello")
@@ -476,13 +486,13 @@ describe("a room with nothing said in it", () => {
 
   it("sorts by when it was made, among threads sorted by when they last stirred", () => {
     // Older than the message below, so it belongs underneath it.
-    const snapshot = mergeIncoming(emptySnapshot(), [envelope(5, "later")], cursor(5))
+    const snapshot = mergeIncoming(emptySnapshot(), [envelope(5, "later")], cursor(5), ME)
     const list = withRooms(conversations(snapshot), [room])
     expect(list.map((c) => c.key)).toEqual([ALICE.replace(/\s+/g, ""), ROOM])
   })
 
   it("leaves the list alone when there is nothing to add", () => {
-    const existing = conversations(mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1)))
+    const existing = conversations(mergeIncoming(emptySnapshot(), [envelope(1, "hi")], cursor(1), ME))
     expect(withRooms(existing, [])).toBe(existing)
   })
 })

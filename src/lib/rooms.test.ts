@@ -12,6 +12,7 @@ function room(id: string, name: string): Group {
     name,
     join_price_luna: 0,
     requires_approval: false,
+    share_history: false,
     created_at: "2026-08-25T00:00:00Z",
   }
 }

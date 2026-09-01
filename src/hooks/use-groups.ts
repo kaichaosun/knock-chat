@@ -73,7 +73,12 @@ export function useGroups(wallet: Wallet | null, owner: string | null) {
   }, [])
 
   const create = useCallback(
-    async (input: { name: string; join_price_luna: number; requires_approval: boolean }) => {
+    async (input: {
+      name: string
+      join_price_luna: number
+      requires_approval: boolean
+      share_history: boolean
+    }) => {
       const group = await createGroup(input)
       await refresh()
       return group

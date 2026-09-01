@@ -132,20 +132,41 @@ export const en = {
     decline: "Decline",
     admit: "Let them in",
   },
+  /**
+   * The words a room's settings are made of.
+   *
+   * Shared because the same two settings are shown twice — once when a room is
+   * created, once when it is edited — and a label kept in both places would
+   * eventually disagree with itself, leaving two screens naming one setting
+   * differently with nothing to catch it.
+   *
+   * Only what both screens show lives here. The settings sheet keeps its own
+   * confirmations, warnings and toasts, which the create sheet has no
+   * counterpart for.
+   */
+  roomSettings: {
+    nameLabel: "Group name",
+    costTitle: "Cost to join",
+    doorTitle: "Who can get in",
+    doorOpen: "Anyone with the link",
+    doorOpenHint: "They walk straight in",
+    doorOpenHintPaid: "They pay and are in",
+    doorApprove: "You approve",
+    doorApproveHint: "They ask, you answer",
+    doorApproveHintPaid: "They pay, you answer",
+    historyTitle: "Chat history",
+    historyHidden: "Hidden",
+    historyHiddenHint: "New members start here",
+    historyVisible: "Visible",
+    historyVisibleHint: "New members can read it all",
+  },
   newGroup: {
     title: "New group",
-    namePlaceholder: "Group name",
     nameTooLong: "A name can be at most {{max}} characters.",
-    costTitle: "Cost to join",
     costNote:
       "Paid to you, once, by anyone who joins. Leave it empty and anyone with the link walks in.",
     costPlaceholder: "Free",
     costLabel: "Cost to join, in NIM",
-    doorTitle: "Who can get in",
-    youApprove: "You approve",
-    youApproveNote: "They ask, you answer",
-    anyoneWithLink: "Anyone with the link",
-    anyoneWithLinkNote: "They walk straight in",
     create: "Create group",
     failed: "Couldn't create the group",
   },
@@ -187,6 +208,7 @@ export const en = {
     addressCopied: "Address copied",
     copyFailed: "Couldn't copy that",
     emptyRoom: "Nothing said here yet. Anyone in the room sees what you write.",
+    pullForEarlier: "Pull down to look for earlier messages.",
   },
   members: {
     inTheRoom: "In the room",
@@ -303,32 +325,29 @@ export const en = {
     clipboardFailed: "Couldn't reach the clipboard",
     notEncrypted: "Messages in a group aren't encrypted.",
     name: "Name",
-    nameLabel: "Group name",
     save: "Save",
     nameSaved: "Name saved",
     saveFailed: "Couldn't save",
-    costTitle: "Cost to join",
     costNote:
       "What someone new pays you to get in. Changing it leaves everyone already here where they are.",
     costFree: "Anyone with the link can get in",
     costSet: "Joining now costs {{amount}} NIM",
-    doorTitle: "Who can get in",
-    doorApprove: "You approve",
-    doorApproveHintPaid: "They pay, you answer",
-    doorApproveHint: "They ask, you answer",
     doorApproveMeansPaid:
       "New people pay the {{price}} and wait for your answer. Paying buys the asking, not the room — declining does not send it back. Everyone already in stays in.",
     doorApproveMeans:
       "New people ask to join, and wait for your answer. Everyone already in stays in.",
-    doorOpen: "Anyone with the link",
-    doorOpenHintPaid: "They pay and are in",
-    doorOpenHint: "They walk straight in",
     doorOpenMeansPaid:
       "Anyone with the link pays the {{price}} and is in, without asking you. Anyone you remove can pay again and come back the same way.",
     doorOpenMeans:
       "Anyone with the link walks straight in, without asking you. Anyone you remove can walk back in the same way.",
     doorApprovalOn: "New people will have to ask you first.",
     doorApprovalOff: "Door open — anyone with the link walks in.",
+    pastPrivateMeans: "New members will only see messages sent from now on.",
+    pastSharedMeans: "New members can read everything, back to the first message.",
+    pastSharedOn: "History is visible to new members.",
+    pastSharedOff: "History is hidden from new members.",
+    pastSharedWarning: "Anyone who joins can read the whole history.",
+    pastNoRecall: "Messages already read stay on their device.",
     removedApproval: "Removed. They'd have to ask to come back.",
     removedOpen: "Removed — though they can walk back in while the door is open.",
     openDoorPaid:
