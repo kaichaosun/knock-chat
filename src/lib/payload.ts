@@ -32,6 +32,8 @@ import { t } from "i18next"
 
 import { addressFrom, shortenAddress } from "./address"
 import { groupIdFrom } from "./group-link"
+import { segments } from "./mentions"
+import { labelIn, snapshot } from "./names"
 import { formatNim } from "./postage"
 
 const FRAME = "\u001fknock1\n"
@@ -226,8 +228,10 @@ export function decode(plain: string): Payload {
 export function preview(plain: string, direction: "in" | "out"): string {
   const payload = decode(plain)
   switch (payload.kind) {
-    case "text":
-      return direction === "out" ? t("preview.youSaid", { text: payload.text }) : payload.text
+    case "text": {
+      const text = spoken(payload.text)
+      return direction === "out" ? t("preview.youSaid", { text }) : text
+    }
     case "payment": {
       const amount = `${formatNim(payload.payment.luna)} NIM`
       return t(direction === "out" ? "preview.sent" : "preview.received", { amount })
@@ -249,4 +253,22 @@ export function preview(plain: string, direction: "in" | "out"): string {
     case "unknown":
       return t("preview.unsupported")
   }
+}
+
+/**
+ * A message as it reads in a list, with anybody named in it drawn as a name.
+ *
+ * The same substitution the bubble makes — see `lib/mentions` — so that one
+ * line does not say "@NQ97 V68G…" about a message the thread shows as "@Alice".
+ * The directory is read here rather than passed in for the same reason `t` is:
+ * every caller of this would otherwise have to carry it.
+ */
+function spoken(text: string): string {
+  const parts = segments(text)
+  // Nothing was named, which is nearly every message. Left exactly as it came.
+  if (parts.length <= 1) return text
+  const directory = snapshot()
+  return parts
+    .map((part) => (part.kind === "text" ? part.text : `@${labelIn(directory, part.address)}`))
+    .join("")
 }

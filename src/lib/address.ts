@@ -86,8 +86,18 @@ export function normalizeInput(input: string): string {
   return value.match(/.{1,4}/g)?.join(" ") ?? value
 }
 
-/** An address wherever it turns up: `NQ`, two check digits, 32 base32 characters. */
-const ADDRESS = new RegExp(`${CCODE}[0-9]{2}[${ALPHABET}]{32}`)
+/**
+ * An address wherever it turns up: `NQ`, two check digits, 32 base32
+ * characters. A pattern rather than a regex, so it can be built into a larger
+ * one.
+ *
+ * Exported because a mention is an address inside ordinary text, and anything
+ * looking for one should match exactly what this module calls an address rather
+ * than keep a second copy of the alphabet that can drift from this one.
+ */
+export const ADDRESS_PATTERN = `${CCODE}[0-9]{2}[${ALPHABET}]{32}`
+
+const ADDRESS = new RegExp(ADDRESS_PATTERN)
 
 /**
  * Pull an address out of whatever was pasted or scanned, or `null` if there

@@ -9,11 +9,15 @@ import {
   LockKeyhole,
   Users,
 } from "lucide-react"
+import { Fragment, useMemo, useRef } from "react"
 import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { GiftCard } from "@/components/gift-card"
+import { useNames } from "@/hooks/use-names"
 import type { Message } from "@/lib/messages"
+import { sameAddress, segments } from "@/lib/mentions"
+import { labelIn } from "@/lib/names"
 import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
 import { shortenAddress } from "@/lib/address"
 import { formatNim } from "@/lib/postage"
@@ -25,6 +29,7 @@ export function MessageBubble({
   onRetry,
   onOpenInvite,
   onOpenContact,
+  onOpenMention,
   channelOpen,
   owner = null,
   stamped = true,
@@ -36,9 +41,16 @@ export function MessageBubble({
   onOpenInvite: (group: string) => void
   /** Open the door a shared contact points at. */
   onOpenContact: (address: string) => void
+  /**
+   * Say who somebody named in the message is.
+   *
+   * Absent where there is nobody to say it about — a one-to-one thread has no
+   * members to name — and a mention there is then drawn but not tappable.
+   */
+  onOpenMention?: (address: string) => void
   /** Whether messages can get through at all right now. */
   channelOpen: boolean
-  /** Your address. Only a gift card needs it, and gifts live in rooms. */
+  /** Your address: what a gift card is drawn against, and who a mention of you is. */
   owner?: string | null
   /**
    * Whether the text may be selected by hand.
@@ -120,7 +132,12 @@ export function MessageBubble({
             )}
           >
             {payload.kind === "text" ? (
-              payload.text
+              <Words
+                text={payload.text}
+                you={owner}
+                outgoing={outgoing}
+                onOpen={onOpenMention}
+              />
             ) : (
               // Something a newer build sent that this one has no way to draw.
               // Shown as a gap on purpose: silently dropping it would leave the
@@ -148,6 +165,105 @@ export function MessageBubble({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * What somebody wrote, with the people in it drawn as people.
+ *
+ * A mention arrives as an address (see `lib/mentions`) and is put back into a
+ * name here, out of this device's own directory — so the same message reads
+ * "@Alice" to somebody who knows her by that and "@NQ97 V68G … JLKY" to
+ * somebody who does not. Nothing is fetched to do it and nothing can fail.
+ */
+function Words({
+  text,
+  you,
+  outgoing,
+  onOpen,
+}: {
+  text: string
+  /** Your address, so a mention of you can say so louder. */
+  you: string | null
+  outgoing: boolean
+  onOpen?: (address: string) => void
+}) {
+  const parts = useMemo(() => segments(text), [text])
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.kind === "text" ? (
+          <Fragment key={index}>{part.text}</Fragment>
+        ) : (
+          <Mention
+            key={index}
+            address={part.address}
+            mine={you !== null && sameAddress(part.address, you)}
+            outgoing={outgoing}
+            onOpen={onOpen}
+          />
+        ),
+      )}
+    </>
+  )
+}
+
+/**
+ * How long a press has to last before it belongs to the message rather than to
+ * whoever is named in it. Mirrors the room's own long press — see `GroupRoom`.
+ */
+const HOLD_MS = 500
+
+/** Somebody, named inside a message. */
+function Mention({
+  address,
+  mine,
+  outgoing,
+  onOpen,
+}: {
+  address: string
+  /** You are the one being named. The whole point of noticing a mention. */
+  mine: boolean
+  outgoing: boolean
+  onOpen?: (address: string) => void
+}) {
+  const names = useNames()
+  const pressed = useRef<number | null>(null)
+  const label = `@${labelIn(names, address)}`
+
+  const className = cn(
+    "rounded-md px-1 font-semibold",
+    outgoing
+      ? "bg-white/25 text-white"
+      : mine
+        ? "bg-primary text-primary-foreground"
+        : "bg-primary/12 text-primary",
+  )
+
+  // Drawn either way, tappable only where there is somebody to open. A mention
+  // still says who it means in a thread that has no members list.
+  if (!onOpen) return <span className={className}>{label}</span>
+
+  return (
+    <button
+      type="button"
+      // Deliberately not stopping the press from reaching the row: a long press
+      // on a message is the message's own gesture wherever on it it lands. What
+      // must not happen is both — the room opening its menu on the timer and
+      // this opening a second sheet over the top of it on release.
+      onPointerDown={(event) => {
+        pressed.current = event.pointerType === "touch" ? Date.now() : null
+      }}
+      onClick={() => {
+        const began = pressed.current
+        pressed.current = null
+        if (began !== null && Date.now() - began >= HOLD_MS) return
+        onOpen(address)
+      }}
+      className={className}
+    >
+      {label}
+    </button>
   )
 }
 
