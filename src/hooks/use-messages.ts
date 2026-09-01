@@ -97,7 +97,7 @@ export function useMessages(
           : result.messages
         if (cancelled) return
 
-        update((current) => history.mergeIncoming(current, opened, result.next))
+        update((current) => history.mergeIncoming(current, opened, result.next, owner))
       } catch (error) {
         if (cancelled) return
         if (error instanceof RelayError && error.status === 401) {
@@ -210,6 +210,20 @@ export function useMessages(
     [update],
   )
 
+  /**
+   * Take the name the relay gave a message this device sent.
+   *
+   * Only rooms need it. A room's history returns everything said in it, this
+   * device's words included, and a message still under its local id would come
+   * back unrecognised and land a second time. A direct message is never handed
+   * back — the relay holds one copy, addressed to the recipient — so its local
+   * id is the only id it will ever need.
+   */
+  const settle = useCallback(
+    (id: string, name: string) => update((current) => history.settle(current, id, name)),
+    [update],
+  )
+
   /** Put a message back on its way, timed for when it is actually resent. */
   const resend = useCallback(
     (id: string) => update((current) => history.resend(current, id)),
@@ -228,9 +242,14 @@ export function useMessages(
    * Room bodies are plain text, so there is nothing to decrypt on the way in.
    */
   const absorbHistory = useCallback(
-    (envelopes: Envelope[]) =>
-      update((current) => history.mergeIncoming(current, envelopes, current.cursor)),
-    [update],
+    (envelopes: Envelope[]) => {
+      // Bound before the closure: nothing arrives for a device with nobody
+      // signed in, and the merge needs to know whose words are whose.
+      const mine = owner
+      if (!mine) return
+      update((current) => history.mergeIncoming(current, envelopes, current.cursor, mine))
+    },
+    [update, owner],
   )
 
   /** Record a message this device sent outside the normal send path — a knock. */
@@ -259,6 +278,7 @@ export function useMessages(
     dismissed,
     recordOutgoing,
     absorbHistory,
+    settle,
     setStatus,
     resend,
     relayStatus,

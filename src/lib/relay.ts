@@ -89,8 +89,11 @@ export function getInfo(): Promise<RelayInfo> {
   return request<RelayInfo>("/v1/info")
 }
 
+/** What the relay calls a message it has just accepted. */
+export type Sent = { id: string; seq: number; created_at: string }
+
 export function sendMessage(from: string, to: string, body: string) {
-  return request<{ seq: number; created_at: string }>("/v1/messages", {
+  return request<Sent>("/v1/messages", {
     method: "POST",
     body: JSON.stringify({ from, to, body }),
   })
@@ -400,7 +403,7 @@ export function joinGroup(
 }
 
 export function sayInGroup(id: string, body: string) {
-  return request<{ seq: number; created_at: string }>(
+  return request<Sent>(
     `/v1/groups/${encodeURIComponent(id)}/messages`,
     { method: "POST", body: JSON.stringify({ body }) },
   )

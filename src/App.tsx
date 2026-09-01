@@ -135,6 +135,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     deleteThread,
     recordOutgoing,
     absorbHistory,
+    settle,
     setStatus,
     resend,
     dismissed,
@@ -874,14 +875,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       // toast is missed or dismissed and the tick is what is left behind.
       recordOutgoing(owner, body, id, openGroup, "sending")
       try {
-        await say(openGroup, body)
-        setStatus(id, "sent")
+        const sent = await say(openGroup, body)
+        // Under the relay's name from here, so the room's history recognises it
+        // as one already held rather than delivering it back a second time.
+        settle(id, `relay:${sent.id}`)
       } catch (error) {
         setStatus(id, "failed")
         toast.error(error instanceof Error ? error.message : t("app.sendThatFailed"))
       }
     },
-    [openGroup, owner, say, recordOutgoing, setStatus],
+    [openGroup, owner, say, recordOutgoing, settle, setStatus],
   )
 
   /**
@@ -896,14 +899,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       if (!message.group) return
       resend(message.id)
       try {
-        await say(message.group, message.body)
-        setStatus(message.id, "sent")
+        const sent = await say(message.group, message.body)
+        settle(message.id, `relay:${sent.id}`)
       } catch (error) {
         setStatus(message.id, "failed")
         toast.error(error instanceof Error ? error.message : t("app.sendThatFailed"))
       }
     },
-    [say, resend, setStatus],
+    [say, resend, settle, setStatus],
   )
 
   if (session.state.status !== "active") {
