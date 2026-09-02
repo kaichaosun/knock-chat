@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ChevronLeft, Clock, Coins, DoorClosed, Info, PanelLeftOpen, UserRound } from "lucide-react"
 
@@ -73,6 +73,8 @@ export function Conversation({
   onShowSidebar?: () => void
 }) {
   const bottom = useRef<HTMLDivElement>(null)
+  /** Everything in the scroller, as one box whose height is the content's. */
+  const content = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const { t } = useTranslation()
   const names = useNames()
@@ -106,10 +108,24 @@ export function Conversation({
   }, [shut, peer])
   const cost = reach?.policy.amount_luna ?? 0
 
+  /**
+   * Put the end of the thread on screen.
+   *
+   * `scrollTop` rather than `scrollIntoView` on the last element: this is the
+   * one instruction that cannot land short. The sentinel has to have been laid
+   * out for the browser to know where to put it, and the moments this has to
+   * survive are the ones where the layout is still moving.
+   */
+  const goToEnd = useCallback(() => {
+    const element = scroller.current
+    if (!element) return
+    element.scrollTop = element.scrollHeight
+  }, [])
+
   // Keep the newest message in view as the thread grows.
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" })
-  }, [messages.length])
+    goToEnd()
+  }, [messages.length, goToEnd])
 
   // And whenever the thread area itself changes size — the keyboard opening is
   // the case that matters, which otherwise leaves the thread scrolled to where
@@ -119,11 +135,15 @@ export function Conversation({
     const element = scroller.current
     if (!element || typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver(() => {
-      bottom.current?.scrollIntoView({ block: "end" })
+      goToEnd()
     })
     observer.observe(element)
+    // And the content, which the line above misses: the thread getting taller
+    // — a link card finishing its lookup — moves nothing about the scroller
+    // itself, so a reader at the end was left short of it having done nothing.
+    if (content.current) observer.observe(content.current)
     return () => observer.disconnect()
-  }, [])
+  }, [goToEnd])
 
   const groups = useMemo(() => groupByDay(messages), [messages])
 
@@ -208,71 +228,75 @@ export function Conversation({
         ref={scroller}
         className="scrollbar-none flex-1 overflow-y-auto overscroll-contain px-3.5 py-4"
       >
-        {groups.length === 0 ? (
-          <ThreadIntro peer={peer} name={name} />
-        ) : (
-          groups.map((group) => (
-            <section key={group.label} className="mb-1">
-              {/* In the thread, not above it. A pinned pill keeps the date in
-                  reach on a long day, but it does it by crossing whatever is
-                  passing underneath — and a date is not worth reading over
-                  somebody's words. It scrolls away with the day it opens. */}
-              <div className="my-3 flex justify-center">
-                <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
-                  {group.label}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {group.messages.map((message, index) => {
-                  const outgoing = message.direction === "out"
-                  const opens = opensTurn(group.messages[index - 1], message)
-                  return (
-                    <div key={message.id} className="flex items-start gap-2">
-                      {/* A gutter held open for the whole run, so the rest of
-                          what somebody says does not step out from under the
-                          face that opened it. */}
-                      <div className="w-8 shrink-0">
-                        {opens &&
-                          (outgoing ? (
-                            // Nothing to open about yourself here: a thread has
-                            // one other person in it, and they are who the
-                            // sheet is about.
-                            <AddressAvatar address={owner} size="sm" />
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setShowing(true)}
-                              aria-label={t("chat.about", { name: labelIn(names, peer) })}
-                              className="block active:opacity-60"
-                            >
-                              <AddressAvatar address={peer} size="sm" />
-                            </button>
-                          ))}
+        {/* One box to measure. The scroller is sized by flex, so its own
+            height says nothing about how tall the thread inside it is. */}
+        <div ref={content}>
+          {groups.length === 0 ? (
+            <ThreadIntro peer={peer} name={name} />
+          ) : (
+            groups.map((group) => (
+              <section key={group.label} className="mb-1">
+                {/* In the thread, not above it. A pinned pill keeps the date in
+                    reach on a long day, but it does it by crossing whatever is
+                    passing underneath — and a date is not worth reading over
+                    somebody's words. It scrolls away with the day it opens. */}
+                <div className="my-3 flex justify-center">
+                  <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
+                    {group.label}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {group.messages.map((message, index) => {
+                    const outgoing = message.direction === "out"
+                    const opens = opensTurn(group.messages[index - 1], message)
+                    return (
+                      <div key={message.id} className="flex items-start gap-2">
+                        {/* A gutter held open for the whole run, so the rest of
+                            what somebody says does not step out from under the
+                            face that opened it. */}
+                        <div className="w-8 shrink-0">
+                          {opens &&
+                            (outgoing ? (
+                              // Nothing to open about yourself here: a thread has
+                              // one other person in it, and they are who the
+                              // sheet is about.
+                              <AddressAvatar address={owner} size="sm" />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setShowing(true)}
+                                aria-label={t("chat.about", { name: labelIn(names, peer) })}
+                                className="block active:opacity-60"
+                              >
+                                <AddressAvatar address={peer} size="sm" />
+                              </button>
+                            ))}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          {opens && (
+                            <p className="text-muted-foreground mb-0.5 ml-1 max-w-full truncate text-[13px] font-semibold">
+                              {outgoing ? t("chat.you") : labelIn(names, peer)}
+                            </p>
+                          )}
+                          <MessageBubble
+                            message={message}
+                            onRetry={onRetry}
+                            onOpenInvite={onOpenInvite}
+                            onOpenContact={onOpenContact}
+                            onOpenCode={onOpenCode}
+                            channelOpen={!shut}
+                            stamped={carriesTime(message, group.messages[index + 1])}
+                          />
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        {opens && (
-                          <p className="text-muted-foreground mb-0.5 ml-1 max-w-full truncate text-[13px] font-semibold">
-                            {outgoing ? t("chat.you") : labelIn(names, peer)}
-                          </p>
-                        )}
-                        <MessageBubble
-                          message={message}
-                          onRetry={onRetry}
-                          onOpenInvite={onOpenInvite}
-                          onOpenContact={onOpenContact}
-                          onOpenCode={onOpenCode}
-                          channelOpen={!shut}
-                          stamped={carriesTime(message, group.messages[index + 1])}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          ))
-        )}
-        <div ref={bottom} />
+                    )
+                  })}
+                </div>
+              </section>
+            ))
+          )}
+          <div ref={bottom} />
+        </div>
       </div>
 
       {shut && (
