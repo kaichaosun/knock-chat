@@ -43,6 +43,8 @@ export const en = {
     aGroup: "a group",
     youLeft: "You left {{amount}}",
     leftForRoom: "Left {{amount}} for the room",
+    reacted: "Reacted {{emoji}}",
+    youReacted: "You reacted {{emoji}}",
     unsupported: "Unsupported message",
   },
   inbox: {

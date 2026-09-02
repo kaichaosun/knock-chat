@@ -19,6 +19,7 @@ import type { Message } from "@/lib/messages"
 import { segments } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
 import { useLinkPreview } from "@/hooks/use-link-preview"
+import type { Reacted } from "@/lib/reactions"
 import { ownCode, type Code } from "@/lib/knock-code"
 import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
 import { unquote, type Quote } from "@/lib/quote"
@@ -36,6 +37,8 @@ export function MessageBubble({
   onOpenQuote,
   onOpenCode,
   channelOpen,
+  reactions,
+  onReact,
   owner = null,
   stamped = true,
   selectable = true,
@@ -69,6 +72,10 @@ export function MessageBubble({
   onOpenCode?: (code: Code) => void
   /** Whether messages can get through at all right now. */
   channelOpen: boolean
+  /** What people have put on this message. Absent where nothing is. */
+  reactions?: Reacted[]
+  /** Put one on, or take yours off by naming the one you already gave. */
+  onReact?: (emoji: string) => void
   /** Your address: what a gift card is drawn against, and who a mention of you is. */
   owner?: string | null
   /**
@@ -193,6 +200,10 @@ export function MessageBubble({
         )}
 
         {payload.kind === "text" && <LinkCard text={payload.text} faded={failed} />}
+
+        {reactions && reactions.length > 0 && (
+          <Reactions reactions={reactions} onReact={onReact} />
+        )}
 
         {(stamped || unsettled) && (
           <div
@@ -394,6 +405,47 @@ function Mention({
     <button type="button" {...tap} className={cn(className, "active:opacity-60")}>
       {label}
     </button>
+  )
+}
+
+/**
+ * What people thought of a message.
+ *
+ * Under the bubble rather than in it, because a reaction is not part of what
+ * was said — and because the bubble belongs to whoever wrote it while this
+ * belongs to everybody else.
+ *
+ * Yours is marked, and tapping it again takes it off — which is why the pill
+ * stays where it is rather than moving to the front or dropping out. A row that
+ * rearranges itself under a thumb is a row that gets tapped twice by accident.
+ */
+function Reactions({
+  reactions,
+  onReact,
+}: {
+  reactions: Reacted[]
+  onReact?: (emoji: string) => void
+}) {
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {reactions.map(({ emoji, count, mine }) => (
+        <button
+          key={emoji}
+          type="button"
+          disabled={!onReact}
+          onClick={() => onReact?.(emoji)}
+          aria-pressed={mine}
+          className={cn(
+            "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] transition-colors",
+            mine ? "border-primary/40 bg-primary/10" : "bg-card active:bg-muted",
+          )}
+        >
+          <span className="text-[13px] leading-none">{emoji}</span>
+          {/* Only once it means more than the emoji already does. */}
+          {count > 1 && <span className="text-muted-foreground tabular-nums">{count}</span>}
+        </button>
+      ))}
+    </div>
   )
 }
 

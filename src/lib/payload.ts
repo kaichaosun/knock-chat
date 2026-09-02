@@ -34,7 +34,7 @@ import { addressFrom, shortenAddress } from "./address"
 import { groupIdFrom } from "./group-link"
 import { segments } from "./mentions"
 import { labelIn, snapshot } from "./names"
-import { unquote } from "./quote"
+import { isTag, unquote } from "./quote"
 import { formatNim } from "./postage"
 
 const FRAME = "\u001fknock1\n"
@@ -103,12 +103,41 @@ export type ContactNote = {
   name: string
 }
 
+/**
+ * How somebody answered a message without saying anything.
+ *
+ * Carried as a message of its own, because it has to be: a direct message is
+ * sealed and the relay drops it the moment it is collected, so there is nowhere
+ * else for a reaction to live that both ends can see. One mechanism serves a
+ * room and a chat alike, and neither needs the relay to know what a reaction
+ * is.
+ *
+ * The cost is paid by clients that predate this: a frame they do not recognise
+ * is drawn as "something it can't display", so a room full of reactions reads
+ * as a room full of gaps to a phone that has not updated. Chosen deliberately
+ * over hiding a reaction inside ordinary text — this says what it is, and what
+ * it is cannot be mistaken for something somebody typed.
+ */
+export type Reaction = {
+  /** The message reacted to, named the way a quote names one — see `lib/quote`. */
+  to: string
+  /**
+   * One emoji, or nothing at all.
+   *
+   * Empty is how a reaction is taken back. Every reaction is a message and
+   * messages only ever arrive, so the last one somebody sent about a message is
+   * the one that counts, and an empty one counts as none.
+   */
+  emoji: string
+}
+
 export type Payload =
   | { kind: "text"; text: string }
   | { kind: "payment"; payment: Payment }
   | { kind: "invite"; invite: Invite }
   | { kind: "gift"; giftNote: GiftNote }
   | { kind: "contact"; contact: ContactNote }
+  | { kind: "reaction"; reaction: Reaction }
   /** A frame this build does not understand — a newer client, or damage. */
   | { kind: "unknown" }
 
@@ -132,6 +161,10 @@ export function contactNote(address: string, name: string): Payload {
   return { kind: "contact", contact: { address, name } }
 }
 
+export function reaction(to: string, emoji: string): Payload {
+  return { kind: "reaction", reaction: { to, emoji } }
+}
+
 /** Turn a payload into the plaintext that gets encrypted. */
 export function encode(payload: Payload): string {
   if (payload.kind === "text") return payload.text
@@ -146,6 +179,9 @@ export function encode(payload: Payload): string {
   }
   if (payload.kind === "contact") {
     return FRAME + JSON.stringify({ kind: "contact", ...payload.contact })
+  }
+  if (payload.kind === "reaction") {
+    return FRAME + JSON.stringify({ kind: "reaction", ...payload.reaction })
   }
   // `unknown` is something this build received and could not read. Re-encoding
   // it would mean claiming to have understood it.
@@ -201,6 +237,15 @@ export function decode(plain: string): Payload {
       return { kind: "contact", contact: { address, name } }
     }
 
+    if (value.kind === "reaction") {
+      // A reaction to nothing is a reaction nothing can be drawn against, and
+      // the tag is the only part of it this can check.
+      const to = typeof value.to === "string" ? value.to.toLowerCase() : ""
+      if (!isTag(to)) return { kind: "unknown" }
+      const emoji = typeof value.emoji === "string" ? [...value.emoji.trim()].slice(0, 4).join("") : ""
+      return { kind: "reaction", reaction: { to, emoji } }
+    }
+
     if (value.kind === "invite") {
       // A room id that is not a room id points at nothing openable, and a card
       // for it would be a button that cannot work.
@@ -252,6 +297,13 @@ export function preview(plain: string, direction: "in" | "out"): string {
       return direction === "out"
         ? t("preview.youShared", { room: who })
         : t("preview.sharedWithYou", { name: who })
+    }
+    case "reaction": {
+      // Named rather than shown: a chat list saying only "👍" is a list that
+      // says nothing, and the message it answers is not this one.
+      const { emoji } = payload.reaction
+      if (!emoji) return t("preview.unsupported")
+      return t(direction === "out" ? "preview.youReacted" : "preview.reacted", { emoji })
     }
     case "unknown":
       return t("preview.unsupported")

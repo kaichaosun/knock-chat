@@ -35,12 +35,23 @@ export function AttachMenu({
   onOpenChange,
   title,
   actions,
+  reactions,
+  onReact,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** What this particular menu is offering. Defaults to the composer's own. */
   title?: string
   actions: AttachAction[]
+  /**
+   * The emoji offered above the rows, and which of them are already yours.
+   *
+   * A row rather than a list item, because answering with one is not the same
+   * kind of act as the things below it: those each open something, and this one
+   * is finished the moment it is tapped.
+   */
+  reactions?: { emoji: string; mine: boolean }[]
+  onReact?: (emoji: string) => void
 }) {
   const { t } = useTranslation()
   return (
@@ -56,6 +67,30 @@ export function AttachMenu({
         <SheetHeader className="px-0 pb-0">
           <SheetTitle>{title ?? t("attach.title")}</SheetTitle>
         </SheetHeader>
+
+        {reactions && onReact && (
+          <div className="flex justify-between gap-1 pb-2">
+            {reactions.map(({ emoji, mine }) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => {
+                  onOpenChange(false)
+                  onReact(emoji)
+                }}
+                aria-pressed={mine}
+                className={cn(
+                  "flex size-12 items-center justify-center rounded-2xl text-2xl transition-colors",
+                  // Yours is marked rather than removed from the row: tapping
+                  // it again is how it comes off, so it has to still be there.
+                  mine ? "bg-accent" : "active:bg-muted",
+                )}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
 
         <ul className="space-y-2 pb-8">
           {actions.map((action) => (

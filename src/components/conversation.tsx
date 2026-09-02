@@ -30,7 +30,9 @@ import { carriesTime, opensTurn, type Message } from "@/lib/messages"
 import { copyText } from "@/lib/clipboard"
 import { givenNameIn, labelIn, nameIn } from "@/lib/names"
 import { preview } from "@/lib/payload"
-import { QUOTE_ID_LEN, unquote, type Quote } from "@/lib/quote"
+import { encode, reaction } from "@/lib/payload"
+import { tagOf, unquote, type Quote } from "@/lib/quote"
+import { CHOICES, fold, mineOn } from "@/lib/reactions"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
@@ -215,17 +217,6 @@ export function Conversation({
   }
 
   /**
-   * The piece of a message's id a quote carries, or nothing.
-   *
-   * Only a message the relay has named has one — the same rule a room follows,
-   * and for the same reason: a `local:` id means nothing to the other side.
-   */
-  const tagOf = (message: Message): string | undefined =>
-    message.id.startsWith("relay:")
-      ? message.id.slice("relay:".length).replace(/-/g, "").slice(0, QUOTE_ID_LEN).toLowerCase()
-      : undefined
-
-  /**
    * Answer a message, putting what it said above whatever is written next.
    *
    * The author is the name they *publish*, never the one you gave them: a
@@ -238,7 +229,7 @@ export function Conversation({
     setAnswering({
       author: givenNameIn(names, who) ?? shortenAddress(who),
       said: preview(message.body, "in"),
-      id: tagOf(message),
+      id: tagOf(message.id),
     })
   }
 
@@ -251,7 +242,7 @@ export function Conversation({
   const jumpTo = (from: Message) => {
     const { quote } = unquote(from.body)
     if (!quote?.id) return
-    const found = messages.find((message) => tagOf(message) === quote.id)
+    const found = shown.find((message) => tagOf(message.id) === quote.id)
     const node = found && rows.current.get(found.id)
     if (!found || !node?.isConnected) {
       toast(t("room.quotedNotHere"))
@@ -260,7 +251,22 @@ export function Conversation({
     node.scrollIntoView({ block: "center", behavior: "smooth" })
   }
 
-  const groups = useMemo(() => groupByDay(messages), [messages])
+  /**
+   * The thread, with reactions taken out of it and put on what they answered.
+   *
+   * Every reaction is a message — see `lib/reactions` — so this is where a
+   * thread stops being what arrived and becomes what is read.
+   */
+  const { shown, on } = useMemo(() => fold(messages, owner), [messages, owner])
+
+  /** Put one on, or take yours off by naming the one you already gave. */
+  const react = (message: Message, emoji: string) => {
+    const tag = tagOf(message.id)
+    if (!tag) return
+    onSend(encode(reaction(tag, mineOn(on.get(message.id), emoji) ? "" : emoji)))
+  }
+
+  const groups = useMemo(() => groupByDay(shown), [shown])
 
   return (
     <div className="flex h-full flex-col">
@@ -417,6 +423,8 @@ export function Conversation({
                                 onOpenCode={onOpenCode}
                                 onOpenQuote={() => jumpTo(message)}
                                 channelOpen={!shut}
+                                reactions={on.get(message.id)}
+                                onReact={(emoji) => react(message, emoji)}
                                 owner={owner}
                                 stamped={carriesTime(message, group.messages[index + 1])}
                                 // The press belongs to the message now, so the
@@ -491,6 +499,12 @@ export function Conversation({
               ]
             : []
         }
+        reactions={
+          held && tagOf(held.id)
+            ? CHOICES.map((emoji) => ({ emoji, mine: mineOn(on.get(held.id), emoji) }))
+            : undefined
+        }
+        onReact={(emoji) => held && react(held, emoji)}
       />
 
       <AttachMenu

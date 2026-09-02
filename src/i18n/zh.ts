@@ -45,6 +45,8 @@ export const zh: Dictionary = {
     aGroup: "一个群组",
     youLeft: "你留下了 {{amount}}",
     leftForRoom: "为群组留下了 {{amount}}",
+    reacted: "回应了 {{emoji}}",
+    youReacted: "你回应了 {{emoji}}",
     unsupported: "不支持的消息",
   },
   inbox: {

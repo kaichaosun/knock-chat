@@ -76,6 +76,26 @@ export type Quote = {
  */
 export const QUOTE_ID_LEN = 8
 
+/**
+ * The piece of a message's id that points at it, or nothing.
+ *
+ * Only a message the relay has named has one: a message still on its way is
+ * called `local:` something this device invented, which would mean nothing to
+ * whoever read the reply. Lives here rather than in the two threads that need
+ * it, because the length above is the whole of the format and the two must not
+ * drift.
+ */
+export function tagOf(id: string): string | undefined {
+  return id.startsWith("relay:")
+    ? id.slice("relay:".length).replace(/-/g, "").slice(0, QUOTE_ID_LEN).toLowerCase()
+    : undefined
+}
+
+/** Whether a string is the shape [`tagOf`] produces. */
+export function isTag(value: string): boolean {
+  return new RegExp(`^[0-9a-f]{${QUOTE_ID_LEN}}$`).test(value)
+}
+
 /** Long enough for a name or a shortened address, and no longer. */
 const MAX_AUTHOR = 48
 /**

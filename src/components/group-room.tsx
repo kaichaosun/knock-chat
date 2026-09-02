@@ -32,8 +32,9 @@ import { useNames } from "@/hooks/use-names"
 import type { Code } from "@/lib/knock-code"
 import { copyText } from "@/lib/clipboard"
 import { shortenAddress } from "@/lib/address"
-import { preview } from "@/lib/payload"
-import { QUOTE_ID_LEN, unquote, type Quote } from "@/lib/quote"
+import { encode, preview, reaction } from "@/lib/payload"
+import { tagOf, unquote, type Quote } from "@/lib/quote"
+import { CHOICES, fold, mineOn } from "@/lib/reactions"
 import { cn } from "@/lib/utils"
 import { givenNameIn, labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
@@ -346,7 +347,7 @@ export function GroupRoom({
   const jumpTo = (from: Message) => {
     const { quote } = unquote(from.body)
     if (!quote?.id) return
-    const found = messages.find((message) => tagOf(message) === quote.id)
+    const found = shown.find((message) => tagOf(message.id) === quote.id)
     const node = found && rows.current.get(found.id)
     if (!found || !node?.isConnected) {
       toast(t("room.quotedNotHere"))
@@ -396,21 +397,9 @@ export function GroupRoom({
     setAnswering({
       author: givenNameIn(names, who) ?? shortenAddress(who),
       said: preview(message.body, "in"),
-      id: tagOf(message),
+      id: tagOf(message.id),
     })
   }
-
-  /**
-   * The piece of a message's id that a quote carries, or nothing.
-   *
-   * Only a message the relay has named has one. A message still on its way is
-   * called `local:` something this device made up, which would mean nothing to
-   * whoever read the reply.
-   */
-  const tagOf = (message: Message): string | undefined =>
-    message.id.startsWith("relay:")
-      ? message.id.slice("relay:".length).replace(/-/g, "").slice(0, QUOTE_ID_LEN).toLowerCase()
-      : undefined
 
   const copy = async (message: Message) => {
     setHeld(null)
@@ -510,7 +499,22 @@ export function GroupRoom({
     }
   }
 
-  const groups = useMemo(() => groupByDay(messages), [messages])
+  /**
+   * The room, with reactions taken out of it and put on what they answered.
+   *
+   * Every reaction is a message — see `lib/reactions` — so this is where a room
+   * stops being what arrived and becomes what is read.
+   */
+  const { shown, on } = useMemo(() => fold(messages, owner), [messages, owner])
+
+  /** Put one on, or take yours off by naming the one you already gave. */
+  const react = (message: Message, emoji: string) => {
+    const tag = tagOf(message.id)
+    if (!tag) return
+    onSay(encode(reaction(tag, mineOn(on.get(message.id), emoji) ? "" : emoji)))
+  }
+
+  const groups = useMemo(() => groupByDay(shown), [shown])
   // The room, not the handful of members the details carry — those are capped
   // at ten and would have a room of thousands calling itself ten.
   const memberCount = detail?.member_count ?? detail?.members.length ?? 0
@@ -716,6 +720,8 @@ export function GroupRoom({
                                   onOpenCode={onOpenCode}
                                   onOpenMention={setShowing}
                                   onOpenQuote={() => jumpTo(message)}
+                                  reactions={on.get(message.id)}
+                                  onReact={(emoji) => react(message, emoji)}
                                   channelOpen
                                   owner={owner}
                                   stamped={stamped}
@@ -831,6 +837,8 @@ export function GroupRoom({
                                 onOpenCode={onOpenCode}
                                 onOpenMention={setShowing}
                                 onOpenQuote={() => jumpTo(message)}
+                                reactions={on.get(message.id)}
+                                onReact={(emoji) => react(message, emoji)}
                                 channelOpen
                                 owner={owner}
                                 stamped={stamped}
@@ -937,6 +945,12 @@ export function GroupRoom({
               ]
             : []
         }
+        reactions={
+          held && tagOf(held.id)
+            ? CHOICES.map((emoji) => ({ emoji, mine: mineOn(on.get(held.id), emoji) }))
+            : undefined
+        }
+        onReact={(emoji) => held && react(held, emoji)}
       />
 
       {onGift && (
