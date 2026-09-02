@@ -1261,6 +1261,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onSay={onSay}
         onRetrySay={onRetrySay}
         onOpenContact={setShowingContact}
+        onOpenCode={openCode}
         onShareContact={(address) => shareContact((body) => onSay(body), address)}
         onRefreshDetail={() => {
           void refreshGroupDetail()
@@ -1288,6 +1289,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       onPay={onPay}
       onOpenInvite={openInvite}
       onOpenContact={setShowingContact}
+      onOpenCode={openCode}
       onShareContact={(address) => shareContact((body) => onSend(body), address)}
       onShowSidebar={wide && !sidebarOpen ? () => setSidebarOpen(true) : undefined}
     />

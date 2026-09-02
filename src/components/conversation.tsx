@@ -11,6 +11,7 @@ import { PickContactSheet } from "@/components/pick-contact-sheet"
 import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
+import type { Code } from "@/lib/knock-code"
 import { shortenAddress } from "@/lib/address"
 import { canBeReached } from "@/lib/keys"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
@@ -34,6 +35,7 @@ export function Conversation({
   onPay,
   onOpenInvite,
   onOpenContact,
+  onOpenCode,
   onShareContact,
   onShowSidebar,
 }: {
@@ -55,6 +57,8 @@ export function Conversation({
   onOpenInvite: (group: string) => void
   /** Open the door a shared contact points at. */
   onOpenContact: (address: string) => void
+  /** Take a link that leads back into Knock without leaving the app. */
+  onOpenCode: (code: Code) => void
   /** Post somebody's contact into this chat. */
   onShareContact: (address: string) => void
   /** Restore the desktop thread list after it has been hidden. */
@@ -248,6 +252,7 @@ export function Conversation({
                           onRetry={onRetry}
                           onOpenInvite={onOpenInvite}
                           onOpenContact={onOpenContact}
+                          onOpenCode={onOpenCode}
                           channelOpen={!shut}
                           stamped={carriesTime(message, group.messages[index + 1])}
                         />

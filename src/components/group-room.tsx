@@ -29,6 +29,7 @@ import { PullIndicator } from "@/components/pull-indicator"
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
 import { useMentionSearch } from "@/hooks/use-mention-search"
 import { useNames } from "@/hooks/use-names"
+import type { Code } from "@/lib/knock-code"
 import { copyText } from "@/lib/clipboard"
 import { shortenAddress } from "@/lib/address"
 import { preview } from "@/lib/payload"
@@ -62,6 +63,7 @@ export function GroupRoom({
   onOpenChat,
   onOpenInvite,
   onOpenContact,
+  onOpenCode,
   onShareContact,
   onInvite,
   onGift,
@@ -93,6 +95,8 @@ export function GroupRoom({
   onOpenInvite: (group: string) => void
   /** Open the door a shared contact points at. */
   onOpenContact: (address: string) => void
+  /** Take a link that leads back into Knock without leaving the app. */
+  onOpenCode: (code: Code) => void
   /** Post somebody's contact into this room. */
   onShareContact: (address: string) => void
   /** Send this room's invite into your chat with somebody. */
@@ -666,6 +670,7 @@ export function GroupRoom({
                                 onRetry={onRetrySay}
                                 onOpenInvite={onOpenInvite}
                                 onOpenContact={onOpenContact}
+                                onOpenCode={onOpenCode}
                                 onOpenMention={setShowing}
                                 onOpenQuote={() => jumpTo(message)}
                                 channelOpen
@@ -780,6 +785,7 @@ export function GroupRoom({
                               onRetry={onRetrySay}
                               onOpenInvite={onOpenInvite}
                               onOpenContact={onOpenContact}
+                              onOpenCode={onOpenCode}
                               onOpenMention={setShowing}
                               onOpenQuote={() => jumpTo(message)}
                               channelOpen

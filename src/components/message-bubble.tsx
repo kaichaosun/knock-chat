@@ -18,6 +18,7 @@ import { useNames } from "@/hooks/use-names"
 import type { Message } from "@/lib/messages"
 import { segments } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
+import { ownCode, type Code } from "@/lib/knock-code"
 import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
 import { unquote, type Quote } from "@/lib/quote"
 import { shortenAddress } from "@/lib/address"
@@ -32,6 +33,7 @@ export function MessageBubble({
   onOpenContact,
   onOpenMention,
   onOpenQuote,
+  onOpenCode,
   channelOpen,
   owner = null,
   stamped = true,
@@ -57,6 +59,13 @@ export function MessageBubble({
    * back through — and the quote is then drawn but not tappable.
    */
   onOpenQuote?: () => void
+  /**
+   * Open something in a link that leads back into Knock.
+   *
+   * Absent where there is nothing to open it with, and such a link is then an
+   * ordinary link that reloads the app to arrive where it already is.
+   */
+  onOpenCode?: (code: Code) => void
   /** Whether messages can get through at all right now. */
   channelOpen: boolean
   /** Your address: what a gift card is drawn against, and who a mention of you is. */
@@ -151,6 +160,7 @@ export function MessageBubble({
                 outgoing={outgoing}
                 onOpen={onOpenMention}
                 onOpenQuote={onOpenQuote}
+                onOpenCode={onOpenCode}
               />
             ) : (
               // Something a newer build sent that this one has no way to draw.
@@ -194,11 +204,13 @@ function Answering({
   outgoing,
   onOpen,
   onOpenQuote,
+  onOpenCode,
 }: {
   text: string
   outgoing: boolean
   onOpen?: (address: string) => void
   onOpenQuote?: () => void
+  onOpenCode?: (code: Code) => void
 }) {
   const { quote, body } = unquote(text)
   return (
@@ -209,7 +221,7 @@ function Answering({
         // than no control.
         <Quoted quote={quote} outgoing={outgoing} onOpen={quote.id ? onOpenQuote : undefined} />
       )}
-      <Words text={body} outgoing={outgoing} onOpen={onOpen} />
+      <Words text={body} outgoing={outgoing} onOpen={onOpen} onOpenCode={onOpenCode} />
     </>
   )
 }
@@ -263,10 +275,12 @@ function Words({
   text,
   outgoing,
   onOpen,
+  onOpenCode,
 }: {
   text: string
   outgoing: boolean
   onOpen?: (address: string) => void
+  onOpenCode?: (code: Code) => void
 }) {
   const parts = useMemo(() => segments(text), [text])
   return (
@@ -275,7 +289,13 @@ function Words({
         part.kind === "text" ? (
           <Fragment key={index}>{part.text}</Fragment>
         ) : part.kind === "link" ? (
-          <Link key={index} text={part.text} href={part.href} outgoing={outgoing} />
+          <Link
+            key={index}
+            text={part.text}
+            href={part.href}
+            outgoing={outgoing}
+            onOpenCode={onOpenCode}
+          />
         ) : (
           <Mention key={index} address={part.address} outgoing={outgoing} onOpen={onOpen} />
         ),
@@ -374,12 +394,35 @@ function Mention({
  * carry room ids and addresses in their query strings, so the referrer is not
  * a small thing to hand over. `noopener` keeps the opened page from reaching
  * back through `window.opener`.
+ *
+ * A link back into Knock is the exception, and stays inside — see [`ownCode`].
+ * It is still written as a link rather than a button: it is one, it can be
+ * copied and shared as one, and if this never runs the browser still gets
+ * somewhere right.
  */
-function Link({ text, href, outgoing }: { text: string; href: string; outgoing: boolean }) {
-  const tap = useTap()
+function Link({
+  text,
+  href,
+  outgoing,
+  onOpenCode,
+}: {
+  text: string
+  href: string
+  outgoing: boolean
+  onOpenCode?: (code: Code) => void
+}) {
+  const code = onOpenCode ? ownCode(href, window.location.origin) : null
+  const tap = useTap(code && onOpenCode ? () => onOpenCode(code) : undefined)
   return (
     <a
       {...tap}
+      onClick={(event) => {
+        // Ours, so there is nowhere to go: following it would restart the app
+        // to arrive where it is already standing. Refused before the press is
+        // weighed, so a long press does not leave either.
+        if (code) event.preventDefault()
+        tap.onClick(event)
+      }}
       href={href}
       target="_blank"
       rel="noopener noreferrer"

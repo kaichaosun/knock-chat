@@ -37,3 +37,28 @@ export function readCode(text: string): Code | null {
 
   return null
 }
+
+/**
+ * A code in a link that leads back to this app, or `null` for one that leads
+ * away.
+ *
+ * A room's invite link is an ordinary URL. It travels in a message like any
+ * other and is drawn as a tappable link — and followed as one it reloads the
+ * whole app to reach somewhere the app is already standing: a second tab in a
+ * browser, and inside Nimiq Pay the Mini App torn down and started again, to
+ * show a sheet that could have opened where it was.
+ *
+ * Only this app's own origin, and the origin is passed in rather than read from
+ * the window so that what counts as "ours" is the caller's to state. A uuid in
+ * somebody else's URL is somebody else's uuid, and a link that goes somewhere
+ * has to be allowed to go there.
+ */
+export function ownCode(href: string, origin: string): Code | null {
+  let url: URL
+  try {
+    url = new URL(href)
+  } catch {
+    return null
+  }
+  return url.origin === origin ? readCode(href) : null
+}
