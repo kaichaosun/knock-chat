@@ -14,6 +14,14 @@ const COMMIT_PX = 45
  * after the decision it was meant to influence.
  */
 const AXIS_PX = 5
+/**
+ * How recently a finger must have landed for a `contextmenu` to be its doing.
+ *
+ * Comfortably past the ~500ms a browser waits before raising one, and far short
+ * of anything somebody would call a separate gesture.
+ */
+const TOUCH_MENU_MS = 1500
+
 /** How long a finger has to stay put before it counts as a press rather than
  *  the start of a swipe. */
 const HOLD_MS = 450
@@ -112,6 +120,20 @@ export function SwipeRow({
   // opening the thread behind the menu that just opened would be a surprise.
   const holding = useRef<ReturnType<typeof setTimeout> | null>(null)
   const held = useRef(false)
+  /**
+   * When a finger last landed on this row.
+   *
+   * Kept for one question, asked below: a `contextmenu` is a right-click on a
+   * desktop and a long press on Android, and only one of those was meant to
+   * open anything.
+   *
+   * A time rather than a flag, because a flag has to be cleared and there is no
+   * safe moment to clear it. Chrome may cancel the touch *before* raising the
+   * menu, which would clear it too early; never clearing it would leave a
+   * touchscreen laptop unable to right-click afterwards. A stamp answers the
+   * question — was a finger involved — whatever order the events arrive in.
+   */
+  const fingered = useRef(0)
   const [drag, setDrag] = useState(0)
 
   /**
@@ -219,6 +241,7 @@ export function SwipeRow({
         style={{ transform: `translateX(${-distance}px)` }}
         onTouchStart={(event) => {
           const touch = event.touches[0]
+          fingered.current = Date.now()
           start.current = { x: touch.clientX, y: touch.clientY }
           swiped.current = false
           axis.current = null
@@ -235,8 +258,14 @@ export function SwipeRow({
           onMenu &&
           ((event) => {
             // The browser's own menu offers nothing for a row like this, and
-            // having both would bury ours under it.
+            // having both would bury ours under it. Refused either way.
             event.preventDefault()
+            // A right-click, which is what this was written for — a mouse has
+            // neither of the gestures above and would otherwise reach nothing.
+            // Android raises the same event for a held finger, and answering it
+            // there put a confirmation in front of anyone who rested a thumb on
+            // a row. Touch has the swipe; this is the other half.
+            if (Date.now() - fingered.current < TOUCH_MENU_MS) return
             onMenu()
           })
         }
