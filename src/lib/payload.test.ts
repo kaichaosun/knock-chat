@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import { contactNote, decode, encode, giftNote, invite, payment, preview, text } from "./payload"
+import { mentionOf } from "./mentions"
+import { remember } from "./names"
 
 /** The frame marker, spelled out here so a test can forge one by hand. */
 const FRAME = "\u001fknock1\n"
@@ -227,5 +229,23 @@ describe("the frame itself", () => {
     // message, so "this is not text" stays a decision rather than a guess.
     expect(decode("\u001f")).toEqual({ kind: "text", text: "\u001f" })
     expect(decode("hello")).toEqual({ kind: "text", text: "hello" })
+  })
+})
+
+describe("a message that names somebody", () => {
+  /** Checksummed, the same vector the rest of the tests use. */
+  const ALICE = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
+
+  it("reads as the name when that is all it says", () => {
+    // One mention and nothing else splits into a single part, which used to be
+    // mistaken for a message with nothing in it worth looking up — so the
+    // commonest way to name somebody came out as the raw address.
+    remember({ [ALICE.replace(/\s/g, "")]: "Alice" })
+    expect(preview(mentionOf(ALICE), "in")).toBe("@Alice")
+  })
+
+  it("reads as the name among words", () => {
+    remember({ [ALICE.replace(/\s/g, "")]: "Alice" })
+    expect(preview(`hey ${mentionOf(ALICE)}`, "in")).toBe("hey @Alice")
   })
 })

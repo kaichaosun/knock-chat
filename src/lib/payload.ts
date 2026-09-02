@@ -360,7 +360,13 @@ export function preview(plain: string, direction: "in" | "out"): string {
 function spoken(text: string): string {
   const parts = segments(text)
   // Nothing was named, which is nearly every message. Left exactly as it came.
-  if (parts.length <= 1) return text
+  //
+  // Counted by what the parts *are*, not how many there are. A message that is
+  // nothing but a mention splits into exactly one part — and that one part is
+  // the mention, so a count of one was reading the commonest way to name
+  // somebody as the one case where nobody had been named. It came out as the
+  // raw address, in a chat list and in every quote of it.
+  if (parts.every((part) => part.kind === "text")) return text
   const directory = snapshot()
   return parts
     .map((part) =>
