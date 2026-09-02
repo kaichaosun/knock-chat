@@ -491,6 +491,9 @@ function Pill({
         // has nothing to offer about a chip like this.
         if (!onShow) return
         event.preventDefault()
+        // Stopped here, or the message behind it answers as well and two
+        // sheets open on one click.
+        event.stopPropagation()
         onShow(reacted)
       }}
       onClick={() => {

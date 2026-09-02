@@ -726,6 +726,15 @@ export function GroupRoom({
                               // it. Both arrive before a 500ms timer can, so the
                               // gesture has to be claimed rather than shared.
                               onPointerDown={(event) => holdStart(() => openFor(message), event)}
+                              onContextMenu={(event) => {
+                                // The pointer's way to the hold. Its own menu
+                                // is refused because ours is the one with
+                                // anything in it — and Copy, the only thing the
+                                // browser's would have offered, is already a
+                                // row of ours.
+                                event.preventDefault()
+                                openFor(message)
+                              }}
                               onPointerMove={holdMove}
                               onPointerUp={holdCancel}
                               onPointerCancel={holdCancel}
@@ -848,6 +857,14 @@ export function GroupRoom({
                           <div
                             className="group/msg relative flex items-start"
                             onPointerDown={(event) => holdStart(() => openFor(message), event)}
+                            onContextMenu={(event) => {
+                              // The pointer's way to the hold. Its own menu is
+                              // refused because ours is the one with anything
+                              // in it — and Copy, the only thing the browser's
+                              // would have offered, is already a row of ours.
+                              event.preventDefault()
+                              openFor(message)
+                            }}
                             onPointerMove={holdMove}
                             onPointerUp={holdCancel}
                             onPointerCancel={holdCancel}
