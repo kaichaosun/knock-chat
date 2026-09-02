@@ -289,6 +289,14 @@ export type GroupDetail = {
   names: Names
   /** Whether the room is at the relay's member limit, so nobody else fits. */
   full?: boolean
+  /**
+   * Whether you are already in this room.
+   *
+   * The relay's answer, not this device's: the room list here is a poll behind
+   * and cannot speak for a membership that changed somewhere else. What the
+   * door draws depends on it — see `JoinGroupSheet`.
+   */
+  joined?: boolean
 }
 
 /** One page of a room's membership. */

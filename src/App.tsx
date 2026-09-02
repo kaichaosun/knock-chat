@@ -267,6 +267,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [invited, setInvited] = useState<Group | null>(null)
   /** Whether that room has room. Kept beside it, since only the door view says. */
   const [invitedFull, setInvitedFull] = useState(false)
+  /**
+   * Whether you turn out to already be in the room the door leads to.
+   *
+   * Kept beside `invitedFull` and for the same reason: the door is the only
+   * screen that asks, and its answer is the relay's rather than this device's
+   * room list, which cannot speak for a membership that changed elsewhere.
+   */
+  const [invitedJoined, setInvitedJoined] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [pasting, setPasting] = useState(false)
@@ -519,10 +527,12 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       setInviteOpen(true)
       setInviteLoading(true)
       setInvitedFull(false)
+      setInvitedJoined(false)
       inspect(id)
         .then((detail) => {
           setInvited(detail.group)
           setInvitedFull(detail.full ?? false)
+          setInvitedJoined(detail.joined ?? false)
         })
         .catch(() => {
           setInviteOpen(false)
@@ -978,6 +988,27 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    */
   const [showingContact, setShowingContact] = useState<string | null>(null)
 
+  /**
+   * A code somebody tapped inside a conversation.
+   *
+   * Deliberately not [`openCode`], which goes where the code points. Reading a
+   * thread is a place to be, and a tap in the middle of one should not take it
+   * away — so this shows what was tapped and leaves going there as a second,
+   * meant tap. A room opens its door, a person opens their card, and both are
+   * screens you can back out of onto the words you were reading.
+   *
+   * The door knows a member from a stranger and says "open" rather than a price
+   * — see `JoinGroupSheet`. Arriving from outside is the other case entirely:
+   * a link opened cold has no conversation to keep, so it goes straight in.
+   */
+  const openFromMessage = useCallback(
+    (code: Code) => {
+      if (code.kind === "group") openInvite(code.id)
+      else setShowingContact(code.address)
+    },
+    [openInvite],
+  )
+
   /** Knock on a door we already know, reusing the sheet the compose flow uses. */
   const knockOnOpenPeer = useCallback(() => {
     setKnockPeer(openPeer)
@@ -1204,7 +1235,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onOpenChange={setInviteOpen}
         group={invited}
         full={invitedFull}
+        joined={invitedJoined}
         loading={inviteLoading}
+        onOpen={(group) => openRoom(group.id)}
         onJoin={async (group) => {
           const result = await join(group)
           if (result.status === "joined") {
@@ -1261,7 +1294,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onSay={onSay}
         onRetrySay={onRetrySay}
         onOpenContact={setShowingContact}
-        onOpenCode={openCode}
+        onOpenCode={openFromMessage}
         onShareContact={(address) => shareContact((body) => onSay(body), address)}
         onRefreshDetail={() => {
           void refreshGroupDetail()
@@ -1289,7 +1322,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       onPay={onPay}
       onOpenInvite={openInvite}
       onOpenContact={setShowingContact}
-      onOpenCode={openCode}
+      onOpenCode={openFromMessage}
       onShareContact={(address) => shareContact((body) => onSend(body), address)}
       onShowSidebar={wide && !sidebarOpen ? () => setSidebarOpen(true) : undefined}
     />

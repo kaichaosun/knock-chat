@@ -194,6 +194,9 @@ export const en = {
     askFor: "Ask to join — {{amount}} NIM",
     joinFor: "Join — {{amount}} NIM",
     failed: "Couldn't join",
+    openTitle: "Open this group",
+    openAlready: "You're already in this one.",
+    open: "Open",
   },
   joinByLink: {
     title: "Join a group",

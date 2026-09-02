@@ -175,6 +175,9 @@ export const zh: Dictionary = {
     askFor: "申请加入 — {{amount}} NIM",
     joinFor: "加入 — {{amount}} NIM",
     failed: "加入失败",
+    openTitle: "打开这个群组",
+    openAlready: "你已经在这个群组里了。",
+    open: "打开",
   },
   joinByLink: {
     title: "加入群组",
