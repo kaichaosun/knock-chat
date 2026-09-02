@@ -97,11 +97,65 @@ describe("segments", () => {
       `${alice}`,
       "@NQ11V68GX92J86C27P1EALS66CGG0V5EJLKY is nobody",
       "plain words",
+      // A link is matched further than it reaches, so what it gives back has
+      // to land in the text rather than fall out of the message.
+      "see https://nimiq.com.",
+      "(https://nimiq.com), then https://nimiq.com/x?a=1&b=2!",
+      `${alice} https://nimiq.com ${bob}`,
+      "https://",
     ]) {
       const rebuilt = segments(text)
-        .map((segment) => (segment.kind === "text" ? segment.text : mentionOf(segment.address)))
+        .map((segment) =>
+          segment.kind === "mention" ? mentionOf(segment.address) : segment.text,
+        )
         .join("")
       expect(rebuilt, text).toBe(text)
+    }
+  })
+
+  it("finds where a message points", () => {
+    expect(segments("see https://nimiq.com now")).toEqual([
+      { kind: "text", text: "see " },
+      { kind: "link", text: "https://nimiq.com", href: "https://nimiq.com/" },
+      { kind: "text", text: " now" },
+    ])
+  })
+
+  it("hands the full stop back to the sentence", () => {
+    expect(segments("go to https://nimiq.com.")).toEqual([
+      { kind: "text", text: "go to " },
+      { kind: "link", text: "https://nimiq.com", href: "https://nimiq.com/" },
+      { kind: "text", text: "." },
+    ])
+  })
+
+  it("finds a person and a place in the same message", () => {
+    expect(segments(`${alice} https://nimiq.com`)).toEqual([
+      { kind: "mention", address: ALICE },
+      { kind: "text", text: " " },
+      { kind: "link", text: "https://nimiq.com", href: "https://nimiq.com/" },
+    ])
+  })
+
+  it("leaves an address inside a link where it was written", () => {
+    // Whatever starts first takes the run. An address in a query string is
+    // part of where the message points, not somebody it names.
+    const text = `https://knock.chat/?knock=${ALICE.replace(/\s/g, "")}`
+    expect(segments(text)).toEqual([{ kind: "link", text, href: text }])
+  })
+
+  it("keeps something that only looks like a link as the text it is", () => {
+    for (const text of [
+      // No scheme, so it is a word with a dot in it.
+      "nimiq.com",
+      "see index.html for that",
+      // A scheme this will not open.
+      "javascript:alert(1)",
+      "ftp://example.com/file",
+      // Nothing after the slashes to parse.
+      "https://",
+    ]) {
+      expect(segments(text), text).toEqual([{ kind: "text", text }])
     }
   })
 })

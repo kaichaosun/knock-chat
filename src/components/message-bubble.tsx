@@ -133,7 +133,12 @@ export function MessageBubble({
               // ancestor cannot decide that: this class is the more specific
               // one and would win.
               "wrap-anywhere",
-              selectable ? "select-text" : "select-none",
+              // Where a long press means something, the browser must not
+              // answer it as well: on iOS a link raises Open / Copy Link on
+              // its own, and that callout is switched off separately from the
+              // selection. It inherits, so setting it here reaches the links
+              // inside.
+              selectable ? "select-text" : "select-none [-webkit-touch-callout:none]",
               outgoing
                 ? "brand-gradient rounded-br-md text-white shadow-sm"
                 : "bg-muted text-foreground rounded-bl-md",
@@ -269,6 +274,8 @@ function Words({
       {parts.map((part, index) =>
         part.kind === "text" ? (
           <Fragment key={index}>{part.text}</Fragment>
+        ) : part.kind === "link" ? (
+          <Link key={index} text={part.text} href={part.href} outgoing={outgoing} />
         ) : (
           <Mention key={index} address={part.address} outgoing={outgoing} onOpen={onOpen} />
         ),
@@ -293,6 +300,9 @@ const HOLD_MS = 500
  *
  * Deliberately does not stop the press reaching the row — the message's gesture
  * belongs to the whole message, wherever on it a finger lands.
+ *
+ * A link has no `act` of its own, because the browser is what follows it. For
+ * one, this is only the refusal.
  */
 function useTap(act?: () => void) {
   const pressed = useRef<number | null>(null)
@@ -300,10 +310,16 @@ function useTap(act?: () => void) {
     onPointerDown: (event: { pointerType: string }) => {
       pressed.current = event.pointerType === "touch" ? Date.now() : null
     },
-    onClick: () => {
+    onClick: (event: { preventDefault: () => void }) => {
       const began = pressed.current
       pressed.current = null
-      if (began !== null && Date.now() - began >= HOLD_MS) return
+      if (began !== null && Date.now() - began >= HOLD_MS) {
+        // Whatever this would have done, the press has already been spent on
+        // the message's own menu. `preventDefault` is what a link needs: for a
+        // button, returning was always enough.
+        event.preventDefault()
+        return
+      }
       act?.()
     },
   }
@@ -338,6 +354,47 @@ function Mention({
     <button type="button" {...tap} className={cn(className, "active:opacity-60")}>
       {label}
     </button>
+  )
+}
+
+/**
+ * Somewhere a message points.
+ *
+ * What is drawn is the address itself — see `lib/links` — so the label and the
+ * destination are one string and cannot disagree. There is nothing to check
+ * before tapping, which is the whole reason a preview card is a harder problem
+ * than a link.
+ *
+ * Nothing is fetched to draw this. A card carrying a title and a picture would
+ * mean some browser asking that site for them, and which browser that is
+ * decides who gets told what is being read.
+ *
+ * The three attributes are the care. `noreferrer`, with the policy beside it,
+ * stops the site learning where the visitor came from — this app's own links
+ * carry room ids and addresses in their query strings, so the referrer is not
+ * a small thing to hand over. `noopener` keeps the opened page from reaching
+ * back through `window.opener`.
+ */
+function Link({ text, href, outgoing }: { text: string; href: string; outgoing: boolean }) {
+  const tap = useTap()
+  return (
+    <a
+      {...tap}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      referrerPolicy="no-referrer"
+      // Underlined as well as coloured: colour alone is not something everybody
+      // can see, and a link that is only a shade of the text is not a link to
+      // them. The two shades are the mention's, picked by what has to stay
+      // legible against the bubble rather than by whose message it is.
+      className={cn(
+        "underline underline-offset-2",
+        outgoing ? "text-mention-on-brand" : "text-mention",
+      )}
+    >
+      {text}
+    </a>
   )
 }
 

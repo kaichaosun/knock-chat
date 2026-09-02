@@ -272,6 +272,10 @@ function spoken(text: string): string {
   if (parts.length <= 1) return text
   const directory = snapshot()
   return parts
-    .map((part) => (part.kind === "text" ? part.text : `@${labelIn(directory, part.address)}`))
+    .map((part) =>
+      // A link reads as itself in a list: there is nothing to look up and
+      // nowhere to tap, and the address is what somebody sent.
+      part.kind === "mention" ? `@${labelIn(directory, part.address)}` : part.text,
+    )
     .join("")
 }
