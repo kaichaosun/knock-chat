@@ -114,7 +114,19 @@ export function MessageBubble({
     // answered. Four fifths used to leave room for the other side of the
     // thread; with nothing on that side it was a margin nothing went in.
     <div className="flex w-full justify-start">
-      <div className="max-w-[92%]">
+      <div
+        className="max-w-[92%]"
+        // A long press on a link is answered by the browser with a menu of its
+        // own — Open in new tab, Copy link address — and raising it cancels the
+        // pointer stream, which takes the room's hold timer down with it. So a
+        // link was the one thing in a message that could not be held. Refused
+        // here, on the whole column, because the preview card is a link too and
+        // sits outside the bubble.
+        //
+        // Only where the press already means something. A one-to-one thread has
+        // no message menu, and there the browser's own is the only one there is.
+        onContextMenu={selectable ? undefined : (event) => event.preventDefault()}
+      >
         {payload.kind === "payment" ? (
           <PaymentCard payment={payload.payment} outgoing={outgoing} faded={failed} />
         ) : payload.kind === "gift" ? (
@@ -422,6 +434,7 @@ function LinkCard({ text, faded }: { text: string; faded: boolean }) {
   return (
     <a
       {...tap}
+      draggable={false}
       href={preview.url}
       target="_blank"
       rel="noopener noreferrer"
@@ -488,6 +501,7 @@ function Link({
   return (
     <a
       {...tap}
+      draggable={false}
       onClick={(event) => {
         // Ours, so there is nowhere to go: following it would restart the app
         // to arrive where it is already standing. Refused before the press is
