@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import { encode, reaction } from "./payload"
-import { fold, mineOn } from "./reactions"
+import { firstEmoji } from "./emoji"
+import { CHOICES, fold, mineOn, offered, remember } from "./reactions"
 import type { Message } from "./messages"
 
 const ME = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
@@ -119,5 +120,82 @@ describe("fold", () => {
     expect(mineOn(reactions, "👍")).toBe(true)
     expect(mineOn(reactions, "😂")).toBe(false)
     expect(mineOn(undefined, "👍")).toBe(false)
+  })
+})
+
+describe("the row somebody is offered", () => {
+  it("puts what they last used in front of the defaults", () => {
+    expect(offered(["🎉"])).toEqual(["🎉", "👍", "❤️", "😂", "😮", "😢"])
+  })
+
+  it("never shows the same one twice", () => {
+    expect(offered(["👍"])).toEqual(["👍", "❤️", "😂", "😮", "😢", "🙏"])
+  })
+
+  it("is the defaults for somebody who has never reacted", () => {
+    expect(offered([])).toEqual(CHOICES)
+  })
+
+  it("moves one to the front rather than adding it again", () => {
+    expect(remember(["🎉", "👍"], "👍")).toEqual(["👍", "🎉"])
+  })
+
+  it("forgets the oldest once the row is full", () => {
+    const full = ["1", "2", "3", "4", "5", "6"]
+    expect(remember(full, "7")).toEqual(["7", "1", "2", "3", "4", "5"])
+  })
+})
+
+describe("firstEmoji", () => {
+  it("takes one out of whatever was typed", () => {
+    expect(firstEmoji("👍")).toBe("👍")
+    expect(firstEmoji("  🎉  ")).toBe("🎉")
+  })
+
+  it("keeps a joined emoji whole", () => {
+    // Seven code points held together by joiners. Split on characters it would
+    // send a lone man and lose his family.
+    expect(firstEmoji("👨‍👩‍👧‍👦")).toBe("👨‍👩‍👧‍👦")
+    // Two regional indicators, which are not two flags — and not pictographic
+    // either, which is why the test is three properties wide.
+    expect(firstEmoji("🇯🇵")).toBe("🇯🇵")
+    // A digit wearing a keycap. The digit alone is not an emoji.
+    expect(firstEmoji("1️⃣")).toBe("1️⃣")
+    expect(firstEmoji("1")).toBeNull()
+  })
+
+  it("takes the first where there are several", () => {
+    expect(firstEmoji("👍🎉")).toBe("👍")
+  })
+
+  it("says no to anything that is not one", () => {
+    for (const text of ["", "   ", "hello", "1", "👍".normalize("NFD").slice(0, 1)]) {
+      expect(firstEmoji(text), JSON.stringify(text)).toBeNull()
+    }
+  })
+
+  it("refuses a sentence that merely contains one", () => {
+    // The field is for an emoji, and text with one buried in it is text.
+    expect(firstEmoji("nice 👍")).toBeNull()
+  })
+})
+
+describe("what arrives from somebody else", () => {
+  it("refuses a reaction that is not an emoji", () => {
+    // A pill sits beside somebody's words with no room to say where it came
+    // from, so a peer must not be able to put a sentence in one.
+    const target = said(TAG)
+    const shouting: Message = {
+      ...reacted(TAG, "x", "in"),
+      body: encode(reaction(TAG, "LOL")),
+    }
+    const { on } = fold([target, shouting], ME)
+    expect(on.has(target.id)).toBe(false)
+  })
+
+  it("keeps one that is", () => {
+    const target = said(TAG)
+    const { on } = fold([target, reacted(TAG, "🎉", "in")], ME)
+    expect(on.get(target.id)).toEqual([{ emoji: "🎉", count: 1, mine: false }])
   })
 })

@@ -32,7 +32,10 @@ import { givenNameIn, labelIn, nameIn } from "@/lib/names"
 import { preview } from "@/lib/payload"
 import { encode, reaction } from "@/lib/payload"
 import { tagOf, unquote, type Quote } from "@/lib/quote"
-import { CHOICES, fold, mineOn } from "@/lib/reactions"
+import { EmojiSheet } from "@/components/emoji-sheet"
+import { usePrefs } from "@/hooks/use-prefs"
+import { update as savePrefs } from "@/lib/prefs"
+import { fold, mineOn, offered, remember } from "@/lib/reactions"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
@@ -259,10 +262,18 @@ export function Conversation({
    */
   const { shown, on } = useMemo(() => fold(messages, owner), [messages, owner])
 
+  /** What this device reaches for, most recent first. */
+  const { reactions: recent } = usePrefs()
+  /** The message an emoji is being picked for, past the row's six. */
+  const [picking, setPicking] = useState<Message | null>(null)
+
   /** Put one on, or take yours off by naming the one you already gave. */
   const react = (message: Message, emoji: string) => {
     const tag = tagOf(message.id)
     if (!tag) return
+    // Remembered whichever way it went: taking one off is still a sign of
+    // which emoji this hand reaches for.
+    savePrefs({ reactions: remember(recent, emoji) })
     onSend(encode(reaction(tag, mineOn(on.get(message.id), emoji) ? "" : emoji)))
   }
 
@@ -501,10 +512,20 @@ export function Conversation({
         }
         reactions={
           held && tagOf(held.id)
-            ? CHOICES.map((emoji) => ({ emoji, mine: mineOn(on.get(held.id), emoji) }))
+            ? offered(recent).map((emoji) => ({ emoji, mine: mineOn(on.get(held.id), emoji) }))
             : undefined
         }
         onReact={(emoji) => held && react(held, emoji)}
+        onMoreEmoji={held && tagOf(held.id) ? () => setPicking(held) : undefined}
+      />
+
+      <EmojiSheet
+        open={picking !== null}
+        onOpenChange={(open) => !open && setPicking(null)}
+        onPick={(emoji) => {
+          if (picking) react(picking, emoji)
+          setPicking(null)
+        }}
       />
 
       <AttachMenu

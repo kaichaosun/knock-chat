@@ -34,6 +34,7 @@ import { addressFrom, shortenAddress } from "./address"
 import { groupIdFrom } from "./group-link"
 import { segments } from "./mentions"
 import { labelIn, snapshot } from "./names"
+import { firstEmoji } from "./emoji"
 import { isTag, unquote } from "./quote"
 import { formatNim } from "./postage"
 
@@ -242,7 +243,11 @@ export function decode(plain: string): Payload {
       // the tag is the only part of it this can check.
       const to = typeof value.to === "string" ? value.to.toLowerCase() : ""
       if (!isTag(to)) return { kind: "unknown" }
-      const emoji = typeof value.emoji === "string" ? [...value.emoji.trim()].slice(0, 4).join("") : ""
+      // One emoji, or none. A reaction is drawn as a pill beside somebody's
+      // words with no room to say where it came from, so a peer must not be
+      // able to put a sentence there — and reading it as a grapheme is what
+      // keeps a joined emoji whole rather than sending half a family.
+      const emoji = typeof value.emoji === "string" ? (firstEmoji(value.emoji) ?? "") : ""
       return { kind: "reaction", reaction: { to, emoji } }
     }
 

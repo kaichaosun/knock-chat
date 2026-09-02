@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react"
+import { ChevronDown, type LucideIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -37,6 +37,7 @@ export function AttachMenu({
   actions,
   reactions,
   onReact,
+  onMoreEmoji,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -52,6 +53,8 @@ export function AttachMenu({
    */
   reactions?: { emoji: string; mine: boolean }[]
   onReact?: (emoji: string) => void
+  /** Reach past the row, to whatever the device's own keyboard holds. */
+  onMoreEmoji?: () => void
 }) {
   const { t } = useTranslation()
   return (
@@ -70,6 +73,20 @@ export function AttachMenu({
 
         {reactions && onReact && (
           <div className="flex justify-between gap-1 pb-2">
+            {onMoreEmoji && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenChange(false)
+                  onMoreEmoji()
+                }}
+                aria-label={t("room.reactMore")}
+                className="text-muted-foreground active:bg-muted flex size-12 items-center justify-center rounded-2xl transition-colors"
+              >
+                <ChevronDown className="size-6" />
+              </button>
+            )}
+
             {reactions.map(({ emoji, mine }) => (
               <button
                 key={emoji}

@@ -33,6 +33,15 @@ export const en = {
     agree: "By signing in you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
   },
   /** The one-line summary of a thread, built where a message is decoded. */
+  emoji: {
+    faces: "Smileys",
+    gestures: "People",
+    hearts: "Hearts & symbols",
+    animals: "Animals & nature",
+    food: "Food & drink",
+    things: "Objects",
+    places: "Travel & places",
+  },
   preview: {
     youSaid: "You: {{text}}",
     sent: "Sent {{amount}}",
@@ -226,6 +235,8 @@ export const en = {
     addressCopied: "Address copied",
     copyFailed: "Couldn't copy that",
     emptyRoom: "Nothing said here yet. Anyone in the room sees what you write.",
+    reactMore: "More emoji",
+    reactTitle: "Pick an emoji",
     messageMenu: "Message",
     replyMessage: "Reply",
     replyMessageNote: "Answer it, quoting what it said.",

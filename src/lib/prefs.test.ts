@@ -44,6 +44,7 @@ describe("preferences", () => {
       language: "host",
       notify: false,
       previews: true,
+      reactions: [],
     })
   })
 
@@ -106,5 +107,29 @@ describe("preferences", () => {
     start()
     expect(() => update({ compose: "header" })).not.toThrow()
     expect(snapshot().compose).toBe("header")
+  })
+})
+
+describe("the emoji you reached for last", () => {
+  it("keeps what looks like emoji and drops what does not", () => {
+    stubStorage({
+      "knock.prefs": JSON.stringify({ reactions: ["👍", "", 42, "🎉"] }),
+    })
+    start()
+    expect(snapshot().reactions).toEqual(["👍", "🎉"])
+  })
+
+  it("holds no more than the row can show", () => {
+    stubStorage({
+      "knock.prefs": JSON.stringify({ reactions: ["1", "2", "3", "4", "5", "6", "7", "8"] }),
+    })
+    start()
+    expect(snapshot().reactions).toHaveLength(6)
+  })
+
+  it("falls back where storage holds something that is not a list", () => {
+    stubStorage({ "knock.prefs": JSON.stringify({ reactions: "👍" }) })
+    start()
+    expect(snapshot().reactions).toEqual([])
   })
 })

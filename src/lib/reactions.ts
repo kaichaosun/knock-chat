@@ -29,14 +29,39 @@ import { tagOf } from "./quote"
 import type { Message } from "./messages"
 
 /**
- * What a message can be answered with.
+ * What a message is answered with before anybody has answered one.
  *
- * Six, and fixed. A picker is a second screen in front of a gesture that is
- * meant to take one tap, and a set everybody shares is a set everybody can
- * read at a glance — a room where each reaction is a different rare glyph
- * says less than one where three people agree.
+ * Six, because six is what fits under a thumb in one row, and these six because
+ * they are the ones a stranger can read without being told. They are a starting
+ * point rather than the set: whatever somebody actually uses takes their place
+ * — see [`offered`] — and anything at all can be reached past them.
  */
 export const CHOICES = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
+
+/** How many the row holds. One thumb's width, and no scrolling. */
+const OFFERED = 6
+
+/**
+ * The row to put in front of somebody: what they last used, then the defaults.
+ *
+ * Recent first because a reaction is a habit — a person who answers everything
+ * with one emoji should reach it without looking, and somebody who went to the
+ * trouble of finding an unusual one should not have to find it twice.
+ */
+export function offered(recent: string[]): string[] {
+  const row: string[] = []
+  for (const emoji of [...recent, ...CHOICES]) {
+    if (!row.includes(emoji)) row.push(emoji)
+    if (row.length === OFFERED) break
+  }
+  return row
+}
+
+/** Put one at the front of the recent list, keeping it short and unique. */
+export function remember(recent: string[], emoji: string): string[] {
+  return [emoji, ...recent.filter((one) => one !== emoji)].slice(0, OFFERED)
+}
+
 
 /** One emoji on one message, and who is behind it. */
 export type Reacted = {

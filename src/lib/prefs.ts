@@ -53,6 +53,14 @@ export type Prefs = {
    * who has to decide.
    */
   previews: boolean
+  /**
+   * The emoji you have reacted with lately, most recent first.
+   *
+   * About this device rather than about you, like the rest of this file: the
+   * row it fills is a shortcut, and a shortcut belongs to the hand using it.
+   * Nobody else is told, and it is never sent anywhere.
+   */
+  reactions: string[]
 }
 
 const DEFAULTS: Prefs = {
@@ -60,6 +68,7 @@ const DEFAULTS: Prefs = {
   language: "host",
   notify: false,
   previews: true,
+  reactions: [],
 }
 
 let prefs: Prefs = DEFAULTS
@@ -78,6 +87,14 @@ function read(): Prefs {
       // Anything but a stored `false` is the default, so a device that has
       // never been asked gets the card.
       previews: stored.previews !== false,
+      // Storage is user-writable, so nothing here is believed on sight: strings
+      // only, short only, and few only.
+      reactions: Array.isArray(stored.reactions)
+        ? stored.reactions
+            .filter((one): one is string => typeof one === "string" && one.length > 0)
+            .map((one) => [...one].slice(0, 16).join(""))
+            .slice(0, 6)
+        : DEFAULTS.reactions,
     }
   } catch {
     // Private mode, no storage, or something that is not JSON.
