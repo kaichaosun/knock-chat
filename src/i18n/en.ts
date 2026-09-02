@@ -506,7 +506,7 @@ export const en = {
     youLeft: "You left a gift",
     forTheRoom: "A gift for the room",
     youGot: "You got {{amount}} NIM",
-    over: "Over — what was left went back to the sender.",
+    over: "Over — the rest went back.",
     take: "Take a share",
     allGone: "All gone.",
     taken: "{{claimed}} of {{shares}} taken",

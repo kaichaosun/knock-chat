@@ -473,7 +473,7 @@ export const zh: Dictionary = {
     youLeft: "你留下了一个红包",
     forTheRoom: "给群组的红包",
     youGot: "你领到了 {{amount}} NIM",
-    over: "已结束，剩余部分已退回给发送者。",
+    over: "已结束，剩余已退回。",
     take: "领取一份",
     allGone: "已被领完。",
     taken: "已领取 {{claimed}} / {{shares}}",
