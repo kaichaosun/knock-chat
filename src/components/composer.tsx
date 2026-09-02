@@ -239,6 +239,33 @@ export function Composer({
     put(address, range)
   }
 
+  /**
+   * Answering something puts the caret here, ready for the answer.
+   *
+   * The quote appears above the box the moment it is chosen, and a box that
+   * looks ready to be typed in but is not is a tap nobody should have to make.
+   *
+   * Only on the way *into* answering — re-running while somebody types would
+   * take the caret from wherever they had put it. Nothing happens when the box
+   * is already where the focus is.
+   */
+  const answering = replyingTo !== null
+  useEffect(() => {
+    const root = box.current
+    if (!answering || !root || root.contains(document.activeElement)) return
+    // After the paint that draws the quote, or the box moves up under a caret
+    // that has just been placed in it.
+    const timer = window.setTimeout(() => {
+      const at = atEnd(root)
+      caret.current = at.cloneRange()
+      const selection = document.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(at)
+      root.focus()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [answering])
+
   useImperativeHandle(ref, () => ({
     mention: (address: string) => {
       const root = box.current
