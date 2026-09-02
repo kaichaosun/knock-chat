@@ -512,6 +512,7 @@ export const en = {
     composeHeaderNote: "In the header it covers nothing, and matches the other tabs.",
     floating: "Floating",
     inHeader: "In the header",
+    previewTitle: "Link preview",
     about: "Messages between Nimiq wallets, with spam priced out instead of guessed at.",
     terms: "Terms of Service",
     privacy: "Privacy Policy",

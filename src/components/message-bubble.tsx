@@ -18,6 +18,7 @@ import { useNames } from "@/hooks/use-names"
 import type { Message } from "@/lib/messages"
 import { segments } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
+import { useLinkPreview } from "@/hooks/use-link-preview"
 import { ownCode, type Code } from "@/lib/knock-code"
 import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
 import { unquote, type Quote } from "@/lib/quote"
@@ -135,6 +136,11 @@ export function MessageBubble({
           <div
             className={cn(
               "rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug whitespace-pre-wrap",
+              // Its own width, not the column's. A link card below shares this
+              // column and is wider than most messages, and without this the
+              // bubble would stretch to match it — so "ok" would arrive as a
+              // short message and become a long one the moment the card landed.
+              "w-fit",
               // What someone wrote is worth lifting out of the page, so it opts
               // back in to the selection the body switched off — unless a long
               // press on it means something, in which case the browser's own
@@ -173,6 +179,8 @@ export function MessageBubble({
             )}
           </div>
         )}
+
+        {payload.kind === "text" && <LinkCard text={payload.text} faded={failed} />}
 
         {(stamped || unsettled) && (
           <div
@@ -378,6 +386,70 @@ function Mention({
 }
 
 /**
+ * What the first link in a message leads to.
+ *
+ * Only the first: a message with five links in it is a message, not a page of
+ * cards, and the one somebody meant is nearly always the one they wrote first.
+ *
+ * Read from the page by the relay rather than written by the sender — see
+ * `hooks/use-link-preview` and the relay's `unfurl`. That is the whole reason
+ * this is worth drawing: a card the sender composed would be a card the sender
+ * chose, and on an app where money moves that is a lure waiting to happen.
+ *
+ * Nothing is drawn until there is something to draw, and nothing at all when
+ * the preference is off or the lookup came back empty.
+ */
+function LinkCard({ text, faded }: { text: string; faded: boolean }) {
+  const href = useMemo(() => {
+    for (const part of segments(unquote(text).body)) {
+      if (part.kind !== "link") continue
+      // Our own links lead back here, and the app has one title for every
+      // screen in it. The card would say nothing the tap does not.
+      try {
+        if (new URL(part.href).origin === window.location.origin) return null
+      } catch {
+        return null
+      }
+      return part.href
+    }
+    return null
+  }, [text])
+
+  const preview = useLinkPreview(href)
+  const tap = useTap()
+  if (!preview || (!preview.title && !preview.description)) return null
+
+  return (
+    <a
+      {...tap}
+      href={preview.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      referrerPolicy="no-referrer"
+      className={cn(
+        "bg-card active:bg-muted mt-1 block rounded-2xl border px-3.5 py-2.5 transition-colors",
+        faded && "opacity-60",
+      )}
+    >
+      {/* The host first and in its own right. Where a link goes is the fact
+          that matters, and a title above it would be the thing a page chose to
+          say about itself sitting over the thing it cannot choose. */}
+      <p className="text-muted-foreground truncate text-[11px] font-semibold">{preview.host}</p>
+      {preview.title && (
+        <p className="mt-0.5 line-clamp-2 text-[14px] leading-snug font-semibold">
+          {preview.title}
+        </p>
+      )}
+      {preview.description && (
+        <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[12px] leading-snug">
+          {preview.description}
+        </p>
+      )}
+    </a>
+  )
+}
+
+/**
  * Somewhere a message points.
  *
  * What is drawn is the address itself — see `lib/links` — so the label and the
@@ -427,14 +499,10 @@ function Link({
       target="_blank"
       rel="noopener noreferrer"
       referrerPolicy="no-referrer"
-      // Underlined as well as coloured: colour alone is not something everybody
-      // can see, and a link that is only a shade of the text is not a link to
-      // them. The two shades are the mention's, picked by what has to stay
-      // legible against the bubble rather than by whose message it is.
-      className={cn(
-        "underline underline-offset-2",
-        outgoing ? "text-mention-on-brand" : "text-mention",
-      )}
+      // Colour alone, and the mention's two shades — picked by what has to
+      // stay legible against the bubble rather than by whose message it is. A
+      // rule under every URL made a thread of them look ruled.
+      className={cn(outgoing ? "text-mention-on-brand" : "text-mention")}
     >
       {text}
     </a>

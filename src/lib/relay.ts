@@ -546,6 +546,35 @@ export type GiftTerms = {
   max_shares: number
 }
 
+/**
+ * What a link in a message turned out to lead to.
+ *
+ * Read from the page itself by the relay, not written by whoever sent the link
+ * — which is the only reason it is worth drawing. A card somebody else composed
+ * is an advertisement at best and a lure at worst.
+ */
+export type Preview = {
+  /** Where the link ended up, after redirects. Not always what was tapped. */
+  url: string
+  /** The host of that. The part worth reading before going. */
+  host: string
+  title: string
+  description: string
+}
+
+/**
+ * Ask what a link leads to.
+ *
+ * The relay fetches it, so the site is never told who is reading — and, because
+ * the answer is cached there, a room reading the same link costs that site one
+ * visit rather than one per person. What this does tell the relay is which link
+ * is about to be read; see `lib/legal`, and the `previews` preference that
+ * turns it off.
+ */
+export function lookUpLink(url: string): Promise<Preview> {
+  return request<Preview>(`/v1/unfurl?url=${encodeURIComponent(url)}`)
+}
+
 export function getGiftTerms(): Promise<GiftTerms> {
   return request<GiftTerms>("/v1/gifts/terms")
 }

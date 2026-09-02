@@ -6,6 +6,7 @@ import { BrandMark } from "@/components/brand-mark"
 import { LanguageSheet } from "@/components/language-sheet"
 import { LegalSheet } from "@/components/legal-sheet"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Switch } from "@/components/ui/switch"
 import { usePrefs } from "@/hooks/use-prefs"
 import { LANGUAGE_NAMES } from "@/i18n"
 import { useTheme } from "@/hooks/use-theme"
@@ -54,7 +55,7 @@ export function SettingsSheet({
 }) {
   const { t } = useTranslation()
   const { theme } = useTheme()
-  const { compose, language } = usePrefs()
+  const { compose, language, previews } = usePrefs()
   /** Whichever document is being read, if either. */
   const [reading, setReading] = useState<LegalDoc | null>(null)
   const [picking, setPicking] = useState(false)
@@ -194,6 +195,20 @@ export function SettingsSheet({
                 )
               })}
             </div>
+          </section>
+
+          {/* One row and no explanation. What it costs is in the privacy
+              policy, which is linked two sections below this one — and the
+              short of it is that the relay reads the page, not this device. */}
+          <section className="flex items-center justify-between gap-4">
+            <h3 id="link-preview" className="text-sm font-semibold">
+              {t("settingsMore.previewTitle")}
+            </h3>
+            <Switch
+              checked={previews}
+              onCheckedChange={(next) => update({ previews: next })}
+              aria-labelledby="link-preview"
+            />
           </section>
 
           {/* Where the mark gets to be a mark. Centred and given a line of its

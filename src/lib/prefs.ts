@@ -41,9 +41,26 @@ export type Prefs = {
    * means nothing can be shown — see `lib/notify`.
    */
   notify: boolean
+  /**
+   * Whether to show what a link in a message leads to.
+   *
+   * On, and worth understanding before turning it off — or leaving it on. The
+   * card is fetched by the relay rather than by this device: the site is never
+   * told who is reading, and a room of readers costs it one visit. What the
+   * relay learns in exchange is which link is about to be read, which is less
+   * than it would learn from a message and far less than the site learns the
+   * moment anybody taps through. `lib/legal` says all of this to the person
+   * who has to decide.
+   */
+  previews: boolean
 }
 
-const DEFAULTS: Prefs = { compose: "floating", language: "host", notify: false }
+const DEFAULTS: Prefs = {
+  compose: "floating",
+  language: "host",
+  notify: false,
+  previews: true,
+}
 
 let prefs: Prefs = DEFAULTS
 const listeners = new Set<() => void>()
@@ -58,6 +75,9 @@ function read(): Prefs {
       compose: stored.compose === "header" ? "header" : DEFAULTS.compose,
       language: isLanguage(stored.language) ? stored.language : DEFAULTS.language,
       notify: stored.notify === true,
+      // Anything but a stored `false` is the default, so a device that has
+      // never been asked gets the card.
+      previews: stored.previews !== false,
     }
   } catch {
     // Private mode, no storage, or something that is not JSON.

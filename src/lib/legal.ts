@@ -24,7 +24,7 @@ const COMPANY = "KEYRING Pte. Ltd."
 const CONTACT = "support@keyring.so"
 const JURISDICTION = "Singapore"
 const MINIMUM_AGE = 18
-const UPDATED = "1 September 2026"
+const UPDATED = "3 September 2026"
 
 export type LegalSection = {
   heading: string
@@ -182,6 +182,14 @@ export const PRIVACY: LegalDoc = {
         "We keep a count of how many times Knock is opened, and how often people come back. It runs on a server of ours rather than a service somebody else operates, so nothing about your visit is handed to anyone.",
         "It records the page, where you arrived from, your browser and operating system by name, your screen size, and the time. It sets no cookie and keeps no IP address.",
         "It never sees your Nimiq address. Nothing it records can be joined to your account, your messages or your assets.",
+      ],
+    },
+    {
+      heading: "Links somebody sends you",
+      body: [
+        "When a message contains a link, the app asks our relay what that page is called, so it can show a card under the link. The relay reads the page; your phone does not. The site therefore never learns that you are reading it, and a room full of people reading the same link costs that site one visit rather than one each.",
+        "What the relay sees in exchange is the link itself, and that somebody is about to look at it. It is held for an hour so it need not be fetched again, and it is not recorded against you.",
+        "Nothing is fetched for a link you never see, and nothing at all if you switch link cards off in Settings. Tapping a link is a separate thing and tells that site much more — your address, your browser, and everything a visit tells anybody.",
       ],
     },
     {

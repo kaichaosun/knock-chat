@@ -475,6 +475,7 @@ export const zh: Dictionary = {
     composeHeaderNote: "放在标题栏不遮挡任何内容，也与其他标签一致。",
     floating: "悬浮",
     inHeader: "在标题栏",
+    previewTitle: "链接预览",
     about: "在 Nimiq 钱包之间收发消息，用付费门槛挡住垃圾信息，而不是靠猜。",
     terms: "服务条款",
     privacy: "隐私政策",

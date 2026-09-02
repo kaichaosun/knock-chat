@@ -39,7 +39,25 @@ describe("preferences", () => {
     // written a preference this one has dropped.
     stubStorage({ "knock.prefs": JSON.stringify({ compose: "sideways", ghosts: true }) })
     start()
-    expect(snapshot()).toEqual({ compose: "floating", language: "host", notify: false })
+    expect(snapshot()).toEqual({
+      compose: "floating",
+      language: "host",
+      notify: false,
+      previews: true,
+    })
+  })
+
+  it("keep link cards until somebody says otherwise", () => {
+    // On for a device that has never been asked, and only a stored `false`
+    // turns them off — so a build that predates the preference does not read
+    // as a refusal.
+    stubStorage({ "knock.prefs": JSON.stringify({ compose: "header" }) })
+    start()
+    expect(snapshot().previews).toBe(true)
+
+    stubStorage({ "knock.prefs": JSON.stringify({ previews: false }) })
+    start()
+    expect(snapshot().previews).toBe(false)
   })
 
   it("keep a language that is spoken and drop one that is not", () => {
