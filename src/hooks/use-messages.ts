@@ -98,14 +98,7 @@ export function useMessages(
         if (cancelled) return
 
         update((current) =>
-          // Taken back before taken in, so a message deleted in the same breath
-          // it was sent does not land and then vanish a frame later.
-          history.mergeIncoming(
-            history.removeMessages(current, result.deleted ?? []),
-            opened,
-            result.next,
-            owner,
-          ),
+          history.applyFeed(current, opened, result.deleted ?? [], result.next, owner),
         )
       } catch (error) {
         if (cancelled) return

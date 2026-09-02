@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 import {
+  applyFeed,
   carriesTime,
   conversations,
   deleteThread,
@@ -280,6 +281,50 @@ describe("a room whose chat was deleted", () => {
     expect(withRooms(conversations(snapshot), [room], snapshot.dismissed)).toHaveLength(0)
   })
 })
+
+describe("applyFeed", () => {
+  it("does not show a message that was taken back in the same read", () => {
+    // Somebody closes Knock. A reply is written and deleted while they are
+    // away, so the read that catches them up carries the message and its
+    // tombstone together — the message's seq is past their cursor either way.
+    const caughtUp = applyFeed(
+      emptySnapshot(),
+      [roomEnvelope(1, "said too much")],
+      ["id-1"],
+      cursor(1),
+      ME,
+    )
+
+    expect(threadWith(caughtUp, ROOM)).toHaveLength(0)
+  })
+
+  it("takes back a message that arrived in an earlier read", () => {
+    const held = applyFeed(emptySnapshot(), [roomEnvelope(1, "said too much")], [], cursor(1), ME)
+    expect(threadWith(held, ROOM)).toHaveLength(1)
+
+    expect(threadWith(applyFeed(held, [], ["id-1"], cursor(2), ME), ROOM)).toHaveLength(0)
+  })
+
+  it("keeps what was not taken back", () => {
+    const snapshot = applyFeed(
+      emptySnapshot(),
+      [roomEnvelope(1, "gone"), roomEnvelope(2, "kept")],
+      ["id-1"],
+      cursor(2),
+      ME,
+    )
+
+    expect(threadWith(snapshot, ROOM).map((m) => m.body)).toEqual(["kept"])
+  })
+
+  it("moves the cursor on a read that was nothing but a tombstone", () => {
+    // The id is for a message this device never held — most deletions are, since
+    // one is delivered to everyone in the room. It must still not replay.
+    const snapshot = applyFeed(emptySnapshot(), [], ["id-9"], cursor(9), ME)
+    expect(snapshot.cursor).toBe(cursor(9))
+  })
+})
+
 
 describe("recordOutgoing", () => {
   /** A knock never comes back through the poll, so the sender must record it. */

@@ -345,6 +345,36 @@ export function removeMessages(snapshot: Snapshot, ids: string[]): Snapshot {
   return { ...snapshot, messages }
 }
 
+/**
+ * Fold one read of the feed into what is held: what was said, and then what was
+ * taken back.
+ *
+ * That order is the whole of this function, and it is the opposite of the one
+ * that reads as careful. A room hands over a message and its tombstone in the
+ * same page whenever the deletion happened between two reads: the message's seq
+ * is past the cursor either way, so the read that catches a device up carries
+ * both. Taking back first finds nothing to take — the message has not landed
+ * yet — and the merge then puts it on screen, where it stays.
+ *
+ * Which is exactly what somebody away from the app sees. A reply is written and
+ * deleted while they are gone; they open Knock and are shown the one thing
+ * nobody was meant to read.
+ *
+ * Nothing is lost the other way round. A tombstone whose message arrived in an
+ * earlier read still matches it, and one for a message this device never held
+ * is a no-op whenever it is applied.
+ */
+export function applyFeed(
+  snapshot: Snapshot,
+  envelopes: OpenedEnvelope[],
+  /** Ids the relay says are gone, as they came — see [`removeMessages`]. */
+  deleted: string[],
+  cursor: string | null,
+  owner: string,
+): Snapshot {
+  return removeMessages(mergeIncoming(snapshot, envelopes, cursor, owner), deleted)
+}
+
 /** Record something this device sent, so the sender sees their own words. */
 export function recordOutgoing(
   snapshot: Snapshot,
