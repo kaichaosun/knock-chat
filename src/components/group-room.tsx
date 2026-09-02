@@ -37,7 +37,7 @@ import { tagOf, unquote, type Quote } from "@/lib/quote"
 import { EmojiSheet } from "@/components/emoji-sheet"
 import { usePrefs } from "@/hooks/use-prefs"
 import { update as savePrefs } from "@/lib/prefs"
-import { fold, mineOn, offered, remember } from "@/lib/reactions"
+import { fold, mineAmong, mineOn, offered, remember, toggled } from "@/lib/reactions"
 import { cn } from "@/lib/utils"
 import { givenNameIn, labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
@@ -522,7 +522,9 @@ export function GroupRoom({
     // Remembered whichever way it went: taking one off is still a sign of
     // which emoji this hand reaches for.
     savePrefs({ reactions: remember(recent, emoji) })
-    onSay(encode(reaction(tag, mineOn(on.get(message.id), emoji) ? "" : emoji)))
+    // The whole of what you have on it once this lands, not the one thing you
+    // just touched — so a second emoji joins the first rather than replacing it.
+    onSay(encode(reaction(tag, toggled(mineAmong(on.get(message.id)), emoji))))
   }
 
   const groups = useMemo(() => groupByDay(shown), [shown])

@@ -40,6 +40,14 @@ import { formatNim } from "./postage"
 
 const FRAME = "\u001fknock1\n"
 
+/**
+ * How many emoji one person may put on one message.
+ *
+ * A limit rather than a judgement: somebody who wants six has six, and a peer
+ * who sends sixty is filling a thread with a row nothing can read.
+ */
+export const MAX_REACTIONS = 8
+
 /** A payment the sender says they made. See the caveat above. */
 export type Payment = {
   /** Amount in luna. A positive integer; luna are indivisible. */
@@ -123,13 +131,15 @@ export type Reaction = {
   /** The message reacted to, named the way a quote names one — see `lib/quote`. */
   to: string
   /**
-   * One emoji, or nothing at all.
+   * Everything this person has put on that message, not what they just did.
    *
-   * Empty is how a reaction is taken back. Every reaction is a message and
-   * messages only ever arrive, so the last one somebody sent about a message is
-   * the one that counts, and an empty one counts as none.
+   * A whole set rather than one emoji and a verb, because a message cannot be
+   * unsent and may arrive twice or out of order — and "add this" applied twice
+   * is wrong in a way "here is the lot" never is. The last one somebody sends
+   * about a message is the truth about them, whatever reached the other end
+   * before it, and an empty list is somebody who has taken all of theirs back.
    */
-  emoji: string
+  emoji: string[]
 }
 
 export type Payload =
@@ -162,7 +172,7 @@ export function contactNote(address: string, name: string): Payload {
   return { kind: "contact", contact: { address, name } }
 }
 
-export function reaction(to: string, emoji: string): Payload {
+export function reaction(to: string, emoji: string[]): Payload {
   return { kind: "reaction", reaction: { to, emoji } }
 }
 
@@ -243,11 +253,25 @@ export function decode(plain: string): Payload {
       // the tag is the only part of it this can check.
       const to = typeof value.to === "string" ? value.to.toLowerCase() : ""
       if (!isTag(to)) return { kind: "unknown" }
-      // One emoji, or none. A reaction is drawn as a pill beside somebody's
-      // words with no room to say where it came from, so a peer must not be
-      // able to put a sentence there — and reading it as a grapheme is what
-      // keeps a joined emoji whole rather than sending half a family.
-      const emoji = typeof value.emoji === "string" ? (firstEmoji(value.emoji) ?? "") : ""
+      // Emoji only, and few. A pill sits beside somebody's words with no room
+      // to say where it came from, so a peer must not be able to put a sentence
+      // in one — and reading each as a grapheme keeps a joined emoji whole
+      // rather than passing on half a family.
+      //
+      // A lone string is read as a list of one: that is what the first build to
+      // send reactions put on the wire, and a message already sent cannot be
+      // rewritten.
+      const raw = Array.isArray(value.emoji)
+        ? value.emoji
+        : typeof value.emoji === "string"
+          ? [value.emoji]
+          : []
+      const emoji: string[] = []
+      for (const one of raw) {
+        const found = typeof one === "string" ? firstEmoji(one) : null
+        if (found && !emoji.includes(found)) emoji.push(found)
+        if (emoji.length === MAX_REACTIONS) break
+      }
       return { kind: "reaction", reaction: { to, emoji } }
     }
 
@@ -307,12 +331,18 @@ export function preview(plain: string, direction: "in" | "out"): string {
       // Named rather than shown: a chat list saying only "👍" is a list that
       // says nothing, and the message it answers is not this one.
       const { emoji } = payload.reaction
-      // Empty is one being taken back — a message this build reads perfectly
-      // well, so it must not borrow the line meant for one it cannot.
-      if (!emoji) {
+      // An empty set is somebody taking all of theirs back — a message this
+      // build reads perfectly well, so it must not borrow the line meant for
+      // one it cannot.
+      if (emoji.length === 0) {
         return t(direction === "out" ? "preview.youUnreacted" : "preview.unreacted")
       }
-      return t(direction === "out" ? "preview.youReacted" : "preview.reacted", { emoji })
+      // Run together rather than listed: this is one line in a list of chats,
+      // and the commas a list would put between them are the loudest thing in
+      // it. Somebody with three is shown as having three.
+      return t(direction === "out" ? "preview.youReacted" : "preview.reacted", {
+        emoji: emoji.join(""),
+      })
     }
     case "unknown":
       return t("preview.unsupported")

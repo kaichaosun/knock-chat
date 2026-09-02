@@ -49,6 +49,15 @@
      send button, which wears the same colour so the two read as a pair. White
      here, and not in the dark theme — see the note there. */
   --bubble-mine-foreground: #ffffff;
+  /**
+   * The chip under a message that carries a reaction of your own.
+   *
+   * Its own colour rather than the brand at some opacity, because one opacity
+   * cannot serve two themes: `primary/15` landed on #172951 in the dark, which
+   * is 1.05 against the chip beside it — the same colour, to any eye. A tint
+   * that faint cannot carry the one thing the chip has to say.
+   */
+  --reaction-mine: #75bae2;
   /* A mention, in the two places one can land. Both are the same hue — what is
      typed and what is read should not look like different things — and they
      differ only by what they have to stay legible against.
@@ -114,6 +123,9 @@
      still 6.49 against the fill, which is margin over the 4.5 a line needs
      rather than the brightness of a thing being read at night. */
   --bubble-mine-foreground: #d6def2;
+  /* Deeper here for the reason everything else in this theme is, and measured
+     the same way: about twice the separation from the chip beside it. */
+  --reaction-mine: #296294;
   /* `--mention` still serves both surfaces here — the dark theme's pale
      surface is navy, so the tint that reads on your own bubble reads on the
      composer too. Calmer than the light theme's: on a dark screen the eye is
@@ -149,6 +161,7 @@
   --color-ring: var(--ring);
   --color-bubble-mine: var(--bubble-mine);
   --color-bubble-mine-foreground: var(--bubble-mine-foreground);
+  --color-reaction-mine: var(--reaction-mine);
   --color-mention: var(--mention);
   --color-mention-on-brand: var(--mention-on-brand);
 

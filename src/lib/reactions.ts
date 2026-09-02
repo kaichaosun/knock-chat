@@ -10,11 +10,14 @@
  *
  * ## The last one counts
  *
- * There is no way to unsend a message, so taking a reaction back is done by
- * sending another one that is empty. Whatever somebody's most recent reaction
- * to a message says is what they think of it now, and an empty one means they
- * have stopped thinking it. That also makes a repeated tap on the same emoji
- * work as the toggle everybody expects, without a second kind of message.
+ * A reaction message carries everything its sender has put on that message, so
+ * the most recent one from somebody is the whole truth about them and earlier
+ * ones can be forgotten. That is what lets a person hold several at once, and
+ * what makes adding and removing the same operation: both send the set as it
+ * now stands. An empty set is somebody who has taken all of theirs back.
+ *
+ * Whole sets rather than "add this" and "remove that" because messages arrive
+ * more than once and out of order, and a set applied twice is the same set.
  *
  * ## Reactions to nothing
  *
@@ -24,7 +27,7 @@
  * is worse than a reaction nobody sees.
  */
 
-import { decode } from "./payload"
+import { decode, MAX_REACTIONS } from "./payload"
 import { tagOf } from "./quote"
 import type { Message } from "./messages"
 
@@ -88,8 +91,8 @@ export type Folded = {
  */
 export function fold(messages: Message[], owner: string): Folded {
   const shown: Message[] = []
-  /** Target tag → who reacted → the emoji they last chose. */
-  const latest = new Map<string, Map<string, string>>()
+  /** Target tag → who reacted → everything they last said they had put on it. */
+  const latest = new Map<string, Map<string, string[]>>()
 
   for (const message of messages) {
     const payload = decode(message.body)
@@ -98,9 +101,9 @@ export function fold(messages: Message[], owner: string): Folded {
       continue
     }
     const who = message.direction === "out" ? owner : message.peer
-    const on = latest.get(payload.reaction.to) ?? new Map<string, string>()
-    // Set even when empty: an empty one is a reaction being taken back, and it
-    // has to overwrite what it takes back rather than be skipped.
+    const on = latest.get(payload.reaction.to) ?? new Map<string, string[]>()
+    // Set even when empty: an empty set is somebody taking all of theirs back,
+    // and it has to overwrite what it takes back rather than be skipped.
     on.set(who, payload.reaction.emoji)
     latest.set(payload.reaction.to, on)
   }
@@ -116,11 +119,12 @@ export function fold(messages: Message[], owner: string): Folded {
     const order: string[] = []
     const counts = new Map<string, number>()
     const mine = new Set<string>()
-    for (const [who, emoji] of chosen) {
-      if (!emoji) continue
-      if (!counts.has(emoji)) order.push(emoji)
-      counts.set(emoji, (counts.get(emoji) ?? 0) + 1)
-      if (who === owner) mine.add(emoji)
+    for (const [who, theirs] of chosen) {
+      for (const emoji of theirs) {
+        if (!counts.has(emoji)) order.push(emoji)
+        counts.set(emoji, (counts.get(emoji) ?? 0) + 1)
+        if (who === owner) mine.add(emoji)
+      }
     }
     if (order.length === 0) continue
 
@@ -137,7 +141,24 @@ export function fold(messages: Message[], owner: string): Folded {
   return { shown, on }
 }
 
-/** What you have already put on a message, so tapping it again takes it off. */
+/** Whether one of them is already yours, so tapping it again takes it off. */
 export function mineOn(reacted: Reacted[] | undefined, emoji: string): boolean {
   return reacted?.some((one) => one.emoji === emoji && one.mine) ?? false
+}
+
+/** Everything you have put on a message, in the order it is drawn. */
+export function mineAmong(reacted: Reacted[] | undefined): string[] {
+  return (reacted ?? []).filter((one) => one.mine).map((one) => one.emoji)
+}
+
+/**
+ * Your set with one added or taken away — whichever it was not.
+ *
+ * The same call for both, because from here they are the same act: saying what
+ * you have on a message now.
+ */
+export function toggled(mine: string[], emoji: string): string[] {
+  return mine.includes(emoji)
+    ? mine.filter((one) => one !== emoji)
+    : [...mine, emoji].slice(-MAX_REACTIONS)
 }

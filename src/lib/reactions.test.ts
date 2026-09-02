@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { encode, reaction } from "./payload"
 import { firstEmoji } from "./emoji"
-import { CHOICES, fold, mineOn, offered, remember } from "./reactions"
+import { CHOICES, fold, mineAmong, mineOn, offered, remember, toggled } from "./reactions"
 import type { Message } from "./messages"
 
 const ME = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
@@ -22,10 +22,15 @@ function said(tag: string, body = "hello", direction: "in" | "out" = "in"): Mess
   }
 }
 
-/** `who` is the speaker, which is what tells two people's reactions apart. */
+/**
+ * `who` is the speaker, which is what tells two people's reactions apart.
+ *
+ * `emoji` is everything that person has on the message once this lands, which
+ * is what a reaction message actually carries — see `lib/payload`.
+ */
 function reacted(
   to: string,
-  emoji: string,
+  emoji: string | string[],
   direction: "in" | "out",
   who: string = THEM,
 ): Message {
@@ -33,13 +38,18 @@ function reacted(
     id: `relay:${direction}-${to}-${emoji}-${who.slice(3, 7)}`,
     peer: who,
     direction,
-    body: encode(reaction(to, emoji)),
+    body: encode(reaction(to, typeof emoji === "string" ? (emoji ? [emoji] : []) : emoji)),
     at: "2026-09-03T10:01:00Z",
     status: "sent",
   }
 }
 
 const TAG = "4f2a91c3"
+
+/** What the first build sent: one emoji, not a set. */
+function legacy(to: string, emoji: string): string {
+  return "\u001fknock1\n" + JSON.stringify({ kind: "reaction", to, emoji })
+}
 
 describe("fold", () => {
   it("takes reactions out of the thread and puts them on the message", () => {
@@ -66,6 +76,33 @@ describe("fold", () => {
     const target = said(TAG)
     const { on } = fold([target, reacted(TAG, "👍", "out"), reacted(TAG, "😂", "out")], ME)
     expect(on.get(target.id)).toEqual([{ emoji: "😂", count: 1, mine: true }])
+  })
+
+  it("lets one person hold several at once", () => {
+    // Answering with a second emoji adds to the first rather than replacing
+    // it — the message carries the whole set, so both survive.
+    const target = said(TAG)
+    const { on } = fold([target, reacted(TAG, ["👍", "😂"], "out")], ME)
+    expect(on.get(target.id)).toEqual([
+      { emoji: "👍", count: 1, mine: true },
+      { emoji: "😂", count: 1, mine: true },
+    ])
+  })
+
+  it("takes one of several off and leaves the rest", () => {
+    const target = said(TAG)
+    const { on } = fold(
+      [target, reacted(TAG, ["👍", "😂"], "out"), reacted(TAG, ["😂"], "out")],
+      ME,
+    )
+    expect(on.get(target.id)).toEqual([{ emoji: "😂", count: 1, mine: true }])
+  })
+
+  it("still reads the lone emoji the first build sent", () => {
+    // A message already on somebody's phone cannot be rewritten.
+    const target = said(TAG)
+    const { on } = fold([target, { ...reacted(TAG, [], "in"), body: legacy(TAG, "👍") }], ME)
+    expect(on.get(target.id)).toEqual([{ emoji: "👍", count: 1, mine: false }])
   })
 
   it("takes one back when the last one is empty", () => {
@@ -187,7 +224,7 @@ describe("what arrives from somebody else", () => {
     const target = said(TAG)
     const shouting: Message = {
       ...reacted(TAG, "x", "in"),
-      body: encode(reaction(TAG, "LOL")),
+      body: encode(reaction(TAG, ["LOL"])),
     }
     const { on } = fold([target, shouting], ME)
     expect(on.has(target.id)).toBe(false)
@@ -197,5 +234,32 @@ describe("what arrives from somebody else", () => {
     const target = said(TAG)
     const { on } = fold([target, reacted(TAG, "🎉", "in")], ME)
     expect(on.get(target.id)).toEqual([{ emoji: "🎉", count: 1, mine: false }])
+  })
+})
+
+describe("toggled", () => {
+  it("adds one that is not there", () => {
+    expect(toggled([], "👍")).toEqual(["👍"])
+    expect(toggled(["👍"], "😂")).toEqual(["👍", "😂"])
+  })
+
+  it("takes off one that is", () => {
+    expect(toggled(["👍", "😂"], "👍")).toEqual(["😂"])
+  })
+
+  it("drops the oldest rather than growing without end", () => {
+    const full = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"]
+    expect(toggled(full, "🎉")).toHaveLength(8)
+    expect(toggled(full, "🎉")).not.toContain("1️⃣")
+  })
+
+  it("says which are yours", () => {
+    expect(
+      mineAmong([
+        { emoji: "👍", count: 2, mine: true },
+        { emoji: "😂", count: 1, mine: false },
+      ]),
+    ).toEqual(["👍"])
+    expect(mineAmong(undefined)).toEqual([])
   })
 })

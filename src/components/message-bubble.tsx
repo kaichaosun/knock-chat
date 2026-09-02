@@ -444,7 +444,7 @@ function Reactions({
           // outline is the one part of a small control that a thumb covers.
           className={cn(
             "flex h-6 items-center gap-1 rounded-full px-2 leading-none transition-colors",
-            mine ? "bg-primary/15" : "bg-muted",
+            mine ? "bg-reaction-mine" : "bg-muted",
             onReact && "active:opacity-70",
           )}
         >
@@ -454,7 +454,7 @@ function Reactions({
             <span
               className={cn(
                 "text-[12px] leading-none font-semibold tabular-nums",
-                mine ? "text-primary" : "text-muted-foreground",
+                mine ? "text-foreground" : "text-muted-foreground",
               )}
             >
               {count}
