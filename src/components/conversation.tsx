@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronLeft, Clock, Coins, DoorClosed, Info, PanelLeftOpen, UserRound } from "lucide-react"
+import { toast } from "sonner"
+import {
+  ChevronLeft,
+  Clock,
+  Coins,
+  Copy,
+  DoorClosed,
+  Info,
+  MoreVertical,
+  PanelLeftOpen,
+  Reply,
+  UserRound,
+} from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { AttachMenu } from "@/components/attach-menu"
@@ -15,7 +27,10 @@ import type { Code } from "@/lib/knock-code"
 import { shortenAddress } from "@/lib/address"
 import { canBeReached } from "@/lib/keys"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
-import { labelIn, nameIn } from "@/lib/names"
+import { copyText } from "@/lib/clipboard"
+import { givenNameIn, labelIn, nameIn } from "@/lib/names"
+import { preview } from "@/lib/payload"
+import { QUOTE_ID_LEN, unquote, type Quote } from "@/lib/quote"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
@@ -144,6 +159,106 @@ export function Conversation({
     if (content.current) observer.observe(content.current)
     return () => observer.disconnect()
   }, [goToEnd])
+
+  /** How long a finger has to stay put before it counts as a press. */
+  const HOLD_MS = 500
+  /** How far it may wander first — a finger on glass is never quite still. */
+  const HOLD_SLOP_PX = 10
+
+  /** The message a held finger has opened the menu on. */
+  const [held, setHeld] = useState<Message | null>(null)
+  /** What the next message answers, until it is sent or dropped. */
+  const [answering, setAnswering] = useState<Quote | null>(null)
+  /** Each message's row, so a quote has somewhere to scroll back to. */
+  const rows = useRef(new Map<string, HTMLDivElement | null>())
+
+  /** Where the press began, so a drag can be told from a hold. */
+  const pressed = useRef<{ x: number; y: number } | null>(null)
+  const holding = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** The hold went off, so the click that ends it is not a tap. */
+  const fired = useRef(false)
+
+  const openFor = (message: Message) => {
+    document.getSelection()?.removeAllRanges()
+    setHeld(message)
+  }
+
+  /**
+   * Begin a press-and-hold. Touch only, as in a room: on a pointer the browser
+   * starts selecting long before a timer could fire, and the `⋮` is there.
+   */
+  const holdStart = (
+    fire: () => void,
+    at: { clientX: number; clientY: number; button: number; pointerType: string },
+  ) => {
+    if (at.pointerType !== "touch" || at.button !== 0) return
+    pressed.current = { x: at.clientX, y: at.clientY }
+    window.clearTimeout(holding.current ?? undefined)
+    fired.current = false
+    holding.current = setTimeout(() => {
+      fired.current = true
+      fire()
+    }, HOLD_MS)
+  }
+
+  const holdMove = (at: { clientX: number; clientY: number }) => {
+    const from = pressed.current
+    if (!from) return
+    if (Math.abs(at.clientX - from.x) > HOLD_SLOP_PX || Math.abs(at.clientY - from.y) > HOLD_SLOP_PX) {
+      holdCancel()
+    }
+  }
+
+  const holdCancel = () => {
+    window.clearTimeout(holding.current ?? undefined)
+    pressed.current = null
+  }
+
+  /**
+   * The piece of a message's id a quote carries, or nothing.
+   *
+   * Only a message the relay has named has one — the same rule a room follows,
+   * and for the same reason: a `local:` id means nothing to the other side.
+   */
+  const tagOf = (message: Message): string | undefined =>
+    message.id.startsWith("relay:")
+      ? message.id.slice("relay:".length).replace(/-/g, "").slice(0, QUOTE_ID_LEN).toLowerCase()
+      : undefined
+
+  /**
+   * Answer a message, putting what it said above whatever is written next.
+   *
+   * The author is the name they *publish*, never the one you gave them: a
+   * private name stays on this device, and a quote is sent. `preview` does the
+   * rest, so answering a payment quotes what it was rather than a line of JSON.
+   */
+  const answer = (message: Message) => {
+    setHeld(null)
+    const who = message.direction === "out" ? owner : peer
+    setAnswering({
+      author: givenNameIn(names, who) ?? shortenAddress(who),
+      said: preview(message.body, "in"),
+      id: tagOf(message),
+    })
+  }
+
+  const copyMessage = async (message: Message) => {
+    setHeld(null)
+    if (await copyText(message.body)) toast.success(t("room.messageCopied"))
+  }
+
+  /** Go to whatever a reply answers, if this thread still holds it. */
+  const jumpTo = (from: Message) => {
+    const { quote } = unquote(from.body)
+    if (!quote?.id) return
+    const found = messages.find((message) => tagOf(message) === quote.id)
+    const node = found && rows.current.get(found.id)
+    if (!found || !node?.isConnected) {
+      toast(t("room.quotedNotHere"))
+      return
+    }
+    node.scrollIntoView({ block: "center", behavior: "smooth" })
+  }
 
   const groups = useMemo(() => groupByDay(messages), [messages])
 
@@ -278,15 +393,52 @@ export function Conversation({
                               {outgoing ? t("chat.you") : labelIn(names, peer)}
                             </p>
                           )}
-                          <MessageBubble
-                            message={message}
-                            onRetry={onRetry}
-                            onOpenInvite={onOpenInvite}
-                            onOpenContact={onOpenContact}
-                            onOpenCode={onOpenCode}
-                            channelOpen={!shut}
-                            stamped={carriesTime(message, group.messages[index + 1])}
-                          />
+                          {/* The same gesture a room's messages have, for the
+                              same two things: answering one, and copying it.
+                              Never deleting — a message here is already the
+                              other side's, and nothing can call it back. */}
+                          <div
+                            ref={(node) => {
+                              rows.current.set(message.id, node)
+                            }}
+                            className="group/msg relative flex items-start"
+                            onPointerDown={(event) => holdStart(() => openFor(message), event)}
+                            onPointerMove={holdMove}
+                            onPointerUp={holdCancel}
+                            onPointerCancel={holdCancel}
+                            onPointerLeave={holdCancel}
+                          >
+                            <div className="min-w-0 flex-1 select-none [-webkit-touch-callout:none]">
+                              <MessageBubble
+                                message={message}
+                                onRetry={onRetry}
+                                onOpenInvite={onOpenInvite}
+                                onOpenContact={onOpenContact}
+                                onOpenCode={onOpenCode}
+                                onOpenQuote={() => jumpTo(message)}
+                                channelOpen={!shut}
+                                owner={owner}
+                                stamped={carriesTime(message, group.messages[index + 1])}
+                                // The press belongs to the message now, so the
+                                // browser's own long press has to stand aside.
+                                // Copy moved into the menu in exchange.
+                                selectable={false}
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => openFor(message)}
+                              aria-label={t("room.messageMenu")}
+                              className={cn(
+                                "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                "absolute top-1 right-0 hidden rounded-lg p-1 opacity-0 transition-opacity lg:block",
+                                "focus-visible:opacity-100 group-hover/msg:opacity-100",
+                              )}
+                            >
+                              <MoreVertical className="size-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )
@@ -303,7 +455,43 @@ export function Conversation({
         <KnockPrompt waiting={waiting} cost={cost} reachable={reachable} onKnock={onKnock} />
       )}
 
-      <Composer onSend={onSend} onAttach={() => setAttaching(true)} disabled={shut} />
+      <Composer
+        // The quote goes with the message it was written into. Sending is the
+        // other way out of answering, and the only one that is easy to forget:
+        // the cancel button is obvious, this is not.
+        onSend={(body) => {
+          onSend(body)
+          setAnswering(null)
+        }}
+        onAttach={() => setAttaching(true)}
+        disabled={shut}
+        replyingTo={answering}
+        onCancelReply={() => setAnswering(null)}
+      />
+
+      <AttachMenu
+        open={held !== null}
+        onOpenChange={(open) => !open && setHeld(null)}
+        title={t("room.messageMenu")}
+        actions={
+          held
+            ? [
+                {
+                  icon: Reply,
+                  label: t("room.replyMessage"),
+                  description: t("room.replyMessageNote"),
+                  onSelect: () => answer(held),
+                },
+                {
+                  icon: Copy,
+                  label: t("room.copyMessage"),
+                  description: t("room.copyMessageNote"),
+                  onSelect: () => void copyMessage(held),
+                },
+              ]
+            : []
+        }
+      />
 
       <AttachMenu
         open={attaching}
