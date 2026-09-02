@@ -33,9 +33,18 @@ import { preview } from "@/lib/payload"
 import { encode, reaction } from "@/lib/payload"
 import { tagOf, unquote, type Quote } from "@/lib/quote"
 import { EmojiSheet } from "@/components/emoji-sheet"
+import { ReactorsSheet } from "@/components/reactors-sheet"
 import { usePrefs } from "@/hooks/use-prefs"
 import { update as savePrefs } from "@/lib/prefs"
-import { fold, mineAmong, mineOn, offered, remember, toggled } from "@/lib/reactions"
+import {
+  fold,
+  mineAmong,
+  mineOn,
+  offered,
+  remember,
+  toggled,
+  type Reacted,
+} from "@/lib/reactions"
 import { formatNim } from "@/lib/postage"
 import type { Reachability } from "@/lib/relay"
 import { SIDEBAR_SHORTCUT_KEYS, SIDEBAR_SHORTCUT_LABEL } from "@/lib/shortcuts"
@@ -266,6 +275,8 @@ export function Conversation({
   const { reactions: recent } = usePrefs()
   /** The message an emoji is being picked for, past the row's six. */
   const [picking, setPicking] = useState<Message | null>(null)
+  /** The emoji whose people are being asked about. */
+  const [reactors, setReactors] = useState<Reacted | null>(null)
 
   /** Put one on, or take yours off by naming the one you already gave. */
   const react = (message: Message, emoji: string) => {
@@ -438,6 +449,7 @@ export function Conversation({
                                 channelOpen={!shut}
                                 reactions={on.get(message.id)}
                                 onReact={(emoji) => react(message, emoji)}
+                                onShowReactors={setReactors}
                                 owner={owner}
                                 stamped={carriesTime(message, group.messages[index + 1])}
                                 // The press belongs to the message now, so the
@@ -519,6 +531,12 @@ export function Conversation({
         }
         onReact={(emoji) => held && react(held, emoji)}
         onMoreEmoji={held && tagOf(held.id) ? () => setPicking(held) : undefined}
+      />
+
+      <ReactorsSheet
+        reacted={reactors}
+        you={owner}
+        onOpenChange={(open) => !open && setReactors(null)}
       />
 
       <EmojiSheet

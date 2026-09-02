@@ -218,6 +218,8 @@ export const zh: Dictionary = {
     addressCopied: "地址已复制",
     copyFailed: "复制失败",
     emptyRoom: "这里还没有人说话。群里的每个人都能看到你写的内容。",
+    reactedBy: "{{count}} 人",
+    reactedBy_other: "{{count}} 人",
     reactMore: "更多表情",
     reactTitle: "选择一个表情",
     messageMenu: "消息",

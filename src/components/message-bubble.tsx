@@ -39,6 +39,7 @@ export function MessageBubble({
   channelOpen,
   reactions,
   onReact,
+  onShowReactors,
   owner = null,
   stamped = true,
   selectable = true,
@@ -76,6 +77,8 @@ export function MessageBubble({
   reactions?: Reacted[]
   /** Put one on, or take yours off by naming the one you already gave. */
   onReact?: (emoji: string) => void
+  /** Ask who is behind one — a long press, or a right-click. */
+  onShowReactors?: (reacted: Reacted) => void
   /** Your address: what a gift card is drawn against, and who a mention of you is. */
   owner?: string | null
   /**
@@ -202,7 +205,7 @@ export function MessageBubble({
         {payload.kind === "text" && <LinkCard text={payload.text} faded={failed} />}
 
         {reactions && reactions.length > 0 && (
-          <Reactions reactions={reactions} onReact={onReact} />
+          <Reactions reactions={reactions} onReact={onReact} onShow={onShowReactors} />
         )}
 
         {(stamped || unsettled) && (
@@ -422,19 +425,82 @@ function Mention({
 function Reactions({
   reactions,
   onReact,
+  onShow,
 }: {
   reactions: Reacted[]
   onReact?: (emoji: string) => void
+  onShow?: (reacted: Reacted) => void
 }) {
   return (
     <div className="mt-1 flex flex-wrap gap-1">
-      {reactions.map(({ emoji, count, mine }) => (
-        <button
-          key={emoji}
-          type="button"
-          disabled={!onReact}
-          onClick={() => onReact?.(emoji)}
-          aria-pressed={mine}
+      {reactions.map((reacted) => (
+        <Pill key={reacted.emoji} reacted={reacted} onReact={onReact} onShow={onShow} />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * One emoji, and the two questions it answers.
+ *
+ * A tap is the common one — put mine on, or take it off. A hold asks the other
+ * one, which is who else did: a count says how many and never who, and in a
+ * room of any size that is the half worth knowing.
+ *
+ * The press is stopped here rather than allowed to reach the message, which has
+ * a hold of its own. Two menus on one gesture is one too many, and the nearer
+ * thing to the thumb should be the one that answers.
+ */
+function Pill({
+  reacted,
+  onReact,
+  onShow,
+}: {
+  reacted: Reacted
+  onReact?: (emoji: string) => void
+  onShow?: (reacted: Reacted) => void
+}) {
+  const { emoji, count, mine } = reacted
+  const holding = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const asked = useRef(false)
+
+  const stop = () => {
+    if (holding.current === null) return
+    clearTimeout(holding.current)
+    holding.current = null
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={!onReact}
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        if (!onShow || event.pointerType !== "touch") return
+        asked.current = false
+        holding.current = setTimeout(() => {
+          asked.current = true
+          onShow(reacted)
+        }, HOLD_MS)
+      }}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onPointerLeave={stop}
+      onContextMenu={(event) => {
+        // The pointer's way to the same question, and the browser's own menu
+        // has nothing to offer about a chip like this.
+        if (!onShow) return
+        event.preventDefault()
+        onShow(reacted)
+      }}
+      onClick={() => {
+        if (asked.current) {
+          asked.current = false
+          return
+        }
+        onReact?.(emoji)
+      }}
+      aria-pressed={mine}
           // Filled, not outlined. A rule around something two pixels tall reads
           // as a rule, and a row of them reads as a row of lines rather than of
           // faces — the emoji is the thing worth seeing, and a border competes
@@ -448,21 +514,19 @@ function Reactions({
             onReact && "active:opacity-70",
           )}
         >
-          <span className="text-[14px] leading-none">{emoji}</span>
-          {/* Only once it means more than the emoji already does. */}
-          {count > 1 && (
-            <span
-              className={cn(
-                "text-[12px] leading-none font-semibold tabular-nums",
-                mine ? "text-foreground" : "text-muted-foreground",
-              )}
-            >
-              {count}
-            </span>
+      <span className="text-[14px] leading-none">{emoji}</span>
+      {/* Only once it means more than the emoji already does. */}
+      {count > 1 && (
+        <span
+          className={cn(
+            "text-[12px] leading-none font-semibold tabular-nums",
+            mine ? "text-foreground" : "text-muted-foreground",
           )}
-        </button>
-      ))}
-    </div>
+        >
+          {count}
+        </span>
+      )}
+    </button>
   )
 }
 

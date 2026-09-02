@@ -35,9 +35,18 @@ import { shortenAddress } from "@/lib/address"
 import { encode, preview, reaction } from "@/lib/payload"
 import { tagOf, unquote, type Quote } from "@/lib/quote"
 import { EmojiSheet } from "@/components/emoji-sheet"
+import { ReactorsSheet } from "@/components/reactors-sheet"
 import { usePrefs } from "@/hooks/use-prefs"
 import { update as savePrefs } from "@/lib/prefs"
-import { fold, mineAmong, mineOn, offered, remember, toggled } from "@/lib/reactions"
+import {
+  fold,
+  mineAmong,
+  mineOn,
+  offered,
+  remember,
+  toggled,
+  type Reacted,
+} from "@/lib/reactions"
 import { cn } from "@/lib/utils"
 import { givenNameIn, labelIn } from "@/lib/names"
 import { carriesTime, opensTurn, type Message } from "@/lib/messages"
@@ -514,6 +523,8 @@ export function GroupRoom({
   const { reactions: recent } = usePrefs()
   /** The message an emoji is being picked for, past the row's six. */
   const [picking, setPicking] = useState<Message | null>(null)
+  /** The emoji whose people are being asked about. */
+  const [reactors, setReactors] = useState<Reacted | null>(null)
 
   /** Put one on, or take yours off by naming the one you already gave. */
   const react = (message: Message, emoji: string) => {
@@ -735,6 +746,7 @@ export function GroupRoom({
                                   onOpenQuote={() => jumpTo(message)}
                                   reactions={on.get(message.id)}
                                   onReact={(emoji) => react(message, emoji)}
+                                  onShowReactors={setReactors}
                                   channelOpen
                                   owner={owner}
                                   stamped={stamped}
@@ -852,6 +864,7 @@ export function GroupRoom({
                                 onOpenQuote={() => jumpTo(message)}
                                 reactions={on.get(message.id)}
                                 onReact={(emoji) => react(message, emoji)}
+                                onShowReactors={setReactors}
                                 channelOpen
                                 owner={owner}
                                 stamped={stamped}
@@ -965,6 +978,12 @@ export function GroupRoom({
         }
         onReact={(emoji) => held && react(held, emoji)}
         onMoreEmoji={held && tagOf(held.id) ? () => setPicking(held) : undefined}
+      />
+
+      <ReactorsSheet
+        reacted={reactors}
+        you={owner}
+        onOpenChange={(open) => !open && setReactors(null)}
       />
 
       <EmojiSheet

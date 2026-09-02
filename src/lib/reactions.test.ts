@@ -57,25 +57,25 @@ describe("fold", () => {
     const { shown, on } = fold([target, reacted(TAG, "👍", "in")], ME)
 
     expect(shown).toEqual([target])
-    expect(on.get(target.id)).toEqual([{ emoji: "👍", count: 1, mine: false }])
+    expect(on.get(target.id)).toEqual([{ emoji: "👍", by: [THEM], count: 1, mine: false }])
   })
 
   it("knows which one is yours", () => {
     const target = said(TAG)
     const { on } = fold([target, reacted(TAG, "👍", "out")], ME)
-    expect(on.get(target.id)).toEqual([{ emoji: "👍", count: 1, mine: true }])
+    expect(on.get(target.id)).toEqual([{ emoji: "👍", by: [ME], count: 1, mine: true }])
   })
 
   it("counts the same emoji from two people once, with two behind it", () => {
     const target = said(TAG)
     const { on } = fold([target, reacted(TAG, "👍", "in"), reacted(TAG, "👍", "out")], ME)
-    expect(on.get(target.id)).toEqual([{ emoji: "👍", count: 2, mine: true }])
+    expect(on.get(target.id)).toEqual([{ emoji: "👍", by: [THEM, ME], count: 2, mine: true }])
   })
 
   it("lets somebody change their mind, and counts only the last word", () => {
     const target = said(TAG)
     const { on } = fold([target, reacted(TAG, "👍", "out"), reacted(TAG, "😂", "out")], ME)
-    expect(on.get(target.id)).toEqual([{ emoji: "😂", count: 1, mine: true }])
+    expect(on.get(target.id)).toEqual([{ emoji: "😂", by: [ME], count: 1, mine: true }])
   })
 
   it("lets one person hold several at once", () => {
@@ -84,8 +84,8 @@ describe("fold", () => {
     const target = said(TAG)
     const { on } = fold([target, reacted(TAG, ["👍", "😂"], "out")], ME)
     expect(on.get(target.id)).toEqual([
-      { emoji: "👍", count: 1, mine: true },
-      { emoji: "😂", count: 1, mine: true },
+      { emoji: "👍", by: [ME], count: 1, mine: true },
+      { emoji: "😂", by: [ME], count: 1, mine: true },
     ])
   })
 
@@ -95,14 +95,14 @@ describe("fold", () => {
       [target, reacted(TAG, ["👍", "😂"], "out"), reacted(TAG, ["😂"], "out")],
       ME,
     )
-    expect(on.get(target.id)).toEqual([{ emoji: "😂", count: 1, mine: true }])
+    expect(on.get(target.id)).toEqual([{ emoji: "😂", by: [ME], count: 1, mine: true }])
   })
 
   it("still reads the lone emoji the first build sent", () => {
     // A message already on somebody's phone cannot be rewritten.
     const target = said(TAG)
     const { on } = fold([target, { ...reacted(TAG, [], "in"), body: legacy(TAG, "👍") }], ME)
-    expect(on.get(target.id)).toEqual([{ emoji: "👍", count: 1, mine: false }])
+    expect(on.get(target.id)).toEqual([{ emoji: "👍", by: [THEM], count: 1, mine: false }])
   })
 
   it("takes one back when the last one is empty", () => {
@@ -117,7 +117,18 @@ describe("fold", () => {
       [target, reacted(TAG, "👍", "in"), reacted(TAG, "👍", "out"), reacted(TAG, "", "out")],
       ME,
     )
-    expect(on.get(target.id)).toEqual([{ emoji: "👍", count: 1, mine: false }])
+    expect(on.get(target.id)).toEqual([{ emoji: "👍", by: [THEM], count: 1, mine: false }])
+  })
+
+  it("says who is behind each one, in the order they arrived", () => {
+    // What a long press asks for. The messages this was read from are folded
+    // away by then, so it has to be kept rather than worked out again.
+    const target = said(TAG)
+    const { on } = fold(
+      [target, reacted(TAG, "👍", "in"), reacted(TAG, "👍", "out"), reacted(TAG, "👍", "in", OTHER)],
+      ME,
+    )
+    expect(on.get(target.id)?.[0].by).toEqual([THEM, ME, OTHER])
   })
 
   it("keeps the order they first appeared in, not the order of the count", () => {
@@ -153,7 +164,10 @@ describe("fold", () => {
   })
 
   it("says what is already yours", () => {
-    const reactions = [{ emoji: "👍", count: 2, mine: true }, { emoji: "😂", count: 1, mine: false }]
+    const reactions = [
+      { emoji: "👍", by: [ME, THEM], count: 2, mine: true },
+      { emoji: "😂", by: [THEM], count: 1, mine: false },
+    ]
     expect(mineOn(reactions, "👍")).toBe(true)
     expect(mineOn(reactions, "😂")).toBe(false)
     expect(mineOn(undefined, "👍")).toBe(false)
@@ -233,7 +247,7 @@ describe("what arrives from somebody else", () => {
   it("keeps one that is", () => {
     const target = said(TAG)
     const { on } = fold([target, reacted(TAG, "🎉", "in")], ME)
-    expect(on.get(target.id)).toEqual([{ emoji: "🎉", count: 1, mine: false }])
+    expect(on.get(target.id)).toEqual([{ emoji: "🎉", by: [THEM], count: 1, mine: false }])
   })
 })
 
@@ -256,8 +270,8 @@ describe("toggled", () => {
   it("says which are yours", () => {
     expect(
       mineAmong([
-        { emoji: "👍", count: 2, mine: true },
-        { emoji: "😂", count: 1, mine: false },
+        { emoji: "👍", by: [ME, THEM], count: 2, mine: true },
+        { emoji: "😂", by: [THEM], count: 1, mine: false },
       ]),
     ).toEqual(["👍"])
     expect(mineAmong(undefined)).toEqual([])

@@ -69,7 +69,15 @@ export function remember(recent: string[], emoji: string): string[] {
 /** One emoji on one message, and who is behind it. */
 export type Reacted = {
   emoji: string
-  /** How many people have put it there. */
+  /**
+   * Everyone who put it there, in the order they first did.
+   *
+   * Kept rather than counted, because a row of emoji answers "how many" and
+   * the question people ask next is "who" — and by then the messages it was
+   * worked out from have been folded away.
+   */
+  by: string[]
+  /** How many people have put it there. `by.length`, named for what it is. */
   count: number
   /** Whether one of them is you. */
   mine: boolean
@@ -117,24 +125,24 @@ export function fold(messages: Message[], owner: string): Folded {
     // First seen, first drawn. Not by count: a row that reorders itself as
     // people react is a row nobody can tap twice in the same place.
     const order: string[] = []
-    const counts = new Map<string, number>()
-    const mine = new Set<string>()
+    const by = new Map<string, string[]>()
     for (const [who, theirs] of chosen) {
       for (const emoji of theirs) {
-        if (!counts.has(emoji)) order.push(emoji)
-        counts.set(emoji, (counts.get(emoji) ?? 0) + 1)
-        if (who === owner) mine.add(emoji)
+        if (!by.has(emoji)) {
+          order.push(emoji)
+          by.set(emoji, [])
+        }
+        by.get(emoji)?.push(who)
       }
     }
     if (order.length === 0) continue
 
     on.set(
       message.id,
-      order.map((emoji) => ({
-        emoji,
-        count: counts.get(emoji) ?? 0,
-        mine: mine.has(emoji),
-      })),
+      order.map((emoji) => {
+        const people = by.get(emoji) ?? []
+        return { emoji, by: people, count: people.length, mine: people.includes(owner) }
+      }),
     )
   }
 
