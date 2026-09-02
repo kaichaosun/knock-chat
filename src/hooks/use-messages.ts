@@ -158,8 +158,14 @@ export function useMessages(
       update((current) => history.appendOutgoing(current, message))
 
       try {
-        await sendMessage(owner, peer, encryptBody(body, key, owner, peer))
-        update((current) => history.setStatus(current, message.id, "sent"))
+        const sent = await sendMessage(owner, peer, encryptBody(body, key, owner, peer))
+        // Under the relay's name from here, not the one this device invented.
+        // A `local:` id is private to the phone that made it, so anything that
+        // points *at* a message — a reply's quote, a reaction — has nothing to
+        // point at while a message of your own still wears one. That is why a
+        // reaction to something you sent showed on their screen and not on
+        // yours: they had the relay's name for it and you never did.
+        update((current) => history.settle(current, message.id, `relay:${sent.id}`))
         setRelayStatus("online")
       } catch (error) {
         // 402 means the door is shut, not that the network hiccuped.

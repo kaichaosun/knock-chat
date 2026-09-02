@@ -435,14 +435,31 @@ function Reactions({
           disabled={!onReact}
           onClick={() => onReact?.(emoji)}
           aria-pressed={mine}
+          // Filled, not outlined. A rule around something two pixels tall reads
+          // as a rule, and a row of them reads as a row of lines rather than of
+          // faces — the emoji is the thing worth seeing, and a border competes
+          // with it for the little contrast this small a shape has.
+          //
+          // Which of them is yours is a fill too, for the same reason: an
+          // outline is the one part of a small control that a thumb covers.
           className={cn(
-            "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] transition-colors",
-            mine ? "border-primary/40 bg-primary/10" : "bg-card active:bg-muted",
+            "flex h-6 items-center gap-1 rounded-full px-2 leading-none transition-colors",
+            mine ? "bg-primary/15" : "bg-muted",
+            onReact && "active:opacity-70",
           )}
         >
-          <span className="text-[13px] leading-none">{emoji}</span>
+          <span className="text-[14px] leading-none">{emoji}</span>
           {/* Only once it means more than the emoji already does. */}
-          {count > 1 && <span className="text-muted-foreground tabular-nums">{count}</span>}
+          {count > 1 && (
+            <span
+              className={cn(
+                "text-[12px] leading-none font-semibold tabular-nums",
+                mine ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              {count}
+            </span>
+          )}
         </button>
       ))}
     </div>

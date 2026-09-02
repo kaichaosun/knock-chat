@@ -15,9 +15,11 @@ import {
   save,
   setStatus,
   threadWith,
+  settle,
   withRooms,
 } from "./messages"
 import type { Message, Snapshot } from "./messages"
+import { tagOf } from "./quote"
 import type { Envelope } from "./relay"
 
 const ALICE = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
@@ -633,5 +635,36 @@ describe("dropStrandedCopies", () => {
     save(ME, snapshot)
     expect(threadWith(load(ME), ROOM)).toHaveLength(1)
     vi.unstubAllGlobals()
+  })
+})
+
+describe("a message of your own, once the relay has named it", () => {
+  it("can be pointed at, which a local one cannot", () => {
+    // The bug this guards: a direct send used to keep the id this device made
+    // up, so a reply or a reaction from the other side had nothing to land on.
+    const local = "local:abc"
+    const named = "relay:9d23068a-287d-407d-ac4c-53f20451c5e2"
+    const snapshot = settle(
+      {
+        messages: [
+          {
+            id: local,
+            peer: "NQ75 248H 7RGK 4V8V 84HS PSA3 QYE8 EA1T 7HYT",
+            direction: "out",
+            body: "hello",
+            at: "2026-09-03T10:00:00Z",
+            status: "sending",
+          },
+        ],
+        cursor: null,
+        readCount: {},
+        dismissed: {},
+      },
+      local,
+      named,
+    )
+    expect(snapshot.messages[0].id).toBe(named)
+    expect(snapshot.messages[0].status).toBe("sent")
+    expect(tagOf(snapshot.messages[0].id)).toBe("9d23068a")
   })
 })

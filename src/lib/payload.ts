@@ -307,7 +307,11 @@ export function preview(plain: string, direction: "in" | "out"): string {
       // Named rather than shown: a chat list saying only "👍" is a list that
       // says nothing, and the message it answers is not this one.
       const { emoji } = payload.reaction
-      if (!emoji) return t("preview.unsupported")
+      // Empty is one being taken back — a message this build reads perfectly
+      // well, so it must not borrow the line meant for one it cannot.
+      if (!emoji) {
+        return t(direction === "out" ? "preview.youUnreacted" : "preview.unreacted")
+      }
       return t(direction === "out" ? "preview.youReacted" : "preview.reacted", { emoji })
     }
     case "unknown":

@@ -53,6 +53,8 @@ export const en = {
     youLeft: "You left {{amount}}",
     leftForRoom: "Left {{amount}} for the room",
     reacted: "Reacted {{emoji}}",
+    unreacted: "Removed a reaction",
+    youUnreacted: "You removed a reaction",
     youReacted: "You reacted {{emoji}}",
     unsupported: "Unsupported message",
   },
