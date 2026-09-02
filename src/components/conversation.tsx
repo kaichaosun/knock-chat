@@ -33,6 +33,7 @@ import { preview } from "@/lib/payload"
 import { encode, reaction } from "@/lib/payload"
 import { tagOf, unquote, type Quote } from "@/lib/quote"
 import { EmojiSheet } from "@/components/emoji-sheet"
+import { useLast } from "@/hooks/use-last"
 import { ReactorsSheet } from "@/components/reactors-sheet"
 import { usePrefs } from "@/hooks/use-prefs"
 import { update as savePrefs } from "@/lib/prefs"
@@ -277,6 +278,13 @@ export function Conversation({
   const [picking, setPicking] = useState<Message | null>(null)
   /** The emoji whose people are being asked about. */
   const [reactors, setReactors] = useState<Reacted | null>(null)
+  /**
+   * The message the menu is about, kept while the menu is leaving.
+   *
+   * Its rows are built from this, and a sheet whose rows vanish the moment it
+   * is dismissed spends its exit animation empty — which reads as lag.
+   */
+  const menuFor = useLast(held)
 
   /** Put one on, or take yours off by naming the one you already gave. */
   const react = (message: Message, emoji: string) => {
@@ -515,30 +523,30 @@ export function Conversation({
         onOpenChange={(open) => !open && setHeld(null)}
         title={t("room.messageMenu")}
         actions={
-          held
+          menuFor
             ? [
                 {
                   icon: Reply,
                   label: t("room.replyMessage"),
                   description: t("room.replyMessageNote"),
-                  onSelect: () => answer(held),
+                  onSelect: () => answer(menuFor),
                 },
                 {
                   icon: Copy,
                   label: t("room.copyMessage"),
                   description: t("room.copyMessageNote"),
-                  onSelect: () => void copyMessage(held),
+                  onSelect: () => void copyMessage(menuFor),
                 },
               ]
             : []
         }
         reactions={
-          held && tagOf(held.id)
-            ? offered(recent).map((emoji) => ({ emoji, mine: mineOn(on.get(held.id), emoji) }))
+          menuFor && tagOf(menuFor.id)
+            ? offered(recent).map((emoji) => ({ emoji, mine: mineOn(on.get(menuFor.id), emoji) }))
             : undefined
         }
-        onReact={(emoji) => held && react(held, emoji)}
-        onMoreEmoji={held && tagOf(held.id) ? () => setPicking(held) : undefined}
+        onReact={(emoji) => menuFor && react(menuFor, emoji)}
+        onMoreEmoji={menuFor && tagOf(menuFor.id) ? () => setPicking(menuFor) : undefined}
       />
 
       <ReactorsSheet

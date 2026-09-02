@@ -1,5 +1,7 @@
 import { useTranslation } from "react-i18next"
 
+import { useLast } from "@/hooks/use-last"
+
 import { AddressAvatar } from "@/components/address-avatar"
 import {
   Sheet,
@@ -40,18 +42,20 @@ export function ReactorsSheet({
 }) {
   const { t } = useTranslation()
   const names = useNames()
+  // Held through the closing animation, or the sheet empties before it leaves.
+  const shown = useLast(reacted)
 
   return (
     <Sheet open={reacted !== null} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
         <SheetHeader className="px-0">
           <SheetTitle>
-            {reacted?.emoji} {t("room.reactedBy", { count: reacted?.count ?? 0 })}
+            {shown?.emoji} {t("room.reactedBy", { count: shown?.count ?? 0 })}
           </SheetTitle>
         </SheetHeader>
 
         <ul className="scrollbar-none max-h-[50vh] space-y-1 overflow-y-auto pb-8">
-          {(reacted?.by ?? []).map((address) => {
+          {(shown?.by ?? []).map((address) => {
             const mine = compact(address) === compact(you)
             const row = (
               <>

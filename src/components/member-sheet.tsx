@@ -2,6 +2,7 @@ import { Copy, MessageSquare, UserMinus } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { useLast } from "@/hooks/use-last"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useNames } from "@/hooks/use-names"
@@ -47,7 +48,15 @@ export function MemberSheet({
 }) {
   const { t } = useTranslation()
   const names = useNames()
-  const called = address ? nameIn(names, address) : null
+  /**
+   * Who this is about, held through the closing animation.
+   *
+   * Everything below is drawn from it, and dismissing the sheet sets it to
+   * null — so without this the sheet spends its 300ms exit empty, which reads
+   * as the app being slow rather than as a thing being dismissed.
+   */
+  const shown = useLast(address)
+  const called = shown ? nameIn(names, shown) : null
 
   // Compared without spaces, because the two forms of an address both arrive
   // here: a member list carries what the relay published, while a name over a
@@ -57,9 +66,9 @@ export function MemberSheet({
 
   // Nothing to do to yourself, and nothing to be done to the owner: there is
   // no way out of a room you own, which is what disbanding is for.
-  const isOwner = address !== null && same(address, roomOwner)
-  const canWrite = address !== null && !same(address, you)
-  const canRemove = mine && address !== null && !isOwner && onRemove !== undefined
+  const isOwner = shown !== null && same(shown, roomOwner)
+  const canWrite = shown !== null && !same(shown, you)
+  const canRemove = mine && shown !== null && !isOwner && onRemove !== undefined
 
   return (
     <Sheet open={address !== null} onOpenChange={onOpenChange}>
@@ -74,7 +83,7 @@ export function MemberSheet({
           <SheetTitle>{title ?? t(isOwner ? "member.owner" : "member.member")}</SheetTitle>
         </SheetHeader>
 
-        {address && (
+        {shown && (
           <div className="space-y-7 pb-8">
             {/* Laid out as the contact sheet lays it out, because it is the
                 same question — who is this — asked somewhere else. The address
@@ -82,16 +91,16 @@ export function MemberSheet({
                 things true of somebody rather than chosen about them, and it
                 is unshortened because this is where you come to be sure. */}
             <section className="flex items-center gap-3.5">
-              <AddressAvatar address={address} size="lg" />
+              <AddressAvatar address={shown} size="lg" />
               <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-[11px]">{t("member.address")}</p>
                 <p className="select-value font-mono text-[13px] leading-relaxed font-semibold wrap-anywhere">
-                  {formatAddress(address)}
+                  {formatAddress(shown)}
                 </p>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => onCopy(formatAddress(address))}
+                  onClick={() => onCopy(formatAddress(shown))}
                   className="mt-2 h-8 rounded-lg"
                 >
                   <Copy className="size-3.5" />
@@ -118,7 +127,7 @@ export function MemberSheet({
                 {canWrite && (
                   <button
                     type="button"
-                    onClick={() => onOpenChat(address)}
+                    onClick={() => onOpenChat(shown)}
                     className="active:bg-muted flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors"
                   >
                     <span className="bg-accent text-accent-foreground flex size-11 shrink-0 items-center justify-center rounded-2xl">
@@ -136,7 +145,7 @@ export function MemberSheet({
                 {canRemove && (
                   <button
                     type="button"
-                    onClick={() => onRemove?.(address)}
+                    onClick={() => onRemove?.(shown)}
                     className="active:bg-muted flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors"
                   >
                     <span className="bg-destructive/10 text-destructive flex size-11 shrink-0 items-center justify-center rounded-2xl">
