@@ -1,21 +1,12 @@
 import { useState } from "react"
 import { Loader2, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 
 import { GroupAvatar } from "@/components/group-avatar"
+import { LeaveGroupDialog } from "@/components/leave-group-dialog"
 import { SwipeRow } from "@/components/swipe-row"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { formatNim } from "@/lib/postage"
-import { removeGroupMember, type Group } from "@/lib/relay"
+import type { Group } from "@/lib/relay"
 
 /**
  * Every room you are in.
@@ -45,25 +36,8 @@ export function Groups({
 }) {
   const { t } = useTranslation()
   const [revealed, setRevealed] = useState<string | null>(null)
-  // Held until confirmed: getting back into a room can cost money, and for a
-  // room that asks the owner it may not be possible at all.
+  /** The room being left, once asked about. See `LeaveGroupDialog`. */
   const [confirming, setConfirming] = useState<Group | null>(null)
-  const [leaving, setLeaving] = useState(false)
-
-  async function leave(group: Group) {
-    setLeaving(true)
-    try {
-      await removeGroupMember(group.id, owner)
-      setConfirming(null)
-      setRevealed(null)
-      onLeft(group.id)
-      toast.success(`Left ${group.name}`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("groups.leaveFailed"))
-    } finally {
-      setLeaving(false)
-    }
-  }
 
   if (loading && groups.length === 0) {
     return (
@@ -132,42 +106,16 @@ export function Groups({
         })}
       </ul>
 
-      <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
-        <DialogContent className="max-w-[20rem] rounded-3xl">
-          <DialogHeader className="items-center text-center sm:text-center">
-            <GroupAvatar members={confirming?.members} />
-            <DialogTitle className="mt-2">{t("groups.leaveTitle")}</DialogTitle>
-            <p className="text-[15px] font-semibold">{confirming?.name}</p>
-            <DialogDescription className="text-balance">
-              {confirming?.owner === owner
-                ? t("groups.leaveOwner")
-                : confirming?.requires_approval
-                  ? t("groups.leaveApproval")
-                  : confirming && confirming.join_price_luna > 0
-                    ? t("groups.leavePaid", { amount: formatNim(confirming.join_price_luna) })
-                    : t("groups.leaveFree")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              variant="ghost"
-              className="h-11 rounded-2xl"
-              onClick={() => setConfirming(null)}
-            >
-              {t("groups.stay")}
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={leaving || confirming?.owner === owner}
-              className="h-11 rounded-2xl"
-              onClick={() => confirming && void leave(confirming)}
-            >
-              {leaving && <Loader2 className="animate-spin" />}
-              {t("groups.leave")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LeaveGroupDialog
+        group={confirming}
+        owner={owner}
+        onOpenChange={(open) => {
+          if (open) return
+          setConfirming(null)
+          setRevealed(null)
+        }}
+        onLeft={onLeft}
+      />
     </>
   )
 }

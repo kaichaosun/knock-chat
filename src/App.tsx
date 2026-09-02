@@ -1280,6 +1280,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onLoadEarlier={loadEarlier}
         onForget={forgetMessages}
         onBack={closeThreadView}
+        // The same consequence the room's row in the list has: the room goes
+        // and its chat goes with it. Stated in one place rather than two, so a
+        // room left from here and a room left from there end up alike.
+        onLeft={() => {
+          deleteChat(room.id)
+          void refreshGroups()
+          closeThreadView()
+        }}
         onDeleteChat={() => {
           if (!openGroup) return
           const thread = openGroup

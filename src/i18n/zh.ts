@@ -116,6 +116,7 @@ export const zh: Dictionary = {
     stay: "留下",
     leave: "退出",
     leaveFailed: "退出失败",
+    left: "已退出 {{name}}",
   },
   queue: {
     oneWaiting: "有人想加入",
@@ -351,6 +352,8 @@ export const zh: Dictionary = {
     openDoorFree: "门开着时移出并不牢靠，他们可以直接走回来。",
     addSomeone: "添加成员",
     showAll: "查看全部成员",
+    leave: "退出群组",
+    leaveNote: "你将不再看到这里的消息。",
     disband: "解散群组",
     disbandNote: "为所有人结束这个群组。",
     disbandTitle: "解散{{name}}？",

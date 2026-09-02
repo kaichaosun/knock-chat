@@ -121,6 +121,7 @@ export const en = {
     stay: "Stay",
     leave: "Leave",
     leaveFailed: "Couldn't leave",
+    left: "Left {{name}}",
   },
   queue: {
     oneWaiting: "Someone wants in",
@@ -382,6 +383,8 @@ export const en = {
     openDoorFree: "With an open door, removing someone doesn't hold — they can walk back in.",
     addSomeone: "Add someone",
     showAll: "Show all members",
+    leave: "Leave group",
+    leaveNote: "You stop seeing what is said here.",
     disband: "Disband group",
     disbandNote: "Ends the room for everyone.",
     disbandTitle: "Disband {{name}}?",

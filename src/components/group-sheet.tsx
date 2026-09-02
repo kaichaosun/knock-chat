@@ -5,6 +5,7 @@ import {
   Copy,
   Loader2,
   ShieldOff,
+  LogOut,
   Trash2,
   UserMinus,
   UserPlus,
@@ -42,6 +43,7 @@ import { copyText } from "@/lib/clipboard"
 import { groupLink } from "@/lib/group-link"
 import { labelIn, nameIn, remember } from "@/lib/names"
 import { parseNim } from "@/lib/payments"
+import { LeaveGroupDialog } from "@/components/leave-group-dialog"
 import { formatNim } from "@/lib/postage"
 import {
   MAX_DELETE_WINDOW_SECS,
@@ -193,6 +195,7 @@ export function GroupSheet({
   owner,
   onChanged,
   onDisbanded,
+  onLeft,
   onDeleteChat,
   onOpenChat,
   onInvite,
@@ -207,6 +210,8 @@ export function GroupSheet({
   onChanged: () => void
   /** Leave the room behind — it is not there to stay in. */
   onDisbanded: () => void
+  /** Called once the relay confirms you are out, so the room can be closed. */
+  onLeft: () => void
   /** Offered only once the room is gone: the thread is all that is left of it. */
   onDeleteChat: () => void
   onOpenChat: (address: string) => void
@@ -221,6 +226,8 @@ export function GroupSheet({
   const mine = group.owner === owner && !gone
   /** Open once the owner asks to disband, holding what they have typed. */
   const [disbanding, setDisbanding] = useState(false)
+  /** Open once a member asks to leave. The owner is offered ending it instead. */
+  const [leaving, setLeaving] = useState(false)
   const [typed, setTyped] = useState("")
   const [ending, setEnding] = useState(false)
   // Typed exactly, because the confirm is the only thing standing between a
@@ -919,6 +926,32 @@ export function GroupSheet({
               )}
             </section>
 
+            {/* The other half of the row below, and the one most people see.
+                Leaving is what an owner cannot do and everybody else can, so
+                the two are never both here — same place, same shape, and the
+                question of how to get out of a room is answered once. */}
+            {!mine && (
+              <section className="border-t pt-4">
+                <button
+                  type="button"
+                  onClick={() => setLeaving(true)}
+                  className="active:bg-muted flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors"
+                >
+                  <span className="bg-destructive/10 text-destructive flex size-11 shrink-0 items-center justify-center rounded-2xl">
+                    <LogOut className="size-5" strokeWidth={1.75} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="text-destructive block text-[15px] font-semibold">
+                      {t("groupSheet.leave")}
+                    </span>
+                    <span className="text-muted-foreground block text-[13px] leading-snug">
+                      {t("groupSheet.leaveNote")}
+                    </span>
+                  </span>
+                </button>
+              </section>
+            )}
+
             {/* Last, and only for the person who can. Not beside the settings it
                 sits under — those change a room, and this ends one. */}
             {mine && (
@@ -1013,6 +1046,18 @@ export function GroupSheet({
           sheet is anchored above the keyboard (`--keyboard-inset`), and only
           the sheet refuses Radix's grab at the first field — a centred dialog
           would raise the keyboard on open and then sit behind it. */}
+      {/* What it costs to come back is the whole question, and this is the
+          same dialog the room's row in the list asks it with. */}
+      <LeaveGroupDialog
+        group={leaving ? group : null}
+        owner={owner}
+        onOpenChange={(open) => !open && setLeaving(false)}
+        onLeft={() => {
+          onOpenChange(false)
+          onLeft()
+        }}
+      />
+
       <Sheet open={disbanding} onOpenChange={(open) => !open && setDisbanding(false)}>
         <SheetContent
           side="bottom"

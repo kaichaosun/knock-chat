@@ -57,6 +57,7 @@ export function GroupRoom({
   messages,
   onBack,
   onDeleteChat,
+  onLeft,
   onSay,
   onRetrySay,
   onRefreshDetail,
@@ -85,6 +86,8 @@ export function GroupRoom({
   onBack: () => void
   /** Offered only once the room is gone: the thread is all that is left. */
   onDeleteChat: () => void
+  /** You walked out. The room closes behind you — see `LeaveGroupDialog`. */
+  onLeft: () => void
   onSay: (body: string) => void
   /** Say again something that never left. Rooms can fail like anything else. */
   onRetrySay: (message: Message) => void
@@ -968,6 +971,7 @@ export function GroupRoom({
         // The same way out the back arrow uses: to whichever list this was
         // opened from, where the room is now missing.
         onDisbanded={onBack}
+        onLeft={onLeft}
         onDeleteChat={onDeleteChat}
         onOpenChat={onOpenChat}
         onInvite={onInvite}
