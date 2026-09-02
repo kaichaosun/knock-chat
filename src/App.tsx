@@ -39,6 +39,12 @@ import { useNames } from "@/hooks/use-names"
 import { useWallet } from "@/hooks/use-wallet"
 import { compact } from "@/lib/address"
 import { readCode, type Code } from "@/lib/knock-code"
+import {
+  reopenedThread,
+  threadInUrl,
+  urlForThread,
+  type Pointed,
+} from "@/lib/thread-url"
 import { copyText } from "@/lib/clipboard"
 import { haveStoredSession } from "@/lib/auth"
 import { toHex } from "@/lib/crypto"
@@ -86,6 +92,18 @@ export default function App() {
 
   if (showProbes) return <ProbeScreen />
   return <Messenger onRevealProbes={() => setShowProbes(true)} />
+}
+
+/**
+ * Whichever thread this history entry was already showing.
+ *
+ * Read at the first render rather than put on screen by an effect — an effect
+ * runs after a paint, and what that paint would show is the chat list. Coming
+ * back from a link should return to the room rather than flash past the list on
+ * the way. See `lib/thread-url`.
+ */
+function reopened(): Pointed {
+  return reopenedThread(window.history.state, window.location.href)
 }
 
 /** How long to wait before re-asking whether a shut thread has opened, per attempt. */
@@ -204,7 +222,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const rooms = useRooms()
   useEffect(() => rememberRooms(groups), [groups])
 
-  const [openPeer, setOpenPeer] = useState<string | null>(null)
+  const [openPeer, setOpenPeer] = useState<string | null>(() => reopened().peer)
   const [knocking, setKnocking] = useState(false)
   // Set when knocking on a door we already know, so the sheet fixes the address
   // instead of asking for it. Null for the ordinary compose flow.
@@ -238,7 +256,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // A room is a thread like any other, but nothing a direct chat does applies
   // to it — no reachability, no knocking — so it is opened separately rather
   // than threaded through logic that would have to keep asking which it is.
-  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [openGroup, setOpenGroup] = useState<string | null>(() => reopened().group)
   const [groupDetail, setGroupDetail] = useState<GroupDetail | null>(null)
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [composing, setComposing] = useState(false)
@@ -280,17 +298,53 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    */
   const openThreadKey = openPeer ?? openGroup
 
-  // Let the hardware/gesture back control leave a thread instead of the app.
+  /**
+   * Counts opens rather than naming rooms.
+   *
+   * The room's id cannot carry this: in the two-pane layout the room never
+   * closes, so picking the one already on screen changes nothing about the id —
+   * and asking for it again is exactly what that tap means. The detail fetched
+   * below is where a room's current terms come from, so this is how a member
+   * sees a setting its owner changed a moment ago.
+   */
+  const [roomOpens, setRoomOpens] = useState(0)
+
+  /**
+   * Put a thread on screen, touching no history.
+   *
+   * The half of opening a thread that the back button also needs: coming back
+   * to an entry is not a new place to go, so it sets the state and stops there.
+   */
+  const show = useCallback((peer: string | null, group: string | null) => {
+    setOpenPeer(peer)
+    setOpenGroup(group)
+    if (group) setRoomOpens((count) => count + 1)
+  }, [])
+
+  /**
+   * Write a thread into the address bar as somewhere the back gesture can leave.
+   *
+   * Nothing is pushed for a thread the address bar already names — in the
+   * two-pane layout picking the room on screen means "show me it again", and an
+   * entry per tap would leave a back button that appears not to work.
+   */
+  const pointAt = useCallback((peer: string | null, group: string | null) => {
+    const url = urlForThread(window.location.href, { peer, group })
+    if (url === window.location.href) return
+    window.history.pushState({ thread: peer ?? group }, "", url)
+  }, [])
+
+  // The back gesture leaves a thread rather than the app, and lands wherever
+  // the entry behind it says — which, after two rooms in a row, is the first
+  // room rather than the list.
   useEffect(() => {
-    if (!openThreadKey) return
-    window.history.pushState({ thread: openThreadKey }, "")
     const onPop = () => {
-      setOpenPeer(null)
-      setOpenGroup(null)
+      const { peer, group } = threadInUrl(window.location.href)
+      show(peer, group)
     }
     window.addEventListener("popstate", onPop)
     return () => window.removeEventListener("popstate", onPop)
-  }, [openThreadKey])
+  }, [show])
 
   // Names are learnt per identity: switching to a development identity should
   // not inherit what the previous one had been told.
@@ -305,10 +359,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    * closing the room changes nothing anyone can see — the thread waits behind
    * it until the room is backed out of.
    */
-  const openThread = useCallback((peer: string) => {
-    setOpenGroup(null)
-    setOpenPeer(peer)
-  }, [])
+  const openThread = useCallback(
+    (peer: string) => {
+      pointAt(peer, null)
+      show(peer, null)
+    },
+    [pointAt, show],
+  )
 
   /**
    * Open a room, leaving whatever thread was open.
@@ -320,22 +377,13 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    * "one thread at a time" is a fact about the state rather than a habit of
    * whoever wrote the call.
    */
-  /**
-   * Counts opens rather than naming rooms.
-   *
-   * The room's id cannot carry this: in the two-pane layout the room never
-   * closes, so picking the one already on screen changes nothing about the id —
-   * and asking for it again is exactly what that tap means. The detail fetched
-   * below is where a room's current terms come from, so this is how a member
-   * sees a setting its owner changed a moment ago.
-   */
-  const [roomOpens, setRoomOpens] = useState(0)
-
-  const openRoom = useCallback((group: string) => {
-    setOpenPeer(null)
-    setOpenGroup(group)
-    setRoomOpens((count) => count + 1)
-  }, [])
+  const openRoom = useCallback(
+    (group: string) => {
+      pointAt(null, group)
+      show(null, group)
+    },
+    [pointAt, show],
+  )
 
   // Opening a chat is the moment worth re-checking who you are writing to.
   // A cached key stays right until the peer signs in on another device, and
@@ -494,12 +542,21 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    */
   const openCode = useCallback(
     (code: Code) => {
-      if (code.kind === "group") {
-        openInvite(code.id)
-        return
-      }
+      // Whatever was pasted or scanned has been read, so the sheet that asked
+      // for it is finished — including where a room is what came back, which
+      // used to leave the scanner standing open over the door it found.
       setPasting(false)
       setScanning(false)
+
+      if (code.kind === "group") {
+        // A room you are already in opens as a room. A door is for somebody who
+        // is not through it yet, and putting one in front of a member offers to
+        // sell them what they already have — the same courtesy the thread below
+        // has always been given.
+        if (groups.some((room) => room.id === code.id)) openRoom(code.id)
+        else openInvite(code.id)
+        return
+      }
       // Somebody you already have a thread with opens as a thread. The knock
       // sheet is for doors you have not been through — offering it for a chat
       // that is sitting right there asks you to pay for what you already have.
@@ -511,24 +568,64 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       setReopening(false)
       setKnocking(true)
     },
-    [openInvite, openThread, threadWith],
+    [groups, openInvite, openRoom, openThread, threadWith],
   )
 
+  /**
+   * Whatever the app was opened pointing at.
+   *
+   * Two different things arrive in the address bar. `?chat=` and `?group=` name
+   * what should be on screen, and are put back there — see `lib/thread-url`.
+   * `?knock=` asks for something to happen instead, and is spent on arrival.
+   *
+   * A room id leads to one of two places, and which one is a question about the
+   * reader rather than about the link: somebody already in the room is taken
+   * straight to it, and somebody who is not is shown the door and what it costs
+   * before they pay anything. So this waits for the room list — a link opened
+   * cold arrives before the answer does, and guessing would send a member to a
+   * door they are already through.
+   *
+   * Runs once. A second pass would reopen a door that had just been closed, and
+   * the address bar stops being an instruction the moment it has been read.
+   */
+  const arrived = useRef(false)
   useEffect(() => {
-    if (!owner) return
-    const params = new URLSearchParams(window.location.search)
-    const asked = params.get("group") ?? params.get("knock")
-    if (!asked) return
-    // Cleared straight away so a reload does not reopen the same door.
-    const url = new URL(window.location.href)
-    url.searchParams.delete("group")
-    url.searchParams.delete("knock")
-    window.history.replaceState({}, "", url)
+    if (!owner || arrived.current) return
+    const knock = new URLSearchParams(window.location.search).get("knock")
+    const { peer, group } = threadInUrl(window.location.href)
+    if (!knock && !peer && !group) {
+      arrived.current = true
+      return
+    }
+    // Already on screen, seeded at the first render, and already sitting on its
+    // own history entry with the list behind it. Nothing to ask and nothing to
+    // push — asking would be what puts the list on screen for a beat.
+    const back = reopened()
+    if (back.peer || back.group) {
+      arrived.current = true
+      return
+    }
+    if (group && groupsLoading) return
+    arrived.current = true
 
-    const code = readCode(asked)
-    if (code) openCode(code)
-    else toast.error(t("app.badLink"))
-  }, [owner, openCode])
+    // The entry the app loaded on becomes the list, and a thread is pushed over
+    // it below: backing out of one should land where backing out of one always
+    // lands, whether it was opened by hand or by a link. It also clears the
+    // one-shot halves — a knock, and a room you are not in — so that a reload
+    // does not ask a second time.
+    const bare = new URL(urlForThread(window.location.href, { peer: null, group: null }))
+    bare.searchParams.delete("knock")
+    window.history.replaceState({}, "", bare)
+
+    if (knock) {
+      const code = readCode(knock)
+      if (code) openCode(code)
+      else toast.error(t("app.badLink"))
+      return
+    }
+    if (peer) openThread(peer)
+    else if (group) openCode({ kind: "group", id: group })
+  }, [owner, groupsLoading, openCode, openThread, t])
 
   // How the open thread stands with its peer. A channel can be closed from the
   // other side at any time, so this is asked on open rather than assumed from
@@ -606,10 +703,17 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     // next back press would spend itself on nothing.
     if (window.history.state?.thread) window.history.back()
     else {
-      setOpenPeer(null)
-      setOpenGroup(null)
+      show(null, null)
+      // No entry to unwind, so the address bar has to be corrected by hand —
+      // left alone it would go on naming a thread that is no longer open, and
+      // the next reload would open it again.
+      window.history.replaceState(
+        {},
+        "",
+        urlForThread(window.location.href, { peer: null, group: null }),
+      )
     }
-  }, [])
+  }, [show])
 
   const copy = useCallback(async (text: string) => {
     // Some WebViews simply will not give a page the clipboard. Say what to do
