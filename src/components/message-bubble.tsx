@@ -155,7 +155,7 @@ export function MessageBubble({
               // inside.
               selectable ? "select-text" : "select-none [-webkit-touch-callout:none]",
               outgoing
-                ? "brand-gradient rounded-br-md text-white shadow-sm"
+                ? "bg-bubble-mine text-bubble-mine-foreground rounded-br-md shadow-sm"
                 : "bg-muted text-foreground rounded-bl-md",
               failed && "opacity-60",
             )}

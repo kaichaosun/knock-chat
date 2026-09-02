@@ -41,21 +41,26 @@
   --input: #e3e6f0;
   --ring: #0582ca;
 
-  /* Brand gradient, used for the mark and outgoing bubbles. */
+  /* Brand gradient, used for the mark and for the things you press. */
   --brand-from: #265dd7;
   --brand-to: #0582ca;
+  --bubble-mine: #0B74B5;
+  /* What is drawn on that fill: the words in the bubble, and the arrow on the
+     send button, which wears the same colour so the two read as a pair. White
+     here, and not in the dark theme — see the note there. */
+  --bubble-mine-foreground: #ffffff;
   /* A mention, in the two places one can land. Both are the same hue — what is
      typed and what is read should not look like different things — and they
      differ only by what they have to stay legible against.
 
      `--mention` sits on a pale surface: the composer, and somebody else's
-     bubble. `--mention-on-brand` sits on the gradient, where the only move
-     left from white is *down* in lightness — `text-white/85` and the rest —
-     which reads as quieter, the opposite of what a mention wants. Warm is the
-     one direction that reads as louder there, and it holds at both ends of a
-     gradient running indigo to cyan. */
-  --mention: #a16c12;
-  --mention-on-brand: #efcd8f;
+     bubble. `--mention-on-brand` sits on your own. From white the only move is
+     *down* in lightness, which reads as quieter — the opposite of what a
+     mention wants — so warm is the one direction that reads as louder there.
+     How far warm can go is set by the 4.5 both have to clear: these are the
+     most colour there is room for, not a preference. */
+  --mention: #966511;
+  --mention-on-brand: #f2d5a2;
 }
 
 .dark {
@@ -91,12 +96,33 @@
 
   --brand-from: #3b6ee0;
   --brand-to: #1f97dc;
-  /* One value serves both here: the dark theme's pale surface is navy, so the
-     tint that reads on the gradient reads on the composer too. Deeper and
-     calmer than the light theme's — on a dark screen the eye is adapted down,
-     so the same colour arrives much louder. */
+  /* Deeper than the brand it is drawn from, and the only token here that is.
+     The dark theme lifts the brand so it survives a dark page, which is right
+     for a button — a small thing you look at once — and wrong for a surface
+     that has to carry text: at #3b6ee0 white manages 4.67 and leaves nothing
+     for anything else, so the mention on it came out at 3.07. Dropped to here,
+     white gets 8.75 and the mention has room to stay gold.
+
+     How far down it can go is set from the other side: the page is #101438 and
+     their bubble is #1c2252, and with every message on the same side of the
+     thread, colour is most of what says who spoke. Deep enough not to glow,
+     and still clearly a blue against that navy. */
+  --bubble-mine: #254793;
+  /* Not white. Nothing else in this theme is — the page reads at #eef0f8 —
+     and the bubble was the one surface still using it, on a saturated blue,
+     which is where white glares hardest. A quarter less light than white and
+     still 6.49 against the fill, which is margin over the 4.5 a line needs
+     rather than the brightness of a thing being read at night. */
+  --bubble-mine-foreground: #d6def2;
+  /* `--mention` still serves both surfaces here — the dark theme's pale
+     surface is navy, so the tint that reads on your own bubble reads on the
+     composer too. Calmer than the light theme's: on a dark screen the eye is
+     adapted down, so the same colour arrives much louder. */
   --mention: #ddb677;
-  --mention-on-brand: #ddb677;
+  /* Deeper than the light theme's, which is the rule everywhere in here: the
+     eye is adapted down, so the same colour arrives louder. It had 6.17 and
+     spent it on being pale; at 5.08 it is a gold again. */
+  --mention-on-brand: #e5c084;
 }
 
 @theme inline {
@@ -121,6 +147,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-bubble-mine: var(--bubble-mine);
+  --color-bubble-mine-foreground: var(--bubble-mine-foreground);
   --color-mention: var(--mention);
   --color-mention-on-brand: var(--mention-on-brand);
 

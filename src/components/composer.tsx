@@ -440,7 +440,12 @@ export function Composer({
           aria-label={t("composer.send")}
           className={cn(
             "size-11 shrink-0 rounded-full transition-transform",
-            canSend ? "brand-gradient scale-100" : "scale-95",
+            // The light theme's send button is the colour of your own bubble,
+            // not the brand's gradient: the two sit one above the other in the
+            // same view, and a button that is nearly the bubble reads as a
+            // mistake where one that *is* the bubble reads as a pair. The dark
+            // theme keeps the gradient, where the two are far enough apart.
+            canSend ? "bg-bubble-mine dark:brand-gradient scale-100" : "scale-95",
           )}
         >
           <ArrowUp className="size-5" />
