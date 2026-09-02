@@ -278,7 +278,7 @@ function Quoted({
   const tap = useTap(onOpen)
   const className = cn(
     "mb-1.5 flex w-full flex-col border-l-2 pl-2 text-left text-[13px] leading-snug",
-    outgoing ? "border-white/40 text-white/80" : "border-border text-muted-foreground",
+    outgoing ? "border-white/40 text-quote-on-mine" : "border-border text-muted-foreground",
   )
   const inside = (
     <>

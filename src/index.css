@@ -50,6 +50,17 @@
      here, and not in the dark theme — see the note there. */
   --bubble-mine-foreground: #ffffff;
   /**
+   * What a quote reads as inside your own bubble.
+   *
+   * Quieter than the words around it, which is the whole of what a quote has to
+   * say about itself — it is what somebody else wrote, and the reply is what
+   * the reader came for. Its own colour rather than the text at some opacity,
+   * because the two themes do not start from the same text: white/80 was fine
+   * against white, and against the dark theme's #d6def2 it came out at 1.04 —
+   * the same colour, so the quote and the answer read as one paragraph.
+   */
+  --quote-on-mine: #cee3f0;
+  /**
    * The chip under a message that carries a reaction of your own.
    *
    * Its own colour rather than the brand at some opacity, because one opacity
@@ -123,6 +134,10 @@
      still 6.49 against the fill, which is margin over the 4.5 a line needs
      rather than the brightness of a thing being read at night. */
   --bubble-mine-foreground: #d6def2;
+  /* Three quarters of the text above it, which is a step the eye can see while
+     staying readable on the fill: 4.41 against the bubble, 1.47 from the words
+     it must not be mistaken for. */
+  --quote-on-mine: #aab8da;
   /* Deeper here for the reason everything else in this theme is, and measured
      the same way: about twice the separation from the chip beside it. */
   --reaction-mine: #296294;
@@ -161,6 +176,7 @@
   --color-ring: var(--ring);
   --color-bubble-mine: var(--bubble-mine);
   --color-bubble-mine-foreground: var(--bubble-mine-foreground);
+  --color-quote-on-mine: var(--quote-on-mine);
   --color-reaction-mine: var(--reaction-mine);
   --color-mention: var(--mention);
   --color-mention-on-brand: var(--mention-on-brand);
