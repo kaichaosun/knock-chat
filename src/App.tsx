@@ -14,6 +14,7 @@ import { GroupRequests } from "@/components/group-requests"
 import { JoinQueueSheet } from "@/components/join-queue-sheet"
 import { KnockSheet } from "@/components/knock-sheet"
 import { MemberSheet } from "@/components/member-sheet"
+import { RemoveContactDialog } from "@/components/remove-contact-dialog"
 import { PullIndicator } from "@/components/pull-indicator"
 import { ScanSheet } from "@/components/scan-sheet"
 import { ProfileSheet } from "@/components/profile-sheet"
@@ -75,7 +76,7 @@ import {
   type Group,
   type GroupDetail,
   type Reachability,
-} from "@/lib/relay"
+  type Contact,} from "@/lib/relay"
 import { devIdentities } from "@/lib/wallet"
 import { WelcomeScreen, type WelcomeStatus } from "@/components/welcome-screen"
 import { useRoomHistory } from "@/hooks/use-room-history"
@@ -661,6 +662,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
     void refreshReach()
   }, [openPeer, refreshReach])
 
+  /** The contact row for whoever this thread is with, if they are one. */
+  const openContact =
+    (openPeer && (contacts ?? []).find((one) => compact(one.address) === compact(openPeer))) || null
+
   const openMessages = openPeer ? threadWith(openPeer) : []
   const roomMessages = openGroup ? threadWith(openGroup) : []
 
@@ -987,6 +992,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    * What happens next is a decision, and this is where it is offered.
    */
   const [showingContact, setShowingContact] = useState<string | null>(null)
+  /** The contact being dropped, once asked about. See `RemoveContactDialog`. */
+  const [dropping, setDropping] = useState<Contact | null>(null)
 
   /**
    * A code somebody tapped inside a conversation.
@@ -1118,6 +1125,20 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       onOpenChat={(peer) => {
         setShowingContact(null)
         openCode({ kind: "peer", address: peer })
+      }}
+    />
+  )
+
+  const dropContactDialog = (
+    <RemoveContactDialog
+      contact={dropping}
+      setContacts={setContacts}
+      onOpenChange={(open) => !open && setDropping(null)}
+      onRemoved={(peer) => {
+        // The channel is shut, so the sheet is about somebody who is no longer
+        // there to act on. The chat goes with it, as it does from the list.
+        setShowingContact(null)
+        deleteChat(peer)
       }}
     />
   )
@@ -1331,6 +1352,11 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       onOpenInvite={openInvite}
       onOpenContact={setShowingContact}
       onOpenCode={openFromMessage}
+      // Only where there is a door to shut. A thread can exist with somebody
+      // whose channel was never opened — a knock nobody answered leaves one —
+      // and the row is looked up rather than assumed, because putting it back
+      // after a failed request needs what the list held.
+      onRemoveContact={openContact ? () => setDropping(openContact) : undefined}
       onShareContact={(address) => shareContact((body) => onSend(body), address)}
       onShowSidebar={wide && !sidebarOpen ? () => setSidebarOpen(true) : undefined}
     />
@@ -1573,6 +1599,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
       {knockSheet}
       {contactSheet}
+      {dropContactDialog}
       {composeMenu}
       {groupMenu}
       {groupSheets}
@@ -1607,6 +1634,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
               appear until the room is closed. */}
           {knockSheet}
           {contactSheet}
+          {dropContactDialog}
         </>
       )
     }
@@ -1616,6 +1644,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           {peerScreen}
           {knockSheet}
           {contactSheet}
+          {dropContactDialog}
           {composeMenu}
           {groupSheets}
         </>

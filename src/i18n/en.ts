@@ -325,6 +325,8 @@ export const en = {
     copy: "Copy",
     save: "Save",
     rowMenu: "Actions for this contact",
+    forget: "Remove contact",
+    forgetNote: "The chat goes, and they would have to knock again.",
     removeTitle: "Remove this contact?",
     removeBody:
       "The door shuts both ways. Neither of you can write to the other for free, and reaching you again means knocking and paying your postage. Your chat with them is deleted too.",

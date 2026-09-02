@@ -1,23 +1,14 @@
 import { useState, type Dispatch, type SetStateAction } from "react"
 import { DoorOpen, Loader2, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { RemoveContactDialog } from "@/components/remove-contact-dialog"
 import { SwipeRow } from "@/components/swipe-row"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { shortenAddress } from "@/lib/address"
 import { useNames } from "@/hooks/use-names"
-import { forget, labelIn, nameIn, type Directory } from "@/lib/names"
-import { removeContact, type Contact } from "@/lib/relay"
+import { labelIn, nameIn, type Directory } from "@/lib/names"
+import type { Contact } from "@/lib/relay"
 import { relativeTime } from "@/lib/time"
 
 /**
@@ -71,29 +62,8 @@ export function Contacts({
   const { t } = useTranslation()
   const names = useNames()
   const [revealed, setRevealed] = useState<string | null>(null)
-  // Held until confirmed: removing costs the other side real money to undo, so
-  // it does not happen on a gesture alone.
+  /** Who is being dropped, once asked about. See `RemoveContactDialog`. */
   const [confirming, setConfirming] = useState<Contact | null>(null)
-
-  async function remove(contact: Contact) {
-    setConfirming(null)
-    setRevealed(null)
-    // Drop it now and put it back if the relay disagrees, so the list never
-    // sits there looking unchanged while the request is in flight.
-    setContacts((current) => current?.filter((c) => c.address !== contact.address) ?? null)
-    try {
-      await removeContact(contact.address)
-      // Only now: the row can be put back if this fails, but messages cannot.
-      onRemoved(contact.address)
-      forget(contact.address)
-      toast.success(t("contacts.removed"))
-    } catch (e) {
-      setContacts((current) =>
-        current ? [contact, ...current].sort((a, b) => b.opened_at.localeCompare(a.opened_at)) : current,
-      )
-      toast.error(e instanceof Error ? e.message : t("contacts.removeFailed"))
-    }
-  }
 
   if (error) {
     return <p className="text-destructive px-6 py-10 text-center text-sm text-balance">{error}</p>
@@ -159,35 +129,16 @@ export function Contacts({
         ))}
       </ul>
 
-      <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
-        <DialogContent className="max-w-[20rem] rounded-3xl">
-          <DialogHeader className="items-center text-center sm:text-center">
-            {confirming && <AddressAvatar address={confirming.address} />}
-            <DialogTitle className="mt-2">{t("contacts.removeTitle")}</DialogTitle>
-            {confirming && nameIn(names, confirming.address) && (
-              <p className="text-[15px] font-semibold">{nameIn(names, confirming.address)}</p>
-            )}
-            <p className="font-mono text-[13px] font-semibold tracking-tight">
-              {confirming ? shortenAddress(confirming.address) : ""}
-            </p>
-            <DialogDescription className="text-balance">
-              {t("contacts.removeBody")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="ghost" className="h-11 rounded-2xl" onClick={() => setConfirming(null)}>
-              {t("contacts.keep")}
-            </Button>
-            <Button
-              variant="destructive"
-              className="h-11 rounded-2xl"
-              onClick={() => confirming && remove(confirming)}
-            >
-              {t("contacts.remove")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RemoveContactDialog
+        contact={confirming}
+        setContacts={setContacts}
+        onOpenChange={(open) => {
+          if (open) return
+          setConfirming(null)
+          setRevealed(null)
+        }}
+        onRemoved={onRemoved}
+      />
     </>
   )
 }

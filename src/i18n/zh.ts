@@ -300,6 +300,8 @@ export const zh: Dictionary = {
     copy: "复制",
     save: "保存",
     rowMenu: "这位联系人的操作",
+    forget: "删除联系人",
+    forgetNote: "聊天记录会一并删除，对方需要重新敲门。",
     removeTitle: "删除这个联系人？",
     removeBody:
       "门会双向关闭。你们都不能再免费给对方发消息，对方要再联系你需要重新敲门并支付你的费用。你与他们的聊天记录也会被删除。",

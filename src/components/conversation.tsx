@@ -35,6 +35,7 @@ export function Conversation({
   onPay,
   onOpenInvite,
   onOpenContact,
+  onRemoveContact,
   onOpenCode,
   onShareContact,
   onShowSidebar,
@@ -57,6 +58,13 @@ export function Conversation({
   onOpenInvite: (group: string) => void
   /** Open the door a shared contact points at. */
   onOpenContact: (address: string) => void
+  /**
+   * Shut the door to whoever this thread is with.
+   *
+   * Absent where there is none open — a thread can exist with somebody who was
+   * knocked on and never answered.
+   */
+  onRemoveContact?: () => void
   /** Take a link that leads back into Knock without leaving the app. */
   onOpenCode: (code: Code) => void
   /** Post somebody's contact into this chat. */
@@ -297,6 +305,13 @@ export function Conversation({
         onOpenChange={setShowing}
         address={peer}
         onCopy={onCopyAddress}
+        onForget={
+          onRemoveContact &&
+          (() => {
+            setShowing(false)
+            onRemoveContact()
+          })
+        }
       />
 
       <PickContactSheet
