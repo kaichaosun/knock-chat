@@ -1,10 +1,14 @@
 import { useState } from "react"
-import { Loader2, Users } from "lucide-react"
+import { Copy, Loader2, LogOut, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
+import { AttachMenu } from "@/components/attach-menu"
 import { GroupAvatar } from "@/components/group-avatar"
 import { LeaveGroupDialog } from "@/components/leave-group-dialog"
 import { SwipeRow } from "@/components/swipe-row"
+import { copyText } from "@/lib/clipboard"
+import { groupLink } from "@/lib/group-link"
 import { formatNim } from "@/lib/postage"
 import type { Group } from "@/lib/relay"
 
@@ -38,6 +42,8 @@ export function Groups({
   const [revealed, setRevealed] = useState<string | null>(null)
   /** The room being left, once asked about. See `LeaveGroupDialog`. */
   const [confirming, setConfirming] = useState<Group | null>(null)
+  /** The room whose actions are open. The same menu the chat list has. */
+  const [holding, setHolding] = useState<Group | null>(null)
 
   if (loading && groups.length === 0) {
     return (
@@ -71,12 +77,13 @@ export function Groups({
               key={group.id}
               actionLabel={`Leave ${group.name}`}
               onAction={() => setConfirming(group)}
-              // The swipe's question, for a pointer that cannot swipe. Offered
-              // for a room you own too: leaving is not something an owner can
-              // do, and the dialog is where that is said — along with where to
-              // go instead. Hiding it would leave an owner with the question
-              // and nowhere it is answered.
-              onMenu={() => setConfirming(group)}
+              // The swipe reveals the one thing it has room for; holding opens
+              // everything, which is how the chat list works and now how this
+              // one does. Leaving is offered to an owner too: they cannot, and
+              // the dialog is where that is said — hiding it would leave them
+              // with the question and nowhere it is answered.
+              onLongPress={() => setHolding(group)}
+              onMenu={() => setHolding(group)}
               menuLabel={t("groups.rowMenu")}
               onClick={() => onOpen(group.id)}
               revealed={revealed === group.id}
@@ -105,6 +112,39 @@ export function Groups({
           )
         })}
       </ul>
+
+      <AttachMenu
+        open={holding !== null}
+        onOpenChange={(open) => !open && setHolding(null)}
+        title={holding?.name ?? ""}
+        actions={
+          holding
+            ? [
+                {
+                  icon: Copy,
+                  label: t("groupSheet.copyInvite"),
+                  description: t("groups.copyLinkNote"),
+                  onSelect: () => {
+                    void copyText(groupLink(holding.id)).then((ok) =>
+                      toast[ok ? "success" : "info"](
+                        ok ? t("groupSheet.inviteCopied") : t("groupSheet.clipboardFailed"),
+                      ),
+                    )
+                  },
+                },
+                {
+                  icon: LogOut,
+                  label: t("groupSheet.leave"),
+                  description: t("groupSheet.leaveNote"),
+                  tone: "destructive" as const,
+                  // Choosing it here is not the leaving — the dialog is, and
+                  // the swipe's own action goes through the same one.
+                  onSelect: () => setConfirming(holding),
+                },
+              ]
+            : []
+        }
+      />
 
       <LeaveGroupDialog
         group={confirming}

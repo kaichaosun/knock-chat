@@ -305,7 +305,7 @@ export function Conversation({
         onOpenChange={setShowing}
         address={peer}
         onCopy={onCopyAddress}
-        onForget={
+        onRemove={
           onRemoveContact &&
           (() => {
             setShowing(false)

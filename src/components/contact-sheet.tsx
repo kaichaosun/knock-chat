@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Copy, DoorClosed } from "lucide-react"
+import { Copy, Trash2 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -28,7 +28,7 @@ export function ContactSheet({
   onOpenChange,
   address,
   onCopy,
-  onForget,
+  onRemove,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -40,8 +40,12 @@ export function ContactSheet({
    * Absent where there is no door to shut: a thread can exist with somebody
    * whose channel was never opened, and offering to close one that is not there
    * is a button that does nothing.
+   *
+   * Not to be read as `lib/names`' `forget`, which drops the name you gave
+   * somebody and nothing else. This closes the channel; forgetting the name is
+   * one of the things that follows.
    */
-  onForget?: () => void
+  onRemove?: () => void
 }) {
   const { t } = useTranslation()
   const names = useNames()
@@ -177,22 +181,22 @@ export function ContactSheet({
               thing here that acts on them rather than on your own copy of
               them. The shape the room's own last row has, red for the same
               reason: what it ends, it ends for both of you. */}
-          {onForget && (
+          {onRemove && (
             <section className="border-t pt-4">
               <button
                 type="button"
-                onClick={onForget}
+                onClick={onRemove}
                 className="active:bg-muted flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors"
               >
                 <span className="bg-destructive/10 text-destructive flex size-11 shrink-0 items-center justify-center rounded-2xl">
-                  <DoorClosed className="size-5" strokeWidth={1.75} />
+                  <Trash2 className="size-5" strokeWidth={1.75} />
                 </span>
                 <span className="min-w-0">
                   <span className="text-destructive block text-[15px] font-semibold">
-                    {t("contacts.forget")}
+                    {t("contacts.removeContact")}
                   </span>
                   <span className="text-muted-foreground block text-[13px] leading-snug">
-                    {t("contacts.forgetNote")}
+                    {t("contacts.removeContactNote")}
                   </span>
                 </span>
               </button>

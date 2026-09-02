@@ -1,11 +1,14 @@
 import { useState, type Dispatch, type SetStateAction } from "react"
-import { DoorOpen, Loader2, Users } from "lucide-react"
+import { Copy, DoorOpen, Loader2, Trash2, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { AttachMenu } from "@/components/attach-menu"
 import { RemoveContactDialog } from "@/components/remove-contact-dialog"
 import { SwipeRow } from "@/components/swipe-row"
-import { shortenAddress } from "@/lib/address"
+import { copyText } from "@/lib/clipboard"
+import { formatAddress, shortenAddress } from "@/lib/address"
 import { useNames } from "@/hooks/use-names"
 import { labelIn, nameIn, type Directory } from "@/lib/names"
 import type { Contact } from "@/lib/relay"
@@ -64,6 +67,8 @@ export function Contacts({
   const [revealed, setRevealed] = useState<string | null>(null)
   /** Who is being dropped, once asked about. See `RemoveContactDialog`. */
   const [confirming, setConfirming] = useState<Contact | null>(null)
+  /** Whose actions are open. The same menu the chat list has. */
+  const [holding, setHolding] = useState<Contact | null>(null)
 
   if (error) {
     return <p className="text-destructive px-6 py-10 text-center text-sm text-balance">{error}</p>
@@ -99,9 +104,11 @@ export function Contacts({
             key={contact.address}
             actionLabel={`Remove ${labelIn(names, contact.address)}`}
             onAction={() => setConfirming(contact)}
-            // The same question a swipe asks, for a pointer that cannot swipe.
-            // One action, so it opens the confirmation rather than a menu of one.
-            onMenu={() => setConfirming(contact)}
+            // The swipe reveals the one thing it has room for; holding opens
+            // everything, which is how the chat list works and now how this one
+            // does.
+            onLongPress={() => setHolding(contact)}
+            onMenu={() => setHolding(contact)}
             menuLabel={t("contacts.rowMenu")}
             onClick={() => onOpen(contact.address)}
             revealed={revealed === contact.address}
@@ -128,6 +135,39 @@ export function Contacts({
           </SwipeRow>
         ))}
       </ul>
+
+      <AttachMenu
+        open={holding !== null}
+        onOpenChange={(open) => !open && setHolding(null)}
+        title={holding ? labelIn(names, holding.address) : ""}
+        actions={
+          holding
+            ? [
+                {
+                  icon: Copy,
+                  label: t("contacts.copyAddress"),
+                  description: t("contacts.copyAddressNote"),
+                  onSelect: () => {
+                    void copyText(formatAddress(holding.address)).then((ok) =>
+                      toast[ok ? "success" : "info"](
+                        ok ? t("app.addressCopied") : t("app.copyFailed"),
+                      ),
+                    )
+                  },
+                },
+                {
+                  icon: Trash2,
+                  label: t("contacts.removeContact"),
+                  description: t("contacts.removeContactNote"),
+                  tone: "destructive" as const,
+                  // Choosing it here is not the removal — the dialog is, and
+                  // the swipe's own action goes through the same one.
+                  onSelect: () => setConfirming(holding),
+                },
+              ]
+            : []
+        }
+      />
 
       <RemoveContactDialog
         contact={confirming}
