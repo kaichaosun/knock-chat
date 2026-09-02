@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react"
 import { useTranslation } from "react-i18next"
-import { ArrowUp, Plus, X } from "lucide-react"
+import { ArrowUp, Plus, Smile, X } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 import { Button } from "@/components/ui/button"
+import { EmojiSheet } from "@/components/emoji-sheet"
 import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
 import { mentionOf } from "@/lib/mentions"
@@ -104,6 +105,14 @@ export function Composer({
   const [body, setBody] = useState("")
   /** An input method is mid-word, so Enter belongs to it rather than to us. */
   const composing = useRef(false)
+  /**
+   * Whether the emoji grid is open.
+   *
+   * Offered on every device, not only where a keyboard has none: a phone's own
+   * picker is two taps behind the emoji key, and this one already knows what
+   * you reached for last.
+   */
+  const [emoji, setEmoji] = useState(false)
 
   /** What has been typed after an `@`, or null when nothing is being named. */
   const [query, setQuery] = useState<string | null>(null)
@@ -226,6 +235,36 @@ export function Composer({
     read()
   }
 
+  /**
+   * Drop text in where the caret was, and leave it after what was dropped.
+   *
+   * The sibling of [`put`] for something that is not a person. Both have to
+   * work from the *remembered* caret rather than the live selection, because
+   * both are reached through something that takes the focus off the box —
+   * a list, or a sheet.
+   */
+  const insert = (value: string) => {
+    const root = box.current
+    if (!root) return
+    const kept = caret.current
+    const range = kept && root.contains(kept.startContainer) ? kept.cloneRange() : atEnd(root)
+
+    range.deleteContents()
+    const node = document.createTextNode(value)
+    range.insertNode(node)
+
+    const landed = document.createRange()
+    landed.setStart(node, node.length)
+    landed.collapse(true)
+    const selection = document.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(landed)
+    caret.current = landed.cloneRange()
+
+    root.focus()
+    read()
+  }
+
   const pick = (address: string) => {
     const root = box.current
     if (!root) return
@@ -299,6 +338,15 @@ export function Composer({
 
   return (
     <div className="bg-background/85 relative border-t backdrop-blur-xl">
+      <EmojiSheet
+        open={emoji}
+        onOpenChange={setEmoji}
+        onPick={(chosen) => {
+          setEmoji(false)
+          insert(chosen)
+        }}
+      />
+
       {picking && (
         <div
           className={cn(
@@ -451,12 +499,31 @@ export function Composer({
             }}
             className={cn(
               "bg-muted max-h-33 min-h-11 w-full overflow-y-auto whitespace-pre-wrap",
-              "rounded-2xl px-4 py-2.5 leading-snug outline-none",
+              // Room on the right for the emoji button, which sits in the
+              // padding rather than in the row — a slot of its own would take
+              // its width from the box, and the box is the point.
+              "rounded-2xl py-2.5 pr-12 pl-4 leading-snug outline-none",
               "focus-visible:ring-ring/60 focus-visible:ring-2",
               disabled && "opacity-60",
               overLimit && "ring-destructive ring-2",
             )}
           />
+
+          {/* Bottom-aligned, so it stays put as the box grows with what is
+              written rather than riding up the side of it. */}
+          <button
+            type="button"
+            onClick={() => setEmoji(true)}
+            disabled={disabled}
+            aria-label={t("composer.emoji")}
+            className={cn(
+              "text-muted-foreground hover:text-foreground absolute right-1 bottom-1",
+              "flex size-10 items-center justify-center rounded-full transition-colors",
+              "disabled:opacity-60",
+            )}
+          >
+            <Smile className="size-5.5" />
+          </button>
         </div>
 
         <Button

@@ -98,6 +98,7 @@ export const zh: Dictionary = {
     knockFor: "敲门 — {{amount}} NIM",
   },
   composer: {
+    emoji: "表情",
     attach: "发送其他内容",
     message: "消息",
     send: "发送",

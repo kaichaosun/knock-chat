@@ -100,6 +100,7 @@ export const en = {
     knockFor: "Knock — {{amount}} NIM",
   },
   composer: {
+    emoji: "Emoji",
     attach: "Send something else",
     message: "Message",
     send: "Send",
