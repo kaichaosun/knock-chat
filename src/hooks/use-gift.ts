@@ -29,7 +29,7 @@ export function useGift(id: string) {
   const refresh = useCallback(async () => {
     try {
       const answer = await getGift(id)
-      remember(answer.names)
+      remember(answer.names, answer.faces)
       setDetail(answer)
     } catch {
       // The card falls back to what the message said, which is enough to draw

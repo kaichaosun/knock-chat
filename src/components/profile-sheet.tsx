@@ -1,9 +1,22 @@
-import { useEffect, useState } from "react"
-import { Copy, Loader2, LogOut, QrCode as QrCodeIcon, Settings, Wifi, WifiOff } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import {
+  Copy,
+  ImagePlus,
+  Loader2,
+  Camera,
+  LogOut,
+  Pencil,
+  QrCode as QrCodeIcon,
+  Settings,
+  Trash2,
+  Wifi,
+  WifiOff,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { AttachMenu } from "@/components/attach-menu"
 import { MyCodeSheet } from "@/components/my-code-sheet"
 import { SettingsSheet } from "@/components/settings-sheet"
 import { Button } from "@/components/ui/button"
@@ -16,14 +29,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useNames } from "@/hooks/use-names"
 import type { RelayStatus } from "@/hooks/use-messages"
 import { formatAddress } from "@/lib/address"
-import { rememberOne } from "@/lib/names"
+import { faceIn, rememberFace, rememberOne } from "@/lib/names"
+import { PictureError, prepare } from "@/lib/picture"
 import {
   LUNA_PER_NIM,
   MAX_AMOUNT_NIM,
+  MAX_AVATAR_BYTES,
   MAX_NAME_LEN,
+  clearAvatar,
   getReachability,
+  setAvatar,
   setPolicy,
   setProfile,
 } from "@/lib/relay"
@@ -59,6 +77,9 @@ export function ProfileSheet({
   onSignOut: () => void
 }) {
   const { t } = useTranslation()
+  const directory = useNames()
+  /** What the top of this sheet is drawing — a chosen picture, or nothing. */
+  const face = faceIn(directory, address)
   const [nim, setNim] = useState("")
   const [name, setName] = useState("")
   /** What the relay last confirmed, so Save can tell a change from a re-tap. */
@@ -73,6 +94,45 @@ export function ProfileSheet({
   const [saving, setSaving] = useState(false)
   const [savingName, setSavingName] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [picturing, setPicturing] = useState(false)
+  const [pictureMenu, setPictureMenu] = useState(false)
+  const picker = useRef<HTMLInputElement>(null)
+
+  /** How long a finger has to stay put before it counts as a press. */
+  const HOLD_MS = 500
+  /** How far it may wander first — a finger on glass is never quite still. */
+  const HOLD_SLOP_PX = 10
+  const holding = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pressed = useRef<{ x: number; y: number } | null>(null)
+
+  // A held finger opens the same menu a tap does. Both, because they answer
+  // different halves of the problem: a hold is what a phone teaches you to try
+  // on a picture, and a click is the only one of the two a mouse has — the hold
+  // below is touch-only, as it is everywhere else in this app, so without the
+  // tap a desktop would have no way to set a picture at all.
+  //
+  // No guard against the click that follows a hold. Elsewhere one is needed
+  // because the tap means something else; here they both open this menu, so
+  // firing twice sets the same flag to the same value.
+  const holdStart = (at: { clientX: number; clientY: number; button: number; pointerType: string }) => {
+    if (at.pointerType !== "touch" || at.button !== 0) return
+    pressed.current = { x: at.clientX, y: at.clientY }
+    window.clearTimeout(holding.current ?? undefined)
+    holding.current = setTimeout(() => setPictureMenu(true), HOLD_MS)
+  }
+
+  const holdMove = (at: { clientX: number; clientY: number }) => {
+    const from = pressed.current
+    if (!from) return
+    if (Math.abs(at.clientX - from.x) > HOLD_SLOP_PX || Math.abs(at.clientY - from.y) > HOLD_SLOP_PX) {
+      holdCancel()
+    }
+  }
+
+  const holdCancel = () => {
+    window.clearTimeout(holding.current ?? undefined)
+    pressed.current = null
+  }
   const [codeOpen, setCodeOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
@@ -87,6 +147,9 @@ export function ProfileSheet({
         setSavedLuna(r.policy.amount_luna)
         setName(r.name ?? "")
         setSavedName(r.name ?? "")
+        // An answer about one address can be believed about the absence too,
+        // so this is what corrects a picture changed on another device.
+        rememberFace(address, r.avatar ?? null)
       })
       .catch(() => {
         setNim("")
@@ -125,6 +188,46 @@ export function ProfileSheet({
     }
   }
 
+  /**
+   * Take the file the picker handed over and wear it.
+   *
+   * Prepared on this device first — see `lib/picture` — so what crosses the
+   * network is kilobytes rather than the several megabytes a phone camera
+   * produces. The relay decodes and re-encodes it again regardless; this is
+   * about the upload, not about trust.
+   */
+  const wear = async (file: File) => {
+    setPicturing(true)
+    try {
+      const image = await prepare(file)
+      if (image.size > MAX_AVATAR_BYTES) {
+        toast.error(t("profile.avatarTooBig", { max: MAX_AVATAR_BYTES / 1024 / 1024 }))
+        return
+      }
+      const worn = await setAvatar(image)
+      rememberFace(address, worn.avatar)
+      toast.success(t("profile.avatarSaved"))
+    } catch (error) {
+      if (error instanceof PictureError) toast.error(t("profile.avatarNotAnImage"))
+      else toast.error(error instanceof Error ? error.message : t("profile.saveFailed"))
+    } finally {
+      setPicturing(false)
+    }
+  }
+
+  const bare = async () => {
+    setPicturing(true)
+    try {
+      await clearAvatar()
+      rememberFace(address, null)
+      toast.success(t("profile.avatarCleared"))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("profile.saveFailed"))
+    } finally {
+      setPicturing(false)
+    }
+  }
+
   const save = async () => {
     if (luna === null) return
     setSaving(true)
@@ -148,7 +251,91 @@ export function ProfileSheet({
 
         <div className="space-y-7 pb-8">
           <section className="flex items-center gap-3.5">
-            <AddressAvatar address={address} size="lg" />
+            {/* The picture is its own control: one badge on the corner rather
+                than a row of icons underneath, which is the same offer made
+                with one thing to read instead of two. A badge is also the only
+                part of this a first-time user can see — nobody's instinct is
+                to tap their own face — so it stays put whether or not there is
+                a picture, and the menu behind it is what changes. */}
+            <button
+              type="button"
+              disabled={picturing}
+              onClick={() => setPictureMenu(true)}
+              onPointerDown={holdStart}
+              onPointerMove={holdMove}
+              onPointerUp={holdCancel}
+              onPointerCancel={holdCancel}
+              // Named for what it opens rather than what it is, since the face
+              // itself is decorative everywhere else in the app.
+              aria-label={t("profile.avatarMenu")}
+              className={cn(
+                "focus-visible:ring-ring/60 relative shrink-0 rounded-full transition-opacity outline-none",
+                "focus-visible:ring-2 focus-visible:ring-offset-2",
+                // The only thing marking it as a control. Deliberately quiet:
+                // a face is not a button, and this is the least that still
+                // answers a finger. Covers the badge as well — pressing a child
+                // makes its ancestor `:active`, and the dimming applies to the
+                // whole button — so the badge must not dim itself again or the
+                // two multiply.
+                "active:opacity-60 disabled:opacity-50",
+              )}
+            >
+              <AddressAvatar address={address} size="lg" />
+
+              {picturing ? (
+                // The one moment this needs to say something, because the
+                // picture on screen is still the old one until the upload
+                // lands and nothing else would show that it is working. Over a
+                // scrim, since a spinner drawn straight onto a photograph is
+                // only visible on the photographs that happen to be pale.
+                <span className="bg-background/70 pointer-events-none absolute inset-0 flex items-center justify-center rounded-full">
+                  <Loader2 className="size-5 animate-spin" />
+                </span>
+              ) : (
+                <span
+                  aria-hidden
+                  className={cn(
+                    // Deliberately *not* `pointer-events-none`. The badge hangs
+                    // over the corner of a `rounded-full` button, and a round
+                    // hit area does not reach its own corners — so with events
+                    // switched off here a tap on the badge fell through the gap
+                    // between the two and hit nothing at all. Left on, the badge
+                    // catches the tap itself and it bubbles to the button, which
+                    // works because the two are related by the DOM rather than
+                    // by where they happen to overlap.
+                    "absolute -top-0.5 -right-0.5",
+                    "flex size-6 items-center justify-center rounded-full",
+                    // The same fill as the copy and invite buttons across from
+                    // it, so the three read as one family of things you can do
+                    // here rather than as a decoration and two controls.
+                    "bg-secondary text-secondary-foreground",
+                    // A gap punched out of whatever is behind, so the badge
+                    // sits above the face instead of on it. Drawn from the
+                    // sheet's own ground, which is what it overlaps.
+                    "ring-background ring-2",
+                  )}
+                >
+                  <Camera className="size-3.5" strokeWidth={2} />
+                </span>
+              )}
+            </button>
+
+            {/* Hidden rather than styled: a file input cannot be made to look
+                like anything else, and the button above is the control. */}
+            <input
+              ref={picker}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                // Cleared before the upload rather than after, so picking the
+                // same file twice still fires a change the second time.
+                event.target.value = ""
+                if (file) void wear(file)
+              }}
+            />
+
             <div className="min-w-0 flex-1">
               <p className="text-muted-foreground text-[12px]">{t("profile.yourAddress")}</p>
               <p className="select-value font-mono text-[13px] leading-relaxed font-semibold wrap-anywhere">
@@ -382,6 +569,43 @@ export function ProfileSheet({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* What can be done to the face at the top of this sheet. Built from
+          what is there rather than greyed out: with no picture there is one
+          thing to do, and with one there are two — a "Remove" row that cannot
+          remove anything is a control that does nothing, which this app
+          refuses everywhere else. */}
+      <AttachMenu
+        open={pictureMenu}
+        onOpenChange={setPictureMenu}
+        title={t("profile.avatarMenu")}
+        actions={
+          face
+            ? [
+                {
+                  icon: Pencil,
+                  label: t("profile.avatarChange"),
+                  description: t("profile.avatarChangeNote"),
+                  onSelect: () => picker.current?.click(),
+                },
+                {
+                  icon: Trash2,
+                  label: t("profile.avatarRemove"),
+                  description: t("profile.avatarRemoveNote"),
+                  tone: "destructive",
+                  onSelect: () => void bare(),
+                },
+              ]
+            : [
+                {
+                  icon: ImagePlus,
+                  label: t("profile.avatarAdd"),
+                  description: t("profile.avatarAddNote"),
+                  onSelect: () => picker.current?.click(),
+                },
+              ]
+        }
+      />
 
       <MyCodeSheet open={codeOpen} onOpenChange={setCodeOpen} address={address} />
       <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />

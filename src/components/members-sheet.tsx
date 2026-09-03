@@ -100,7 +100,7 @@ export function MembersSheet({
       listGroupMembers(group.id, { q: query })
         .then((page) => {
           if (mine !== era.current) return
-          remember(page.names)
+          remember(page.names, page.faces)
           setMembers(page.members)
           setNext(page.next)
         })
@@ -126,7 +126,7 @@ export function MembersSheet({
     listGroupMembers(group.id, { after: next, q: query })
       .then((page) => {
         if (mine !== era.current) return
-        remember(page.names)
+        remember(page.names, page.faces)
         // Appended rather than replaced, and by identity: a member who joined
         // between two pages can arrive in both.
         setMembers((held) => [...held, ...page.members.filter((one) => !held.includes(one))])

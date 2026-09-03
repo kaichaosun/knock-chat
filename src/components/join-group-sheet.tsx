@@ -11,6 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { formatAddress } from "@/lib/address"
 import { formatNim } from "@/lib/postage"
 import type { Group } from "@/lib/relay"
 
@@ -105,7 +106,7 @@ export function JoinGroupSheet({
           ) : (
             <>
               <div className="bg-muted flex items-center gap-3 rounded-2xl px-4 py-3">
-                <GroupAvatar size="sm" />
+                <GroupAvatar size="sm" icon={group.icon} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] leading-tight font-semibold">{group.name}</p>
                   {/* What it costs, to somebody it could still cost. Quoting a
@@ -118,6 +119,22 @@ export function JoinGroupSheet({
                     </p>
                   )}
                 </div>
+              </div>
+
+              {/* Who is asking for the money.
+                  
+                  A room's mark used to be a mosaic of its members' addresses,
+                  which could not be forged — so the door needed nothing else.
+                  An icon can be: a room called "Nimiq Official" wearing the
+                  real logo and charging to be let in is the obvious use for
+                  one, and this is the screen where that would pay off. So the
+                  owner's address is here, unshortened, because this is where
+                  somebody comes to be sure rather than to skim. */}
+              <div className="px-1">
+                <p className="text-muted-foreground text-[12px]">{t("joinGroup.runBy")}</p>
+                <p className="select-value font-mono text-[12px] leading-relaxed font-semibold wrap-anywhere">
+                  {formatAddress(group.owner)}
+                </p>
               </div>
 
               {!joined && group.requires_approval && (

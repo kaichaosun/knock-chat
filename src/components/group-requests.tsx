@@ -55,7 +55,7 @@ export function GroupRequests({
                 onClick={() => onOpen(group.id)}
                 className="bg-card flex w-full items-center gap-3 rounded-2xl border p-3 text-left shadow-sm active:brightness-95"
               >
-                <GroupAvatar members={group.members} />
+                <GroupAvatar icon={group.icon} members={group.members} />
 
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] font-semibold">{group.name}</p>

@@ -602,7 +602,7 @@ export function GroupRoom({
             </Button>
           )}
 
-          <GroupAvatar size="sm" members={faces} className="size-9" />
+          <GroupAvatar size="sm" icon={group.icon} members={faces} className="size-9" />
 
           <button
             type="button"
@@ -1115,7 +1115,7 @@ function RoomIntro({
   const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center px-8 py-14 text-center">
-      <GroupAvatar size="lg" members={members} />
+      <GroupAvatar size="lg" icon={group.icon} members={members} />
       <p className="mt-4 text-base font-semibold">{group.name}</p>
       <p className="text-muted-foreground mt-2 text-sm text-balance">
         {t("room.emptyRoom")}

@@ -1,5 +1,5 @@
 /**
- * The display-name directory.
+ * The directory: what to call an address, and what to draw beside it.
  *
  * Names arrive attached to things the app already asks for — the contact list,
  * the knock list, a reachability check — rather than from a lookup of their own.
@@ -11,30 +11,51 @@
  * cached name can be out of date; that is the trade, and the address beside it
  * is what stays true.
  *
- * Two layers, kept apart. What someone calls themselves comes from the relay and
- * is replaced whenever they change it; what *you* call them is yours, never
+ * Three layers, kept apart. What someone calls themselves comes from the relay
+ * and is replaced whenever they change it; what *you* call them is yours, never
  * leaves this device, and wins wherever both exist. They are stored separately
  * so a relay answer can never quietly overwrite a name you chose, and so the
- * name you overrode is still there to show you what you overrode.
+ * name you overrode is still there to show you what you overrode. The third is
+ * the picture an address wears, which travels with the names and is read the
+ * same way.
  *
- * A name is never an identity. Nothing here resolves a name back to an address,
+ * Neither a name nor a picture is ever an identity. Nothing here resolves a name back to an address,
  * two people may pick the same one, and the relay does not check that anyone is
  * who they say. Every surface that shows a name to help you recognise someone
  * shows the address that actually identifies them.
+ *
+ * Pictures are the sharper edge of that, which is why one place deliberately
+ * does not learn them: an unanswered knock. A picture is the strongest thing on
+ * a row — stronger than the name, far stronger than the address underneath — so
+ * somebody arriving unasked is drawn as their identicon until you have let them
+ * in. See `use-knocks`.
  */
 
 import { compact, shortenAddress } from "./address"
-import { MAX_NAME_LEN, type Names } from "./relay"
+import { MAX_NAME_LEN, type Faces, type Names } from "./relay"
 
-/** One layer of names, keyed by [`key`] so spacing and case cannot split an entry. */
+/** One layer, keyed by [`key`] so spacing and case cannot split an entry. */
 type Layer = Record<string, string>
 
-/** Both layers of the directory. Read it through [`nameIn`] rather than by hand. */
+/** All three layers. Read it through [`nameIn`] and [`faceIn`], not by hand. */
 export type Directory = {
   /** What each address calls itself, as the relay last reported it. */
   given: Layer
   /** What you decided to call them. This device only — the relay never sees it. */
   chosen: Layer
+  /**
+   * The picture each address wears, by fingerprint, as the relay last reported.
+   *
+   * A third layer rather than a field on the other two, because a picture and a
+   * name arrive from the same responses but change independently: somebody can
+   * rename themselves without touching their picture, and a map keyed by address
+   * lets either land without disturbing the other.
+   *
+   * There is deliberately no `chosen` equivalent. A name you give somebody is a
+   * note to yourself that fits in a text field; a picture you give them would be
+   * an image library on the device, which is a different feature.
+   */
+  faces: Layer
 }
 
 const STORAGE_PREFIX = "knock.names."
@@ -44,6 +65,12 @@ const STORAGE_PREFIX = "knock.names."
  * every answer without any risk of taking your names down with it.
  */
 const CHOSEN_PREFIX = "knock.nicknames."
+/**
+ * Pictures get their own key for the same reason names and nicknames do: the
+ * layers are rewritten at different moments and must not be able to take each
+ * other down.
+ */
+const FACES_PREFIX = "knock.faces."
 
 /**
  * The directory key for an address.
@@ -102,8 +129,24 @@ export function sanitize(raw: string): string | null {
   return [...clean].slice(0, MAX_NAME_LEN).join("")
 }
 
+/**
+ * A picture's fingerprint, as the relay writes one: 64 lower-case hex digits.
+ *
+ * Checked rather than trusted, because this string is pasted into a URL path.
+ * The relay only ever emits this shape, but `VITE_RELAY_URL` can point anywhere
+ * and storage is user-writable, so anything else is discarded — a missing
+ * picture falls back to the identicon, which is the honest answer for one.
+ *
+ * Exactly one spelling is accepted, so a picture cannot occupy two cache entries.
+ */
+const FINGERPRINT = /^[0-9a-f]{64}$/
+
+export function isFingerprint(value: string): boolean {
+  return FINGERPRINT.test(value)
+}
+
 let owner: string | null = null
-let directory: Directory = { given: {}, chosen: {} }
+let directory: Directory = { given: {}, chosen: {}, faces: {} }
 const listeners = new Set<() => void>()
 
 function storageKey(forOwner: string): string {
@@ -112,6 +155,10 @@ function storageKey(forOwner: string): string {
 
 function chosenKey(forOwner: string): string {
   return `${CHOSEN_PREFIX}${key(forOwner)}`
+}
+
+function facesKey(forOwner: string): string {
+  return `${FACES_PREFIX}${key(forOwner)}`
 }
 
 function announce(): void {
@@ -129,29 +176,37 @@ export function adopt(nextOwner: string | null): void {
   directory = {
     given: nextOwner ? load(storageKey(nextOwner)) : {},
     chosen: nextOwner ? load(chosenKey(nextOwner)) : {},
+    faces: nextOwner ? load(facesKey(nextOwner), isFingerprint) : {},
   }
   announce()
 }
 
-/** Whatever is at `at` that still looks like a name, keyed the way this file keys. */
-function load(at: string): Layer {
-  const names: Layer = {}
+/**
+ * Whatever is at `at` that still survives `clean`, keyed the way this file keys.
+ *
+ * `clean` defaults to the name sanitiser; the faces layer passes the fingerprint
+ * check instead. Either way nothing reaches the directory without going through
+ * the same gate a fresh relay answer would.
+ */
+function load(at: string, clean: (raw: string) => string | null | boolean = sanitize): Layer {
+  const values: Layer = {}
   try {
     const raw = localStorage.getItem(at)
     const parsed: unknown = raw ? JSON.parse(raw) : null
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       // Storage is user-writable, and was written by an older build at least
-      // once — take only what still looks like a name.
-      for (const [address, name] of Object.entries(parsed as Record<string, unknown>)) {
-        if (typeof name !== "string") continue
-        const clean = sanitize(name)
-        if (clean) names[key(address)] = clean
+      // once — take only what still looks like what belongs here.
+      for (const [address, value] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof value !== "string") continue
+        const kept = clean(value)
+        if (kept === true) values[key(address)] = value
+        else if (typeof kept === "string") values[key(address)] = kept
       }
     }
   } catch {
     // Malformed or unavailable storage just means nothing was known.
   }
-  return names
+  return values
 }
 
 /**
@@ -162,9 +217,9 @@ function load(at: string): Layer {
  * not the same as having no name. Only `forget` removes an entry, so a knock
  * list cannot wipe a name the contact list taught us.
  */
-export function remember(names: Names): void {
-  let changed = false
+export function remember(names: Names, faces?: Faces): void {
   const given = { ...directory.given }
+  let changed = false
   for (const [address, raw] of Object.entries(names)) {
     const at = key(address)
     const clean = sanitize(raw)
@@ -172,7 +227,25 @@ export function remember(names: Names): void {
     given[at] = clean
     changed = true
   }
-  if (changed) commit({ given })
+
+  // Pictures behave exactly as names do here, including the part where a map
+  // that does not mention an address says nothing about it. A relay that
+  // predates pictures sends no map at all, which is also nothing said.
+  const withFaces = { ...directory.faces }
+  let facesChanged = false
+  for (const [address, fingerprint] of Object.entries(faces ?? {})) {
+    const at = key(address)
+    if (!isFingerprint(fingerprint) || withFaces[at] === fingerprint) continue
+    withFaces[at] = fingerprint
+    facesChanged = true
+  }
+
+  if (changed || facesChanged) {
+    commit({
+      ...(changed ? { given } : {}),
+      ...(facesChanged ? { faces: withFaces } : {}),
+    })
+  }
 }
 
 /**
@@ -181,6 +254,25 @@ export function remember(names: Names): void {
  * Used where the relay answered about a single address and so can be believed
  * about the absence too — a reachability check, or saving your own name.
  */
+/**
+ * Record one address's picture, including the fact that it has none.
+ *
+ * Used where the relay answered about a single address and so can be believed
+ * about the absence too — a reachability check, or setting your own picture.
+ */
+export function rememberFace(address: string, fingerprint: string | null): void {
+  const at = key(address)
+  const faces = { ...directory.faces }
+  if (fingerprint === null || !isFingerprint(fingerprint)) {
+    if (!(at in faces)) return
+    delete faces[at]
+  } else {
+    if (faces[at] === fingerprint) return
+    faces[at] = fingerprint
+  }
+  commit({ faces })
+}
+
 export function rememberOne(address: string, name: string | null): void {
   const at = key(address)
   const clean = name === null ? null : sanitize(name)
@@ -225,12 +317,14 @@ export function rename(address: string, name: string | null): void {
  */
 export function forget(address: string): void {
   const at = key(address)
-  if (!(at in directory.given) && !(at in directory.chosen)) return
+  if (!(at in directory.given) && !(at in directory.chosen) && !(at in directory.faces)) return
   const given = { ...directory.given }
   const chosen = { ...directory.chosen }
+  const faces = { ...directory.faces }
   delete given[at]
   delete chosen[at]
-  commit({ given, chosen })
+  delete faces[at]
+  commit({ given, chosen, faces })
 }
 
 function commit(next: Partial<Directory>): void {
@@ -240,6 +334,7 @@ function commit(next: Partial<Directory>): void {
     // rename, and it has no business rewriting the file your names are in.
     if (next.given) save(storageKey(owner), next.given)
     if (next.chosen) save(chosenKey(owner), next.chosen)
+    if (next.faces) save(facesKey(owner), next.faces)
   }
   announce()
 }
@@ -282,6 +377,16 @@ export function givenNameIn(directory: Directory, address: string): string | nul
 /** What you call `address`, or `null` if you have not named them. */
 export function chosenNameIn(directory: Directory, address: string): string | null {
   return directory.chosen[key(address)] ?? null
+}
+
+/**
+ * The picture `address` wears, or `null` for the ones who wear none.
+ *
+ * `null` is the ordinary answer, not a failure: an address without a picture has
+ * the identicon it always had, which is a face rather than a blank.
+ */
+export function faceIn(directory: Directory, address: string): string | null {
+  return directory.faces[key(address)] ?? null
 }
 
 /**

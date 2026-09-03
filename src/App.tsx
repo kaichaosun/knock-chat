@@ -55,7 +55,7 @@ import { cn } from "@/lib/utils"
 import { AlreadyPaidError, fundGift } from "@/lib/gift-funding"
 import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftReceipt } from "@/lib/gift-receipts"
 import { messageId, withRooms, type Message } from "@/lib/messages"
-import { adopt as adoptNames, givenNameIn, rememberOne } from "@/lib/names"
+import { adopt as adoptNames, givenNameIn, rememberFace, rememberOne } from "@/lib/names"
 import { adopt as adoptPins, unpin } from "@/lib/pins"
 import {
   adopt as adoptRooms,
@@ -651,6 +651,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       // absence of a name too — unlike a list, which only speaks for the names
       // it happens to carry.
       rememberOne(openPeer, answer.name)
+      rememberFace(openPeer, answer.avatar ?? null)
     } catch {
       // Leave it null: the composer stays in its ordinary mode, and a send that
       // turns out to be impossible is caught below.

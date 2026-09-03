@@ -149,6 +149,11 @@ export type Reachability = {
   knock_pending: boolean
   /** What they call themselves, if they have said. Unverified — see `lib/names`. */
   name: string | null
+  /**
+   * The picture they wear, as a fingerprint. Absent on a relay that predates
+   * pictures, `null` for somebody who has not set one.
+   */
+  avatar?: string | null
 }
 
 export type Knock = {
@@ -195,6 +200,83 @@ export function setProfile(name: string): Promise<Profile> {
   })
 }
 
+// -- profile pictures ------------------------------------------------------
+
+/**
+ * Profile pictures for a list of addresses, keyed the same way [`Names`] is.
+ *
+ * The value is a fingerprint, not a URL — the relay names a picture and this
+ * client knows how to build a path from the name. Only addresses wearing one
+ * appear, and the field itself is absent from a relay that predates pictures,
+ * which is why every reader treats it as optional.
+ */
+export type Faces = Record<string, string>
+
+/** What you are wearing now, as reported after setting or clearing a picture. */
+export type Worn = { avatar: string | null }
+
+/**
+ * The widths the relay renders. Mirrors `avatar::SIZES` in knock-relay.
+ *
+ * Asking for anything else is a 404 rather than a resize, so this list is not a
+ * suggestion — see [`faceUri`], which only ever builds one of these.
+ */
+export const FACE_SIZES = [96, 192, 384] as const
+export type FaceSize = (typeof FACE_SIZES)[number]
+
+/**
+ * The widths a link card's banner is rendered at, and its shape.
+ *
+ * Mirrors `avatar::BANNERS` and `BANNER_RATIO` in knock-relay. The ratio is
+ * Open Graph's own, and it is here so a card can reserve the right space before
+ * the picture lands — otherwise the thread jumps under the reader's thumb.
+ */
+export const BANNER_SIZES = [400, 800] as const
+export type BannerSize = (typeof BANNER_SIZES)[number]
+export const BANNER_RATIO = 1.91
+
+/**
+ * The most an upload may weigh, mirroring the relay's own ceiling.
+ *
+ * The picker downsizes long before this matters; it is here so a file that
+ * somehow survives that is refused on this side of the network rather than
+ * after a slow upload.
+ */
+export const MAX_AVATAR_BYTES = 1024 * 1024
+
+/**
+ * Where one rendition of a picture lives.
+ *
+ * A plain URL rather than something fetched, because these are drawn by `<img>`
+ * and the browser's own cache is the right cache for them: the fingerprint is
+ * in the path, so the bytes at a URL never change and the relay says so with a
+ * year of `immutable`.
+ *
+ * Absolute, because `BASE` may point at another origin entirely.
+ */
+export function faceUri(fingerprint: string, size: FaceSize | BannerSize): string {
+  return `${BASE}/v1/avatar/${fingerprint}/${size}`
+}
+
+/**
+ * Put on a profile picture. The body is the image itself — see the relay's
+ * `set_avatar` for why it is not wrapped in anything.
+ */
+export function setAvatar(image: Blob): Promise<Worn> {
+  return request<Worn>("/v1/profile/avatar", {
+    method: "PUT",
+    body: image,
+    // Overrides the JSON default. The relay reads the format from the bytes
+    // and ignores this, but sending the truth costs nothing.
+    headers: { "content-type": image.type || "application/octet-stream" },
+  })
+}
+
+/** Take your picture off, falling back to the identicon. */
+export function clearAvatar(): Promise<Worn> {
+  return request<Worn>("/v1/profile/avatar", { method: "DELETE" })
+}
+
 /** Knock on a door. `postage` is omitted only when the recipient waived it. */
 export function sendKnock(
   to: string,
@@ -213,8 +295,13 @@ export function sendKnock(
  * `sent` is your side of it: knocks you made that nobody has answered yet.
  * Both come back together because a client that shows either shows both.
  */
-export function listKnocks(): Promise<{ knocks: Knock[]; sent?: Knock[]; names: Names }> {
-  return request<{ knocks: Knock[]; sent?: Knock[]; names: Names }>("/v1/knocks")
+export function listKnocks(): Promise<{
+  knocks: Knock[]
+  sent?: Knock[]
+  names: Names
+  faces?: Faces
+}> {
+  return request("/v1/knocks")
 }
 
 export function acceptKnock(id: string) {
@@ -227,8 +314,8 @@ export function declineKnock(id: string) {
 
 export type Contact = { address: string; opened_at: string }
 
-export function listContacts(): Promise<{ contacts: Contact[]; names: Names }> {
-  return request<{ contacts: Contact[]; names: Names }>("/v1/contacts")
+export function listContacts(): Promise<{ contacts: Contact[]; names: Names; faces?: Faces }> {
+  return request("/v1/contacts")
 }
 
 // -- groups ----------------------------------------------------------------
@@ -267,6 +354,15 @@ export type Group = {
    * be quietly rewritten stops being a record of anything.
    */
   delete_window_secs: number
+  /**
+   * The picture the room's owner gave it, as a fingerprint.
+   *
+   * Absent or null means the mosaic of member faces the room started as — see
+   * `GroupAvatar`. Unlike that mosaic, which is made of addresses, this is a
+   * file somebody chose: the owner's address travels beside it because that is
+   * the part a visitor can actually check.
+   */
+  icon?: string | null
   created_at: string
   /**
    * The earliest few members, when the relay sent them.
@@ -287,6 +383,11 @@ export type GroupDetail = {
   /** How many are in the room, which `members` no longer tells you. */
   member_count?: number
   names: Names
+  /**
+   * Pictures for the addresses above. Absent from a relay that predates them.
+   * See [`Faces`].
+   */
+  faces?: Faces
   /** Whether the room is at the relay's member limit, so nobody else fits. */
   full?: boolean
   /**
@@ -303,6 +404,11 @@ export type GroupDetail = {
 export type MemberPage = {
   members: string[]
   names: Names
+  /**
+   * Pictures for the addresses above. Absent from a relay that predates them.
+   * See [`Faces`].
+   */
+  faces?: Faces
   /** Where the next page starts, or null at the end of the list. */
   next: number | null
 }
@@ -454,6 +560,26 @@ export function joinGroup(
   })
 }
 
+/**
+ * Give a room a picture. The owner's alone, and the body is the image itself.
+ *
+ * Answers with the whole room rather than just the icon, because the icon
+ * travels as part of a `Group` everywhere else and a caller holding one wants
+ * the updated version of it.
+ */
+export function setGroupIcon(id: string, image: Blob): Promise<Group> {
+  return request<Group>(`/v1/groups/${encodeURIComponent(id)}/icon`, {
+    method: "PUT",
+    body: image,
+    headers: { "content-type": image.type || "application/octet-stream" },
+  })
+}
+
+/** Take a room's picture off, back to the faces of its members. */
+export function clearGroupIcon(id: string): Promise<Group> {
+  return request<Group>(`/v1/groups/${encodeURIComponent(id)}/icon`, { method: "DELETE" })
+}
+
 export function sayInGroup(id: string, body: string) {
   return request<Sent>(
     `/v1/groups/${encodeURIComponent(id)}/messages`,
@@ -461,8 +587,10 @@ export function sayInGroup(id: string, body: string) {
   )
 }
 
-export function listJoinRequests(id: string): Promise<{ requests: JoinRequest[]; names: Names }> {
-  return request<{ requests: JoinRequest[]; names: Names }>(
+export function listJoinRequests(
+  id: string,
+): Promise<{ requests: JoinRequest[]; names: Names; faces?: Faces }> {
+  return request(
     `/v1/groups/${encodeURIComponent(id)}/requests`,
   )
 }
@@ -535,6 +663,11 @@ export type GiftDetail = {
   gift: Gift
   claims: GiftClaim[]
   names: Names
+  /**
+   * Pictures for the addresses above. Absent from a relay that predates them.
+   * See [`Faces`].
+   */
+  faces?: Faces
   /** What you got, if you were quick enough. */
   yours: number | null
 }
@@ -560,6 +693,18 @@ export type Preview = {
   host: string
   title: string
   description: string
+  /**
+   * The page's own picture, rendered and served **by the relay**.
+   *
+   * Never the site's URL. An `<img>` pointed at the site would hand it every
+   * reader's address and the fact that they read the message — in a room, when
+   * each member opened it — which is the one thing unfurling centrally exists
+   * to prevent. See the relay's `unfurl` module.
+   *
+   * Absent for most links, and for pictures too small or too square to crop
+   * wide. The card is then what it always was.
+   */
+  image?: string | null
 }
 
 /**

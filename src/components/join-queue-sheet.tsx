@@ -66,7 +66,7 @@ export function JoinQueueSheet({
                 everywhere else, without starting at an edge the sheet has no
                 other content against. */}
             <section className="flex items-center justify-center gap-3">
-              <GroupAvatar members={group.members} />
+              <GroupAvatar icon={group.icon} members={group.members} />
               <div className="min-w-0">
                 <p className="truncate text-[15px] leading-tight font-semibold">{group.name}</p>
                 <p className="text-muted-foreground truncate text-[12px]">

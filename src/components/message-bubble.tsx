@@ -9,7 +9,7 @@ import {
   LockKeyhole,
   Users,
 } from "lucide-react"
-import { Fragment, useMemo, useRef } from "react"
+import { Fragment, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -19,6 +19,7 @@ import type { Message } from "@/lib/messages"
 import { segments } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
 import { useLinkPreview } from "@/hooks/use-link-preview"
+import { bannerSources } from "@/lib/avatar"
 import type { Reacted } from "@/lib/reactions"
 import { ownCode, type Code } from "@/lib/knock-code"
 import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
@@ -565,6 +566,9 @@ function LinkCard({ text, faded }: { text: string; faded: boolean }) {
 
   const preview = useLinkPreview(href)
   const tap = useTap()
+  // A banner whose bytes will not load falls back to the card that was there
+  // before pictures existed, rather than to a broken image in a bubble.
+  const [brokenImage, setBrokenImage] = useState(false)
   if (!preview || (!preview.title && !preview.description)) return null
 
   return (
@@ -577,9 +581,43 @@ function LinkCard({ text, faded }: { text: string; faded: boolean }) {
       referrerPolicy="no-referrer"
       className={cn(
         "bg-card active:bg-muted mt-1 block rounded-2xl border px-3.5 py-2.5 transition-colors",
+        // A width of its own, so every card is the same one.
+        //
+        // Without it the card sizes to its content and the column sizes to the
+        // card: a page whose description runs to ninety characters gets a card
+        // at the column's 92% cap, and one with sixty gets a narrower card and
+        // a narrower banner with it. `line-clamp-2` does not help — it clamps
+        // what is drawn, not the max-content width the browser measures the
+        // column against. The same fixed-width idiom as the payment rows below.
+        //
+        // Wider once there is room for it. `lg` is 64rem, which is the same
+        // point `use-wide` splits the app into two panes — so the card grows
+        // exactly when the thread stops being the whole window and starts being
+        // a column of at least 40rem.
+        "w-72 max-w-full lg:w-96",
         faded && "opacity-60",
       )}
     >
+      {/* The page's own picture, when it has one worth drawing.
+
+          Served by the relay, never by the site: an `<img>` pointed at the site
+          would hand it this reader's address and the fact that they opened the
+          message, which is exactly what unfurling centrally exists to prevent.
+
+          The box is reserved before the picture lands — `aspect-[1.91]` with a
+          ground behind it — because a card that grows when an image arrives
+          pushes the thread under whoever is reading it. */}
+      {preview.image && !brokenImage && (
+        <img
+          alt=""
+          {...bannerSources(preview.image)}
+          sizes="(min-width: 40rem) 28rem, 78vw"
+          draggable={false}
+          onError={() => setBrokenImage(true)}
+          className="bg-muted -mx-3.5 -mt-2.5 mb-2.5 aspect-[1.91] w-[calc(100%+1.75rem)] max-w-none rounded-t-2xl object-cover select-none"
+        />
+      )}
+
       {/* The host first and in its own right. Where a link goes is the fact
           that matters, and a title above it would be the thing a page chose to
           say about itself sitting over the thing it cannot choose. */}

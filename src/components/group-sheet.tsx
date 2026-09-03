@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  Camera,
   Check,
   ChevronRight,
   Copy,
+  ImagePlus,
   Loader2,
+  Pencil,
   ShieldOff,
   LogOut,
   Trash2,
@@ -16,6 +19,8 @@ import { Trans, useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { AddressAvatar } from "@/components/address-avatar"
+import { AttachMenu } from "@/components/attach-menu"
+import { GroupAvatar } from "@/components/group-avatar"
 import {
   Dialog,
   DialogContent,
@@ -43,16 +48,20 @@ import { copyText } from "@/lib/clipboard"
 import { groupLink } from "@/lib/group-link"
 import { labelIn, nameIn, remember } from "@/lib/names"
 import { parseNim } from "@/lib/payments"
+import { PictureError, prepare } from "@/lib/picture"
 import { LeaveGroupDialog } from "@/components/leave-group-dialog"
 import { formatNim } from "@/lib/postage"
 import {
   MAX_DELETE_WINDOW_SECS,
   MAX_AMOUNT_LUNA,
   MAX_AMOUNT_NIM,
+  MAX_AVATAR_BYTES,
   answerJoinRequest,
+  clearGroupIcon,
   disbandGroup,
   listJoinRequests,
   removeGroupMember,
+  setGroupIcon,
   updateGroup,
   type Group,
   type GroupDetail,
@@ -259,6 +268,9 @@ export function GroupSheet({
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [saving, setSaving] = useState<"name" | "price" | "door" | "past" | "window" | null>(null)
+  const [iconMenu, setIconMenu] = useState(false)
+  const [iconBusy, setIconBusy] = useState(false)
+  const iconPicker = useRef<HTMLInputElement>(null)
   /** The door being changed to, while it is being confirmed. Null when nothing is. */
   const [changing, setChanging] = useState<boolean | null>(null)
   /** The history setting being moved to, while it is still only being offered. */
@@ -296,7 +308,7 @@ export function GroupSheet({
     }
     try {
       const answer = await listJoinRequests(group.id)
-      remember(answer.names)
+      remember(answer.names, answer.faces)
       setRequests(answer.requests)
     } catch {
       // Not worth surfacing; the sheet still shows everything else.
@@ -454,6 +466,45 @@ export function GroupSheet({
     setChangingPast(share)
   }
 
+  /**
+   * Give the room the picture the owner just picked.
+   *
+   * Prepared on this device first, exactly as a profile picture is — the relay
+   * decodes and re-encodes it again regardless, so this is about not sending a
+   * phone camera's several megabytes over mobile data.
+   */
+  const wearIcon = async (file: File) => {
+    setIconBusy(true)
+    try {
+      const image = await prepare(file)
+      if (image.size > MAX_AVATAR_BYTES) {
+        toast.error(t("profile.avatarTooBig", { max: MAX_AVATAR_BYTES / 1024 / 1024 }))
+        return
+      }
+      await setGroupIcon(group.id, image)
+      onChanged()
+      toast.success(t("groupSheet.iconSaved"))
+    } catch (error) {
+      if (error instanceof PictureError) toast.error(t("profile.avatarNotAnImage"))
+      else toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
+    } finally {
+      setIconBusy(false)
+    }
+  }
+
+  const bareIcon = async () => {
+    setIconBusy(true)
+    try {
+      await clearGroupIcon(group.id)
+      onChanged()
+      toast.success(t("groupSheet.iconCleared"))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
+    } finally {
+      setIconBusy(false)
+    }
+  }
+
   const saveName = async () => {
     setSaving("name")
     try {
@@ -501,15 +552,72 @@ export function GroupSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="mx-auto w-full max-w-[30rem] rounded-t-3xl px-5 pb-safe">
-        <SheetHeader className="px-0">
-          <SheetTitle>{group.name}</SheetTitle>
-          <SheetDescription>
-            {gone
-              ? t("groupSheet.disbandedNote")
-              : group.join_price_luna === 0
-                ? t("groupSheet.freeNote")
-                : t("groupSheet.priceNote", { amount: formatNim(group.join_price_luna) })}
-          </SheetDescription>
+        {/* The room's mark, beside what it is called and what it costs.
+            `flex-row` wins over the header's own `flex-col` through
+            `tailwind-merge`, which keeps whichever of a conflicting pair was
+            passed last. */}
+        <SheetHeader className="flex-row items-center gap-3.5 px-0">
+          {mine ? (
+            /* The same control as your own picture — see `ProfileSheet` — down
+               to the badge being the only thing that says it is one. What
+               differs is what it replaces: a room's mark is a mosaic of its
+               members rather than an identicon. */
+            <button
+              type="button"
+              disabled={iconBusy}
+              onClick={() => setIconMenu(true)}
+              aria-label={t("groupSheet.icon")}
+              className={cn(
+                "focus-visible:ring-ring/60 relative shrink-0 rounded-[22%] transition-opacity outline-none",
+                "focus-visible:ring-2 focus-visible:ring-offset-2",
+                "active:opacity-60 disabled:opacity-50",
+              )}
+            >
+              <GroupAvatar size="lg" icon={group.icon} members={members} />
+              {iconBusy ? (
+                <span className="bg-background/70 pointer-events-none absolute inset-0 flex items-center justify-center rounded-[22%]">
+                  <Loader2 className="size-5 animate-spin" />
+                </span>
+              ) : (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute -top-0.5 -right-0.5",
+                    "flex size-6 items-center justify-center rounded-full",
+                    "bg-secondary text-secondary-foreground",
+                    "ring-background ring-2",
+                  )}
+                >
+                  <Camera className="size-3.5" strokeWidth={2} />
+                </span>
+              )}
+            </button>
+          ) : (
+            /* Everybody else gets the mark itself. A room's own sheet is the
+               one place it was never drawn, which is a thing the icon is worth
+               fixing whether or not you are the one who can change it. */
+            <GroupAvatar size="lg" icon={group.icon} members={members} />
+          )}
+
+          {/* The header's own column, now that the header is a row. */}
+          <div className="grid min-w-0 flex-1 gap-1.5">
+            <SheetTitle className="truncate">{group.name}</SheetTitle>
+            {gone && <SheetDescription>{t("groupSheet.disbandedNote")}</SheetDescription>}
+          </div>
+
+          <input
+            ref={iconPicker}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              // Cleared before the upload rather than after, so picking the
+              // same file twice still fires a change the second time.
+              event.target.value = ""
+              if (file) void wearIcon(file)
+            }}
+          />
         </SheetHeader>
 
         {/* Everything here acts on the room through the relay — the link, the
@@ -987,6 +1095,40 @@ export function GroupSheet({
           </div>
         )}
       </SheetContent>
+
+      {/* What can be done to the room's mark. Built from what is there: a room
+          with no icon has one thing to offer, and one with an icon has two. */}
+      <AttachMenu
+        open={iconMenu}
+        onOpenChange={setIconMenu}
+        title={t("groupSheet.icon")}
+        actions={
+          group.icon
+            ? [
+                {
+                  icon: Pencil,
+                  label: t("groupSheet.iconChange"),
+                  description: t("groupSheet.iconChangeNote"),
+                  onSelect: () => iconPicker.current?.click(),
+                },
+                {
+                  icon: Trash2,
+                  label: t("groupSheet.iconRemove"),
+                  description: t("groupSheet.iconRemoveNote"),
+                  tone: "destructive",
+                  onSelect: () => void bareIcon(),
+                },
+              ]
+            : [
+                {
+                  icon: ImagePlus,
+                  label: t("groupSheet.iconAdd"),
+                  description: t("groupSheet.iconAddNote"),
+                  onSelect: () => iconPicker.current?.click(),
+                },
+              ]
+        }
+      />
 
       <MemberSheet
         address={showing}
