@@ -15,7 +15,7 @@ export const zh: Dictionary = {
     groups: "群组",
   },
   welcome: {
-    tagline: "在 Nimiq 钱包之间收发消息，用付费门槛挡住垃圾信息，而不是靠猜。",
+    tagline: "在 Nimiq 上聊天。为朋友、家人和社群——不为垃圾信息。",
     points: {
       noSignup: {
         title: "无需注册",
@@ -502,7 +502,7 @@ export const zh: Dictionary = {
     floating: "悬浮",
     inHeader: "在标题栏",
     previewTitle: "链接预览",
-    about: "在 Nimiq 钱包之间收发消息，用付费门槛挡住垃圾信息，而不是靠猜。",
+    about: "在 Nimiq 上聊天。为朋友、家人和社群——不为垃圾信息。",
     terms: "服务条款",
     privacy: "隐私政策",
   },

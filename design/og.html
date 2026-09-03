@@ -54,20 +54,31 @@
     color: #eef0f8;
     display: flex;
     align-items: center;
+    /* Centred rather than pinned to the left padding. The mark is narrower
+       than the space beside the text, so anchoring the row to one edge leaves
+       its slack all on the other one and the whole card sits off to the left. */
+    justify-content: center;
     gap: 62px;
     padding: 0 84px;
   }
-  .mark { width: 400px; flex: none; }
+  /* Sized against the text beside it, not the canvas. At 400 the mark stood
+     318px tall next to a 268px block of text - the tallest thing on the card,
+     a saturated block of blue on a dark ground, competing with the name rather
+     than introducing it. 240 puts it at 232, comfortably inside the text's
+     height, which is what makes it read as a mark and not a column. */
+  .mark { width: 240px; flex: none; }
   .mark img { width: 100%; display: block; }
   h1 { font-size: 112px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
   /* The logo's blue, not the app's gradient: one accent, and it belongs to the
      mark sitting next to it. */
   .rule { width: 84px; height: 7px; border-radius: 4px; background: #1192fc; margin: 28px 0 26px; }
-  p { font-size: 35px; font-weight: 600; line-height: 1.36; color: #c3cbe8; max-width: 570px; }
+  /* Wide enough for two lines rather than three: a short measure next to a
+     narrower mark left the text looking like a column of offcuts. */
+  p { font-size: 35px; font-weight: 600; line-height: 1.36; color: #c3cbe8; max-width: 660px; }
 </style>
 <div class="mark"><img src="og-mark.png"></div>
 <div>
   <h1>Knock</h1>
   <div class="rule"></div>
-  <p>Messages between Nimiq wallets, with spam priced out instead of guessed at.</p>
+  <p>Chat on Nimiq. For friends, family and community - not for spam.</p>
 </div>

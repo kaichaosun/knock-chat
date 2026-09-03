@@ -1,7 +1,7 @@
 {
   "name": "Knock",
   "short_name": "Knock",
-  "description": "Messages between Nimiq wallets, with spam priced out instead of guessed at.",
+  "description": "Chat on Nimiq. For friends, family and community - not for spam.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

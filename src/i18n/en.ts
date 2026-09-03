@@ -12,7 +12,7 @@ export const en = {
     groups: "Groups",
   },
   welcome: {
-    tagline: "Messages between Nimiq wallets, with spam priced out instead of guessed at.",
+    tagline: "Chat on Nimiq. For friends, family and community - not for spam.",
     points: {
       noSignup: {
         title: "No sign-up",
@@ -539,7 +539,7 @@ export const en = {
     floating: "Floating",
     inHeader: "In the header",
     previewTitle: "Link preview",
-    about: "Messages between Nimiq wallets, with spam priced out instead of guessed at.",
+    about: "Chat on Nimiq. For friends, family and community - not for spam.",
     terms: "Terms of Service",
     privacy: "Privacy Policy",
   },
