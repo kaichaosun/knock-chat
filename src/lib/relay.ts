@@ -225,6 +225,17 @@ export const FACE_SIZES = [96, 192, 384] as const
 export type FaceSize = (typeof FACE_SIZES)[number]
 
 /**
+ * The widths a link card's banner is rendered at, and its shape.
+ *
+ * Mirrors `avatar::BANNERS` and `BANNER_RATIO` in knock-relay. The ratio is
+ * Open Graph's own, and it is here so a card can reserve the right space before
+ * the picture lands — otherwise the thread jumps under the reader's thumb.
+ */
+export const BANNER_SIZES = [400, 800] as const
+export type BannerSize = (typeof BANNER_SIZES)[number]
+export const BANNER_RATIO = 1.91
+
+/**
  * The most an upload may weigh, mirroring the relay's own ceiling.
  *
  * The picker downsizes long before this matters; it is here so a file that
@@ -243,7 +254,7 @@ export const MAX_AVATAR_BYTES = 1024 * 1024
  *
  * Absolute, because `BASE` may point at another origin entirely.
  */
-export function faceUri(fingerprint: string, size: FaceSize): string {
+export function faceUri(fingerprint: string, size: FaceSize | BannerSize): string {
   return `${BASE}/v1/avatar/${fingerprint}/${size}`
 }
 
@@ -682,6 +693,18 @@ export type Preview = {
   host: string
   title: string
   description: string
+  /**
+   * The page's own picture, rendered and served **by the relay**.
+   *
+   * Never the site's URL. An `<img>` pointed at the site would hand it every
+   * reader's address and the fact that they read the message — in a room, when
+   * each member opened it — which is the one thing unfurling centrally exists
+   * to prevent. See the relay's `unfurl` module.
+   *
+   * Absent for most links, and for pictures too small or too square to crop
+   * wide. The card is then what it always was.
+   */
+  image?: string | null
 }
 
 /**

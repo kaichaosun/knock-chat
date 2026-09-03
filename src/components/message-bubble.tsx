@@ -9,7 +9,7 @@ import {
   LockKeyhole,
   Users,
 } from "lucide-react"
-import { Fragment, useMemo, useRef } from "react"
+import { Fragment, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { AddressAvatar } from "@/components/address-avatar"
@@ -19,6 +19,7 @@ import type { Message } from "@/lib/messages"
 import { segments } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
 import { useLinkPreview } from "@/hooks/use-link-preview"
+import { bannerSources } from "@/lib/avatar"
 import type { Reacted } from "@/lib/reactions"
 import { ownCode, type Code } from "@/lib/knock-code"
 import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
@@ -565,6 +566,9 @@ function LinkCard({ text, faded }: { text: string; faded: boolean }) {
 
   const preview = useLinkPreview(href)
   const tap = useTap()
+  // A banner whose bytes will not load falls back to the card that was there
+  // before pictures existed, rather than to a broken image in a bubble.
+  const [brokenImage, setBrokenImage] = useState(false)
   if (!preview || (!preview.title && !preview.description)) return null
 
   return (
@@ -580,6 +584,26 @@ function LinkCard({ text, faded }: { text: string; faded: boolean }) {
         faded && "opacity-60",
       )}
     >
+      {/* The page's own picture, when it has one worth drawing.
+
+          Served by the relay, never by the site: an `<img>` pointed at the site
+          would hand it this reader's address and the fact that they opened the
+          message, which is exactly what unfurling centrally exists to prevent.
+
+          The box is reserved before the picture lands — `aspect-[1.91]` with a
+          ground behind it — because a card that grows when an image arrives
+          pushes the thread under whoever is reading it. */}
+      {preview.image && !brokenImage && (
+        <img
+          alt=""
+          {...bannerSources(preview.image)}
+          sizes="(min-width: 40rem) 28rem, 78vw"
+          draggable={false}
+          onError={() => setBrokenImage(true)}
+          className="bg-muted -mx-3.5 -mt-2.5 mb-2.5 aspect-[1.91] w-[calc(100%+1.75rem)] max-w-none rounded-t-2xl object-cover select-none"
+        />
+      )}
+
       {/* The host first and in its own right. Where a link goes is the fact
           that matters, and a title above it would be the thing a page chose to
           say about itself sitting over the thing it cannot choose. */}

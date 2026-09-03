@@ -20,7 +20,13 @@
 import { createIdenticonCache, createIdenticonCached } from "identicons-esm/cache"
 
 import { formatAddress } from "./address"
-import { FACE_SIZES, faceUri, type FaceSize } from "./relay"
+import {
+  BANNER_SIZES,
+  FACE_SIZES,
+  faceUri,
+  type BannerSize,
+  type FaceSize,
+} from "./relay"
 
 /**
  * The same address is drawn repeatedly — a row in the inbox, the header of its
@@ -71,5 +77,21 @@ export function faceSources(fingerprint: string): FaceSources {
   return {
     src: faceUri(fingerprint, FACE_SIZES[0]),
     srcSet: FACE_SIZES.map((size: FaceSize) => `${faceUri(fingerprint, size)} ${size}w`).join(", "),
+  }
+}
+
+/**
+ * The same, for the wide picture a link card draws.
+ *
+ * Kept beside [`faceSources`] rather than in a module of its own because it is
+ * the same store, the same immutable URLs and the same reasoning — only the
+ * shape differs.
+ */
+export function bannerSources(fingerprint: string): FaceSources {
+  return {
+    src: faceUri(fingerprint, BANNER_SIZES[0]),
+    srcSet: BANNER_SIZES.map((size: BannerSize) => `${faceUri(fingerprint, size)} ${size}w`).join(
+      ", ",
+    ),
   }
 }
