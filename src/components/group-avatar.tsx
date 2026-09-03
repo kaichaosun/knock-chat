@@ -19,24 +19,73 @@ const SIZES = {
  * Only the smallest rendition, and no `srcSet` — a quarter of a 44px tile is
  * eleven points, so even a phone's pixel ratio asks for less than the 96 this
  * fetches. Anything larger would be bytes spent on detail the tile cannot show.
+ *
+ * `corner` is applied to both kinds of face. It does nothing visible to an
+ * identicon, whose hexagon never reaches its own corners, but applying it
+ * unconditionally means the two cannot drift apart.
  */
-function Face({ address }: { address: string }) {
+function Face({ address, corner }: { address: string; corner: string }) {
   const directory = useNames()
   const face = faceIn(directory, address)
   const [broken, setBroken] = useState(false)
 
   if (!face || broken) {
-    return <img src={avatarUri(address)} alt="" className="size-full object-cover" />
+    return (
+      <img src={avatarUri(address)} alt="" className={cn("size-full object-cover", corner)} />
+    )
   }
   return (
     <img
       src={faceSources(face).src}
       alt=""
       onError={() => setBroken(true)}
-      className="size-full rounded-[18%] object-cover"
+      className={cn("size-full object-cover", corner)}
     />
   )
 }
+
+/**
+ * How far the faces sit inside the mosaic's own edge.
+ *
+ * Fixed pixels rather than a percentage, because percentage padding resolves
+ * against the *containing block's* width — the row this mark happens to be
+ * sitting in — rather than against the mark. One value per size is the only way
+ * to keep it proportional to the thing it is insetting.
+ */
+const INSET = {
+  sm: "p-[2px]",
+  md: "p-[3px]",
+  lg: "p-[4px]",
+} as const
+
+/**
+ * Each tile's corners, as `border-radius`: top-left, top-right, bottom-right,
+ * bottom-left.
+ *
+ * A tile's *outer* corner has to follow the curve of the mosaic it sits in, or
+ * that curve cuts across it. Concentric rounding is the rule for two shapes
+ * nested like this: the inner radius is the outer one minus the gap between
+ * them. Here the mosaic is 22% of its width and the faces sit a little over 9%
+ * inside it, which leaves about a third of a tile — and because every term
+ * scales with the mark, 33% holds at all three sizes rather than needing one
+ * number each.
+ *
+ * The other three corners stay nearly square. They meet the tiles beside them
+ * rather than the outside world, and rounding those would open a hole in the
+ * middle of the mark.
+ *
+ * This is what was wrong before: the faces were rounded uniformly and only 3px
+ * inside a 10px curve, so the mosaic's own corners clipped them. It went
+ * unnoticed while every face was an identicon — a hexagon leaves its corners
+ * empty, so there was nothing there to clip — and became visible the moment a
+ * photograph, which fills its square, arrived in one of these slots.
+ */
+const CORNERS = [
+  "rounded-[33%_10%_10%_10%]",
+  "rounded-[10%_33%_10%_10%]",
+  "rounded-[10%_10%_10%_33%]",
+  "rounded-[10%_10%_33%_10%]",
+] as const
 
 /**
  * How many faces a mosaic draws.
@@ -108,12 +157,11 @@ export function GroupAvatar({
         // The ground behind the faces, seen through the quarters a room with
         // fewer than four members leaves empty. Same reasoning as above.
         "bg-foreground/10 shrink-0 overflow-hidden",
-        // The inset keeps the faces off the tile's own edge — an identicon is a
-        // hexagon running nearly the full width of its box, and without it the
-        // outer faces are clipped by the rounding. Fixed pixels because two of
-        // them read the same at all three sizes; the radius stays proportional
-        // because border-radius percentages are not in dispute anywhere.
-        "rounded-[22%] p-[2px]",
+        // The radius stays proportional — border-radius percentages resolve
+        // against the element's own box, so 22% is 22% of the mark at every
+        // size. What it is inset by cannot be, hence [`INSET`].
+        "rounded-[22%]",
+        INSET[size],
         //
         // Four cells at half the width and half the height, wrapped — not a
         // grid with two stated rows. That is what this was, and on WebKit the
@@ -136,8 +184,16 @@ export function GroupAvatar({
       {Array.from({ length: MOST }, (_, slot) => {
         const address = faces[slot]
         return (
-          <div key={address ?? `empty-${slot}`} className="h-1/2 w-1/2 p-[1px]">
-            {address && <Face address={address} />}
+          <div
+            key={address ?? `empty-${slot}`}
+            // Half the mark each way, then padded in. Two neighbouring cells
+            // each pad by this much, so the gap between two faces is twice it —
+            // which is what stops four photographs reading as one rectangle
+            // with lines drawn on it. A percentage works here where it does not
+            // on the container above: a cell's containing block *is* the mark.
+            className="h-1/2 w-1/2 p-[4%]"
+          >
+            {address && <Face address={address} corner={CORNERS[slot]} />}
           </div>
         )
       })}
