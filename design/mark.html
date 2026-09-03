@@ -1,11 +1,22 @@
 <!doctype html>
-<!-- Just knock_logo.svg, large, on nothing - the first half of the build in
-     og.html, which explains why it is drawn this big. 1600x1544 keeps the
-     SVG's own 227x219 proportion. -->
+<!--
+  knock_logo.svg, large, on nothing. The one master render everything else is
+  cut from: design/og-mark.png for the share card, and the whole icon set in
+  scripts/icons.sh.
+
+  Drawn far bigger than anything that uses it, on purpose. The SVG builds the
+  door out of two overlapping paths under one drop shadow filter, and both
+  Chrome and rsvg leave a pale hairline where they meet - across the middle of
+  the largest flat blue area, which is where the eye goes. It is not in the
+  artwork; knock_logo.png, exported from the same design, is clean. Shrunk from
+  2048 the artifact averages out below a pixel and is gone.
+
+  2048x1976 keeps the SVG's own 227x219 proportion.
+-->
 <meta charset="utf-8">
 <style>
   * { margin: 0; padding: 0 }
-  html, body { width: 1600px; height: 1544px }
-  img { width: 1600px; display: block }
+  html, body { width: 2048px; height: 1976px }
+  img { width: 2048px; display: block }
 </style>
 <img src="knock_logo.svg">

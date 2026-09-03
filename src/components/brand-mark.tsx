@@ -14,7 +14,9 @@ import { cn } from "@/lib/utils"
  *
  * Wider than it is tall, and the real ratio is declared rather than squared off
  * — a square box would reserve height the art never uses, and every caller
- * would be centring against space that is not there.
+ * would be centring against space that is not there. The two numbers below are
+ * the file's own, so `scripts/icons.sh` — which writes it — is where they have
+ * to be checked if the art is ever redrawn.
  */
 export function BrandMark({ className }: { className?: string }) {
   return (
@@ -23,7 +25,7 @@ export function BrandMark({ className }: { className?: string }) {
       alt=""
       aria-hidden
       width={512}
-      height={505}
+      height={495}
       className={cn("object-contain select-none", className)}
     />
   )

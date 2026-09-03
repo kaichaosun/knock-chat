@@ -4,15 +4,9 @@
   shared - public/og.png, built from this.
 
   Kept as source because the alternative is a 1200x630 binary nobody can
-  change. To rebuild, from the repo root:
-
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-      --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
-      --window-size=1600,1544 --virtual-time-budget=6000 \
-      --default-background-color=00000000 \
-      --screenshot=design/og-mark-4x.png design/mark.html
-    magick design/og-mark-4x.png -filter Lanczos -resize 400x design/og-mark.png
-    rm design/og-mark-4x.png
+  change. The mark it places comes from scripts/icons.sh, which cuts every
+  size of the logo from one render - run that first if the logo has changed.
+  Then, from the repo root:
 
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
       --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
@@ -21,16 +15,6 @@
     magick design/og-raw.png -strip \
       -define png:compression-level=9 -define png:compression-filter=5 public/og.png
     rm design/og-raw.png
-
-  ## Why the mark is drawn four times over and shrunk
-
-  knock_logo.svg builds the door out of two overlapping paths under one drop
-  shadow filter, and both Chrome and rsvg leave a pale hairline where they
-  meet - a line across the middle of a large flat blue area, which is exactly
-  where the eye goes. It is not in the artwork: knock_logo.png, exported from
-  the same design, has no such line. Drawn at 1600px and shrunk to 400 the
-  artifact averages out below a pixel and is gone. If the SVG is ever cleaned
-  up so a direct render is clean, this step and og-mark.png can both go.
 
   ## Why the background is a plain vertical gradient
 
