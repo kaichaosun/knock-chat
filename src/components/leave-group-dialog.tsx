@@ -72,7 +72,7 @@ export function LeaveGroupDialog({
     <Dialog open={group !== null} onOpenChange={(open) => !open && onOpenChange(false)}>
       <DialogContent className="max-w-[20rem] rounded-3xl">
         <DialogHeader className="items-center text-center sm:text-center">
-          <GroupAvatar members={group?.members} />
+          <GroupAvatar icon={group?.icon} members={group?.members} />
           <DialogTitle className="mt-2">{t("groups.leaveTitle")}</DialogTitle>
           <p className="text-[15px] font-semibold">{group?.name}</p>
           <DialogDescription className="text-balance">

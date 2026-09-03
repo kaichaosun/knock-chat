@@ -299,7 +299,11 @@ function ConversationRow({
       )}
       selected={selected}
     >
-      {group ? <GroupAvatar members={room?.members} /> : peer && <AddressAvatar address={peer} />}
+      {group ? (
+        <GroupAvatar icon={room?.icon} members={room?.members} />
+      ) : (
+        peer && <AddressAvatar address={peer} />
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">

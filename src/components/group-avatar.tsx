@@ -12,6 +12,13 @@ const SIZES = {
   lg: "size-16",
 } as const
 
+/** What each size measures, for `sizes`. Mirrors [`SIZES`], as in `AddressAvatar`. */
+const WIDTHS = {
+  sm: "2rem",
+  md: "2.75rem",
+  lg: "4rem",
+} as const
+
 /**
  * One quarter of the mosaic: whoever is in that slot, as they are drawn
  * everywhere else.
@@ -117,18 +124,59 @@ const MOST = 4
  *
  * Falls back to the glyph when nobody is known — a room whose membership has
  * not arrived, or one this list does not carry faces for.
+ *
+ * All of that is what a room looks like until its owner gives it a picture. An
+ * `icon` replaces the mosaic outright rather than sitting beside it: the two are
+ * answers to the same question, and a room showing both would be telling you
+ * twice. What it does not replace is the reason the mosaic was trustworthy —
+ * that mark is made of addresses and cannot be borrowed, and an icon is a file
+ * somebody chose. Every screen where trusting a room costs something shows the
+ * owner's address next to it.
  */
 export function GroupAvatar({
+  icon,
   members,
   size = "md",
   className,
 }: {
+  /**
+   * The picture the room's owner gave it. Absent for a room that has none, and
+   * on screens holding a `Group` from before this existed.
+   */
+  icon?: string | null
   /** The room's earliest members. Absent on screens that do not know them. */
   members?: string[]
   size?: keyof typeof SIZES
   className?: string
 }) {
   const faces = (members ?? []).slice(0, MOST)
+  // Keyed by fingerprint, so a room whose icon was taken down falls back to its
+  // members' faces rather than to a broken image — and a new icon gets its own
+  // chance instead of inheriting the last one's failure.
+  const [broken, setBroken] = useState<string | null>(null)
+
+  if (icon && broken !== icon) {
+    const { src, srcSet } = faceSources(icon)
+    return (
+      <img
+        aria-hidden
+        alt=""
+        src={src}
+        srcSet={srcSet}
+        sizes={WIDTHS[size]}
+        draggable={false}
+        onError={() => setBroken(icon)}
+        className={cn(
+          // The mosaic's own silhouette, kept exactly: a room stays a rounded
+          // square and a person stays a circle, which is the difference a list
+          // is read by before anything in either picture is.
+          "bg-foreground/10 shrink-0 rounded-[22%] object-cover select-none",
+          SIZES[size],
+          className,
+        )}
+      />
+    )
+  }
 
   if (faces.length === 0) {
     return (

@@ -343,6 +343,15 @@ export type Group = {
    * be quietly rewritten stops being a record of anything.
    */
   delete_window_secs: number
+  /**
+   * The picture the room's owner gave it, as a fingerprint.
+   *
+   * Absent or null means the mosaic of member faces the room started as — see
+   * `GroupAvatar`. Unlike that mosaic, which is made of addresses, this is a
+   * file somebody chose: the owner's address travels beside it because that is
+   * the part a visitor can actually check.
+   */
+  icon?: string | null
   created_at: string
   /**
    * The earliest few members, when the relay sent them.
@@ -538,6 +547,26 @@ export function joinGroup(
     method: "POST",
     body: JSON.stringify({ postage }),
   })
+}
+
+/**
+ * Give a room a picture. The owner's alone, and the body is the image itself.
+ *
+ * Answers with the whole room rather than just the icon, because the icon
+ * travels as part of a `Group` everywhere else and a caller holding one wants
+ * the updated version of it.
+ */
+export function setGroupIcon(id: string, image: Blob): Promise<Group> {
+  return request<Group>(`/v1/groups/${encodeURIComponent(id)}/icon`, {
+    method: "PUT",
+    body: image,
+    headers: { "content-type": image.type || "application/octet-stream" },
+  })
+}
+
+/** Take a room's picture off, back to the faces of its members. */
+export function clearGroupIcon(id: string): Promise<Group> {
+  return request<Group>(`/v1/groups/${encodeURIComponent(id)}/icon`, { method: "DELETE" })
 }
 
 export function sayInGroup(id: string, body: string) {

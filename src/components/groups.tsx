@@ -90,7 +90,7 @@ export function Groups({
               onReveal={(open) => setRevealed(open ? group.id : null)}
               selected={selectedId === group.id}
             >
-              <GroupAvatar members={group.members} />
+              <GroupAvatar icon={group.icon} members={group.members} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold">{group.name}</p>
                 {/* The door, not the calendar. How old a room is tells nobody
