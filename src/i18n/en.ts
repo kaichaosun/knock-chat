@@ -437,6 +437,16 @@ export const en = {
     showUpAs: "You'll show up as {{name}}",
     nameCleared: "Name cleared",
     saveFailed: "Couldn't save",
+    picture: "Your picture",
+    pictureNote:
+      "Shown beside your name to people you've let in. Anyone can pick any picture, so it decorates your address rather than proving anything about you.",
+    pictureChange: "Change picture",
+    pictureAdd: "Add a picture",
+    pictureRemove: "Remove picture",
+    pictureSaved: "Your picture is set",
+    pictureCleared: "Picture removed",
+    pictureTooBig: "That picture is too large. Try one under {{max}} MB.",
+    pictureNotAPicture: "That file isn't a picture.",
     costTitle: "Cost to knock",
     costNote:
       "What someone new pays to reach you. You keep it whether or not you answer. People you've let in never pay again.",

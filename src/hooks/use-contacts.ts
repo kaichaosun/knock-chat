@@ -45,9 +45,9 @@ export function useContacts(
   const read = useCallback(async () => {
     const mine = era.current
     try {
-      const { contacts, names } = await listContacts()
+      const { contacts, names, faces } = await listContacts()
       if (mine !== era.current) return
-      remember(names)
+      remember(names, faces)
       held.current = contacts
       setContacts(contacts)
       setError("")

@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   adopt,
   chosenNameIn,
+  faceIn,
   forget,
   givenNameIn,
+  isFingerprint,
   labelIn,
   nameIn,
   remember,
+  rememberFace,
   rememberOne,
   rename,
   sanitize,
@@ -232,6 +235,116 @@ describe("persistence", () => {
   it("treats malformed storage as an empty directory", () => {
     stubStorage({ [`knock.names.${ME.replace(/ /g, "")}`]: "{ not json" })
     expect(() => adopt(ME)).not.toThrow()
-    expect(snapshot()).toEqual({ given: {}, chosen: {} })
+    expect(snapshot()).toEqual({ given: {}, chosen: {}, faces: {} })
+  })
+})
+
+/** A fingerprint of the shape the relay actually emits. */
+const FACE = "a".repeat(64)
+const OTHER_FACE = "b3".repeat(32)
+
+describe("faces", () => {
+  it("learns a picture alongside the name it arrived with", () => {
+    remember({ [ALICE]: "alice" }, { [ALICE]: FACE })
+    expect(nameIn(snapshot(), ALICE)).toBe("alice")
+    expect(faceIn(snapshot(), ALICE)).toBe(FACE)
+  })
+
+  it("has no picture for somebody who has not chosen one", () => {
+    // The ordinary state, not a failure: their address still draws its own.
+    remember({ [ALICE]: "alice" })
+    expect(faceIn(snapshot(), ALICE)).toBeNull()
+  })
+
+  it("takes a relay that predates pictures as saying nothing about them", () => {
+    remember({ [ALICE]: "alice" }, { [ALICE]: FACE })
+    // No `faces` at all, which is what an older relay sends.
+    remember({ [ALICE]: "alice" })
+    expect(faceIn(snapshot(), ALICE)).toBe(FACE)
+  })
+
+  it("says nothing about addresses a picture map does not mention", () => {
+    // Same rule as names: a knock list cannot wipe what the contact list taught.
+    remember({}, { [ALICE]: FACE })
+    remember({}, { [BOB]: OTHER_FACE })
+    expect(faceIn(snapshot(), ALICE)).toBe(FACE)
+    expect(faceIn(snapshot(), BOB)).toBe(OTHER_FACE)
+  })
+
+  it("replaces a picture when its owner changes it", () => {
+    remember({}, { [ALICE]: FACE })
+    remember({}, { [ALICE]: OTHER_FACE })
+    expect(faceIn(snapshot(), ALICE)).toBe(OTHER_FACE)
+  })
+
+  it("refuses anything that is not a fingerprint", () => {
+    // This string is pasted into a URL path, so its shape is checked rather
+    // than trusted — `VITE_RELAY_URL` can point anywhere.
+    for (const hostile of [
+      "../../etc/passwd",
+      "a".repeat(63),
+      "a".repeat(65),
+      "A".repeat(64), // one spelling only, so one picture is one cache entry
+      `${"a".repeat(60)}/../`,
+      "",
+    ]) {
+      expect(isFingerprint(hostile)).toBe(false)
+      remember({}, { [ALICE]: hostile })
+      expect(faceIn(snapshot(), ALICE)).toBeNull()
+    }
+  })
+
+  it("records one address's picture, including that it has none", () => {
+    rememberFace(ALICE, FACE)
+    expect(faceIn(snapshot(), ALICE)).toBe(FACE)
+    // Where the relay answered about one address, it can be believed about
+    // the absence too — this is how taking your own picture off lands.
+    rememberFace(ALICE, null)
+    expect(faceIn(snapshot(), ALICE)).toBeNull()
+  })
+
+  it("keeps a picture across a cold start", () => {
+    remember({ [ALICE]: "alice" }, { [ALICE]: FACE })
+    adopt(ME)
+    expect(faceIn(snapshot(), ALICE)).toBe(FACE)
+  })
+
+  it("does not carry pictures between identities", () => {
+    remember({}, { [ALICE]: FACE })
+    adopt(BOB)
+    expect(faceIn(snapshot(), ALICE)).toBeNull()
+  })
+
+  it("ignores anything in storage that is not a fingerprint", () => {
+    stubStorage({
+      [`knock.faces.${ME.replace(/ /g, "")}`]: JSON.stringify({
+        [ALICE.replace(/ /g, "")]: "not-a-fingerprint",
+        [BOB.replace(/ /g, "")]: FACE,
+      }),
+    })
+    adopt(ME)
+    expect(faceIn(snapshot(), ALICE)).toBeNull()
+    expect(faceIn(snapshot(), BOB)).toBe(FACE)
+  })
+
+  it("takes the picture with it when an address is forgotten", () => {
+    // Removing a contact undoes the reason to have any of it.
+    remember({ [ALICE]: "alice" }, { [ALICE]: FACE })
+    rename(ALICE, "mum")
+    forget(ALICE)
+    expect(faceIn(snapshot(), ALICE)).toBeNull()
+    expect(nameIn(snapshot(), ALICE)).toBeNull()
+    expect(chosenNameIn(snapshot(), ALICE)).toBeNull()
+  })
+
+  it("keeps a picture and a name from disturbing each other", () => {
+    remember({ [ALICE]: "alice" }, { [ALICE]: FACE })
+    // A rename that says nothing about pictures leaves the picture alone...
+    remember({ [ALICE]: "alice again" })
+    expect(faceIn(snapshot(), ALICE)).toBe(FACE)
+    // ...and a new picture leaves the name alone.
+    remember({}, { [ALICE]: OTHER_FACE })
+    expect(nameIn(snapshot(), ALICE)).toBe("alice again")
+    expect(givenNameIn(snapshot(), ALICE)).toBe("alice again")
   })
 })

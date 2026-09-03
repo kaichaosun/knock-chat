@@ -1,6 +1,9 @@
+import { useState } from "react"
 import { Users } from "lucide-react"
 
-import { avatarUri } from "@/lib/avatar"
+import { useNames } from "@/hooks/use-names"
+import { avatarUri, faceSources } from "@/lib/avatar"
+import { faceIn } from "@/lib/names"
 import { cn } from "@/lib/utils"
 
 const SIZES = {
@@ -8,6 +11,32 @@ const SIZES = {
   md: "size-11",
   lg: "size-16",
 } as const
+
+/**
+ * One quarter of the mosaic: whoever is in that slot, as they are drawn
+ * everywhere else.
+ *
+ * Only the smallest rendition, and no `srcSet` — a quarter of a 44px tile is
+ * eleven points, so even a phone's pixel ratio asks for less than the 96 this
+ * fetches. Anything larger would be bytes spent on detail the tile cannot show.
+ */
+function Face({ address }: { address: string }) {
+  const directory = useNames()
+  const face = faceIn(directory, address)
+  const [broken, setBroken] = useState(false)
+
+  if (!face || broken) {
+    return <img src={avatarUri(address)} alt="" className="size-full object-cover" />
+  }
+  return (
+    <img
+      src={faceSources(face).src}
+      alt=""
+      onError={() => setBroken(true)}
+      className="size-full rounded-[18%] object-cover"
+    />
+  )
+}
 
 /**
  * How many faces a mosaic draws.
@@ -108,9 +137,7 @@ export function GroupAvatar({
         const address = faces[slot]
         return (
           <div key={address ?? `empty-${slot}`} className="h-1/2 w-1/2 p-[1px]">
-            {address && (
-              <img src={avatarUri(address)} alt="" className="size-full object-cover" />
-            )}
+            {address && <Face address={address} />}
           </div>
         )
       })}

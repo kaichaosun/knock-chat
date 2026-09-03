@@ -31,7 +31,7 @@ export function useMentionSearch(group: string, you: string) {
   return useCallback(
     async (query: string) => {
       const page = await listGroupMembers(group, { q: query })
-      remember(page.names)
+      remember(page.names, page.faces)
       // Naming yourself in your own message points at the one person who
       // already knows they wrote it.
       const published = page.members.filter((address) => !sameAddress(address, you))

@@ -42,7 +42,7 @@ export function useJoinRequests(waiting: Record<string, number>) {
     for (const id of doors) {
       try {
         const answer = await listJoinRequests(id)
-        remember(answer.names)
+        remember(answer.names, answer.faces)
         if (answer.requests.length > 0) found[id] = answer.requests
       } catch {
         // A door that will not answer is left out rather than shown empty; the

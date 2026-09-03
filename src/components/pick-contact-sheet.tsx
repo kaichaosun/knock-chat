@@ -57,7 +57,7 @@ export function PickContactSheet({
     listContacts()
       .then((answer) => {
         if (cancelled) return
-        remember(answer.names)
+        remember(answer.names, answer.faces)
         setContacts(answer.contacts)
       })
       .catch(() => !cancelled && setContacts([]))

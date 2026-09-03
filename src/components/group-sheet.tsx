@@ -296,7 +296,7 @@ export function GroupSheet({
     }
     try {
       const answer = await listJoinRequests(group.id)
-      remember(answer.names)
+      remember(answer.names, answer.faces)
       setRequests(answer.requests)
     } catch {
       // Not worth surfacing; the sheet still shows everything else.

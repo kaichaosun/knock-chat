@@ -101,6 +101,16 @@ export function useKnocks(
     if (!signedIn) return
     try {
       const { knocks, sent, names } = await listKnocks()
+      // Names only — the `faces` this answer carries are deliberately dropped.
+      //
+      // A knock is somebody arriving unasked, and a profile picture is the
+      // loudest thing on the row they arrive as: it is what a reader recognises
+      // before the name and long before the address underneath, which is the
+      // only part that is actually checked. Wearing somebody else's face to get
+      // let in is the one attack this screen exists to survive, so a stranger is
+      // drawn as their identicon — which is derived from their address and
+      // cannot be borrowed — until you have opened the door. Accepting puts them
+      // in the contact list, and that answer brings their picture with it.
       remember(names)
       setKnocks(knocks)
       setSent(sent ?? [])

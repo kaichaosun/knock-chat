@@ -1,5 +1,15 @@
-import { useEffect, useState } from "react"
-import { Copy, Loader2, LogOut, QrCode as QrCodeIcon, Settings, Wifi, WifiOff } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import {
+  Copy,
+  ImagePlus,
+  Loader2,
+  LogOut,
+  QrCode as QrCodeIcon,
+  Settings,
+  Trash2,
+  Wifi,
+  WifiOff,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -16,14 +26,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useNames } from "@/hooks/use-names"
 import type { RelayStatus } from "@/hooks/use-messages"
 import { formatAddress } from "@/lib/address"
-import { rememberOne } from "@/lib/names"
+import { faceIn, rememberFace, rememberOne } from "@/lib/names"
+import { PictureError, prepare } from "@/lib/picture"
 import {
   LUNA_PER_NIM,
   MAX_AMOUNT_NIM,
+  MAX_AVATAR_BYTES,
   MAX_NAME_LEN,
+  clearAvatar,
   getReachability,
+  setAvatar,
   setPolicy,
   setProfile,
 } from "@/lib/relay"
@@ -59,6 +74,9 @@ export function ProfileSheet({
   onSignOut: () => void
 }) {
   const { t } = useTranslation()
+  const directory = useNames()
+  /** What the top of this sheet is drawing — a chosen picture, or nothing. */
+  const face = faceIn(directory, address)
   const [nim, setNim] = useState("")
   const [name, setName] = useState("")
   /** What the relay last confirmed, so Save can tell a change from a re-tap. */
@@ -73,6 +91,8 @@ export function ProfileSheet({
   const [saving, setSaving] = useState(false)
   const [savingName, setSavingName] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [picturing, setPicturing] = useState(false)
+  const picker = useRef<HTMLInputElement>(null)
   const [codeOpen, setCodeOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
@@ -87,6 +107,9 @@ export function ProfileSheet({
         setSavedLuna(r.policy.amount_luna)
         setName(r.name ?? "")
         setSavedName(r.name ?? "")
+        // An answer about one address can be believed about the absence too,
+        // so this is what corrects a picture changed on another device.
+        rememberFace(address, r.avatar ?? null)
       })
       .catch(() => {
         setNim("")
@@ -122,6 +145,46 @@ export function ProfileSheet({
       toast.error(error instanceof Error ? error.message : "Couldn't save")
     } finally {
       setSavingName(false)
+    }
+  }
+
+  /**
+   * Take the file the picker handed over and wear it.
+   *
+   * Prepared on this device first — see `lib/picture` — so what crosses the
+   * network is kilobytes rather than the several megabytes a phone camera
+   * produces. The relay decodes and re-encodes it again regardless; this is
+   * about the upload, not about trust.
+   */
+  const wear = async (file: File) => {
+    setPicturing(true)
+    try {
+      const image = await prepare(file)
+      if (image.size > MAX_AVATAR_BYTES) {
+        toast.error(t("profile.pictureTooBig", { max: MAX_AVATAR_BYTES / 1024 / 1024 }))
+        return
+      }
+      const worn = await setAvatar(image)
+      rememberFace(address, worn.avatar)
+      toast.success(t("profile.pictureSaved"))
+    } catch (error) {
+      if (error instanceof PictureError) toast.error(t("profile.pictureNotAPicture"))
+      else toast.error(error instanceof Error ? error.message : t("profile.saveFailed"))
+    } finally {
+      setPicturing(false)
+    }
+  }
+
+  const bare = async () => {
+    setPicturing(true)
+    try {
+      await clearAvatar()
+      rememberFace(address, null)
+      toast.success(t("profile.pictureCleared"))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("profile.saveFailed"))
+    } finally {
+      setPicturing(false)
     }
   }
 
@@ -176,6 +239,56 @@ export function ProfileSheet({
                 </Button>
               </div>
             </div>
+          </section>
+
+          <section>
+            <h3 className="text-sm font-semibold">{t("profile.picture")}</h3>
+            <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
+              {t("profile.pictureNote")}
+            </p>
+
+            {/* No preview of its own: the avatar at the top of this sheet is
+                already the picture, a finger's width above, and it updates the
+                moment this does. A second copy would only raise the question of
+                which one is the real one. */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                disabled={picturing}
+                onClick={() => picker.current?.click()}
+                className="h-11 rounded-2xl px-4"
+              >
+                {picturing ? <Loader2 className="animate-spin" /> : <ImagePlus className="size-4" />}
+                {face ? t("profile.pictureChange") : t("profile.pictureAdd")}
+              </Button>
+              {face && (
+                <Button
+                  variant="ghost"
+                  disabled={picturing}
+                  onClick={() => void bare()}
+                  className="text-muted-foreground h-11 rounded-2xl px-4"
+                >
+                  <Trash2 className="size-4" />
+                  {t("profile.pictureRemove")}
+                </Button>
+              )}
+            </div>
+
+            {/* Hidden rather than styled: a file input cannot be made to look
+                like anything else, and the button above is the control. */}
+            <input
+              ref={picker}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                // Cleared before the upload rather than after, so picking the
+                // same file twice still fires a change the second time.
+                event.target.value = ""
+                if (file) void wear(file)
+              }}
+            />
           </section>
 
           <section>

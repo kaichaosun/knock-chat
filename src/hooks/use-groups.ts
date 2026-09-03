@@ -68,7 +68,7 @@ export function useGroups(wallet: Wallet | null, owner: string | null) {
   /** What a link leads to: the room's name and price, before deciding to join. */
   const inspect = useCallback(async (id: string): Promise<GroupDetail> => {
     const detail = await getGroup(id)
-    remember(detail.names)
+    remember(detail.names, detail.faces)
     return detail
   }, [])
 
