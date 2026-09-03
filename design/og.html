@@ -1,0 +1,89 @@
+<!doctype html>
+<!--
+  The picture Discord, X, Slack and iMessage draw when a link to Knock is
+  shared - public/og.png, built from this.
+
+  Kept as source because the alternative is a 1200x630 binary nobody can
+  change. To rebuild, from the repo root:
+
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+      --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+      --window-size=1600,1544 --virtual-time-budget=6000 \
+      --default-background-color=00000000 \
+      --screenshot=design/og-mark-4x.png design/mark.html
+    magick design/og-mark-4x.png -filter Lanczos -resize 400x design/og-mark.png
+    rm design/og-mark-4x.png
+
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+      --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+      --window-size=1200,630 --virtual-time-budget=6000 \
+      --screenshot=design/og-raw.png design/og.html
+    magick design/og-raw.png -strip \
+      -define png:compression-level=9 -define png:compression-filter=5 public/og.png
+    rm design/og-raw.png
+
+  ## Why the mark is drawn four times over and shrunk
+
+  knock_logo.svg builds the door out of two overlapping paths under one drop
+  shadow filter, and both Chrome and rsvg leave a pale hairline where they
+  meet - a line across the middle of a large flat blue area, which is exactly
+  where the eye goes. It is not in the artwork: knock_logo.png, exported from
+  the same design, has no such line. Drawn at 1600px and shrunk to 400 the
+  artifact averages out below a pixel and is gone. If the SVG is ever cleaned
+  up so a direct render is clean, this step and og-mark.png can both go.
+
+  ## Why the background is a plain vertical gradient
+
+  It used to be a radial glow, and that one flourish was 153 kB of a 281 kB
+  file - more than double what the mark itself cost. PNG predicts each row
+  from the one above, so a vertical gradient is nearly free and a radial one
+  is nearly incompressible. The same card over a flat or vertical ground is
+  109 kB.
+
+  Not worth trying: a 256-colour palette gets this under 50 kB and puts
+  magenta speckle across the hand.
+
+  ## Sizes
+
+  1200x630 is what both X and Discord lay a wide card out at, and
+  --force-device-scale-factor=1 stops a retina screen quietly doubling it.
+  Type is set large for the size the card is *seen* at - a feed shows it about
+  a third of the width it is drawn at, so anything scaled to look right at
+  1200px arrives unreadable.
+
+  Mulish comes from Google Fonts, the same face the app loads, so this needs a
+  network. `display=block` rather than `swap`: a screenshot has one frame to
+  get right, and swap would spend it on the fallback font.
+-->
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700;800&display=block" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    font-family: Mulish, system-ui, sans-serif;
+    /* The app's own dark background and text, so the card and the thing it
+       opens are recognisably one product. */
+    background: linear-gradient(180deg, #151b4e 0%, #101438 55%, #0c0f2c 100%);
+    color: #eef0f8;
+    display: flex;
+    align-items: center;
+    gap: 62px;
+    padding: 0 84px;
+  }
+  .mark { width: 400px; flex: none; }
+  .mark img { width: 100%; display: block; }
+  h1 { font-size: 112px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+  /* The logo's blue, not the app's gradient: one accent, and it belongs to the
+     mark sitting next to it. */
+  .rule { width: 84px; height: 7px; border-radius: 4px; background: #1192fc; margin: 28px 0 26px; }
+  p { font-size: 35px; font-weight: 600; line-height: 1.36; color: #c3cbe8; max-width: 570px; }
+</style>
+<div class="mark"><img src="og-mark.png"></div>
+<div>
+  <h1>Knock</h1>
+  <div class="rule"></div>
+  <p>Messages between Nimiq wallets, with spam priced out instead of guessed at.</p>
+</div>

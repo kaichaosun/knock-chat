@@ -15,6 +15,58 @@
       name="description"
       content="Messages between Nimiq wallets, with spam priced out instead of guessed at."
     />
+
+    <!-- The card Discord, X, Slack, WhatsApp and iMessage draw when somebody
+         shares a link to this. Without these they have a URL and nothing else,
+         which is what a link to Knock used to look like anywhere it was posted.
+
+         Written here, in the HTML, rather than anywhere in the app: a crawler
+         asks for the page and reads what comes back. It does not run the
+         bundle, so nothing React sets would ever be seen.
+
+         Absolute, not `/og.png`. A relative URL works in some readers and is
+         simply dropped by others — X among them — and there is no way to tell
+         which happened from the outside. The cost of hard-coding the host is
+         one line to change if it ever moves; the cost of the alternative is a
+         card that silently has no picture on half the internet.
+
+         And a caution this repo has already paid for once: an unknown path
+         here is answered with this file, so a wrong image path is not a 404. A
+         crawler asks for a picture, gets 200 and a page of HTML, and shows no
+         image — exactly the symptom of having no tags at all. If a card comes
+         back empty, check what /og.png actually returns before touching
+         anything else. Same trap as /icon.svg below.
+
+         Both vocabularies are needed. X reads its own `twitter:` tags first
+         and falls back to Open Graph; Discord and the rest read Open Graph.
+         `summary_large_image` is what makes X draw the wide card rather than a
+         thumbnail beside the text. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Knock" />
+    <meta property="og:url" content="https://knockchat.org/" />
+    <meta property="og:title" content="Knock - chat on Nimiq" />
+    <meta
+      property="og:description"
+      content="Messages between Nimiq wallets, with spam priced out instead of guessed at."
+    />
+    <meta property="og:image" content="https://knockchat.org/og.png" />
+    <!-- Stated so the card is laid out on the first request, before the image
+         itself has been fetched and measured. -->
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Knock - messages between Nimiq wallets, with spam priced out instead of guessed at."
+    />
+    <meta property="og:locale" content="en" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Knock - chat on Nimiq" />
+    <meta
+      name="twitter:description"
+      content="Messages between Nimiq wallets, with spam priced out instead of guessed at."
+    />
+    <meta name="twitter:image" content="https://knockchat.org/og.png" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
