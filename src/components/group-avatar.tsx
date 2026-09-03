@@ -27,18 +27,18 @@ const WIDTHS = {
  * eleven points, so even a phone's pixel ratio asks for less than the 96 this
  * fetches. Anything larger would be bytes spent on detail the tile cannot show.
  *
- * `corner` is applied to both kinds of face. It does nothing visible to an
- * identicon, whose hexagon never reaches its own corners, but applying it
- * unconditionally means the two cannot drift apart.
+ * Rounded on all four corners, and to both kinds of face. It does nothing
+ * visible to an identicon, whose hexagon never reaches its own corners, but
+ * applying it unconditionally means the two cannot drift apart.
  */
-function Face({ address, corner }: { address: string; corner: string }) {
+function Face({ address }: { address: string }) {
   const directory = useNames()
   const face = faceIn(directory, address)
   const [broken, setBroken] = useState(false)
 
   if (!face || broken) {
     return (
-      <img src={avatarUri(address)} alt="" className={cn("size-full object-cover", corner)} />
+      <img src={avatarUri(address)} alt="" className={cn("size-full object-cover", TILE)} />
     )
   }
   return (
@@ -46,7 +46,7 @@ function Face({ address, corner }: { address: string; corner: string }) {
       src={faceSources(face).src}
       alt=""
       onError={() => setBroken(true)}
-      className={cn("size-full object-cover", corner)}
+      className={cn("size-full object-cover", TILE)}
     />
   )
 }
@@ -66,33 +66,24 @@ const INSET = {
 } as const
 
 /**
- * Each tile's corners, as `border-radius`: top-left, top-right, bottom-right,
- * bottom-left.
+ * How round a face in the mosaic is, on every corner equally.
  *
- * A tile's *outer* corner has to follow the curve of the mosaic it sits in, or
- * that curve cuts across it. Concentric rounding is the rule for two shapes
- * nested like this: the inner radius is the outer one minus the gap between
- * them. Here the mosaic is 22% of its width and the faces sit a little over 9%
- * inside it, which leaves about a third of a tile — and because every term
- * scales with the mark, 33% holds at all three sizes rather than needing one
- * number each.
+ * A third of the tile, which is the radius its *outward* corner needs: the
+ * mosaic's own curve is 22% of a much larger box, and a tile sitting a little
+ * over 9% inside that works out to about a third of itself. Every term scales
+ * with the mark, so one number holds at all three sizes.
  *
- * The other three corners stay nearly square. They meet the tiles beside them
- * rather than the outside world, and rounding those would open a hole in the
- * middle of the mark.
+ * The other three corners were nearly square at first, on the theory that they
+ * meet their neighbours rather than the outside world and only the outward one
+ * has a curve to follow. That is true of a full mosaic and wrong of every other
+ * one: a room with a single face puts one rounded corner and three sharp ones
+ * on screen, which reads as a mistake rather than as a rule. A tile that is the
+ * same shape wherever it lands has no such states.
  *
- * This is what was wrong before: the faces were rounded uniformly and only 3px
- * inside a 10px curve, so the mosaic's own corners clipped them. It went
- * unnoticed while every face was an identicon — a hexagon leaves its corners
- * empty, so there was nothing there to clip — and became visible the moment a
- * photograph, which fills its square, arrived in one of these slots.
+ * Rounding all four cannot clip anything, either — it only takes material away
+ * from corners that were already inside the frame.
  */
-const CORNERS = [
-  "rounded-[33%_10%_10%_10%]",
-  "rounded-[10%_33%_10%_10%]",
-  "rounded-[10%_10%_10%_33%]",
-  "rounded-[10%_10%_33%_10%]",
-] as const
+const TILE = "rounded-[28%]"
 
 /**
  * How many faces a mosaic draws.
@@ -241,7 +232,7 @@ export function GroupAvatar({
             // on the container above: a cell's containing block *is* the mark.
             className="h-1/2 w-1/2 p-[4%]"
           >
-            {address && <Face address={address} corner={CORNERS[slot]} />}
+            {address && <Face address={address} />}
           </div>
         )
       })}

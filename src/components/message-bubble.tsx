@@ -581,6 +581,20 @@ function LinkCard({ text, faded }: { text: string; faded: boolean }) {
       referrerPolicy="no-referrer"
       className={cn(
         "bg-card active:bg-muted mt-1 block rounded-2xl border px-3.5 py-2.5 transition-colors",
+        // A width of its own, so every card is the same one.
+        //
+        // Without it the card sizes to its content and the column sizes to the
+        // card: a page whose description runs to ninety characters gets a card
+        // at the column's 92% cap, and one with sixty gets a narrower card and
+        // a narrower banner with it. `line-clamp-2` does not help — it clamps
+        // what is drawn, not the max-content width the browser measures the
+        // column against. The same fixed-width idiom as the payment rows below.
+        //
+        // Wider once there is room for it. `lg` is 64rem, which is the same
+        // point `use-wide` splits the app into two panes — so the card grows
+        // exactly when the thread stops being the whole window and starts being
+        // a column of at least 40rem.
+        "w-72 max-w-full lg:w-96",
         faded && "opacity-60",
       )}
     >
