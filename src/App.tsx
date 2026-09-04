@@ -1127,6 +1127,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         }
         onSignIn={session.authenticate}
         onRetry={retry}
+        onDismiss={session.invalidate}
       />
     )
   }

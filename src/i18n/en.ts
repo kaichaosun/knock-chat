@@ -31,6 +31,8 @@ export const en = {
     looking: "Looking for your wallet",
     opening: "Opening your wallet",
     signIn: "Sign in with your wallet",
+    signInTitle: "Sign in",
+    signInNote: "Your wallet signs one message to prove the address is yours.",
     oneSignature: "One signature. Nothing is spent.",
     agree: "By signing in you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
   },

@@ -34,6 +34,8 @@ export const zh: Dictionary = {
     looking: "正在寻找你的钱包",
     opening: "正在打开你的钱包",
     signIn: "用钱包登录",
+    signInTitle: "登录",
+    signInNote: "你的钱包会签名一条消息，用来证明这个地址属于你。",
     oneSignature: "只需一次签名，不会花费任何费用。",
     agree: "登录即表示你同意我们的<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
   },
