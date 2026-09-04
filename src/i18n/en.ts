@@ -25,6 +25,8 @@ export const en = {
     },
     openInPay: "Open in Nimiq Pay",
     useBrowserWallet: "Use a wallet in this browser",
+    payMissing: "Nimiq Pay didn't open — you may not have it installed.",
+    getPay: "Get Nimiq Pay",
     tryAgain: "Try again",
     looking: "Looking for your wallet",
     opening: "Opening your wallet",

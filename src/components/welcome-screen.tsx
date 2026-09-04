@@ -6,7 +6,12 @@ import { BrandMark } from "@/components/brand-mark"
 import { LegalSheet } from "@/components/legal-sheet"
 import { Button } from "@/components/ui/button"
 import { PRIVACY, TERMS, type LegalDoc } from "@/lib/legal"
-import { chooseBrowserWallet, insideNimiqPay, nimiqPayDeeplink } from "@/lib/wallet"
+import {
+  NIMIQ_PAY_PAGE,
+  chooseBrowserWallet,
+  insideNimiqPay,
+  openNimiqPay,
+} from "@/lib/wallet"
 
 /**
  * Everything before the inbox, on one screen.
@@ -48,6 +53,10 @@ export function WelcomeScreen({
   const { t } = useTranslation()
   /** Whichever document is being read, if either. */
   const [reading, setReading] = useState<LegalDoc | null>(null)
+  /** Set once a tap on "Open in Nimiq Pay" has gone unanswered. */
+  const [payMissing, setPayMissing] = useState(false)
+  /** Between the tap and finding out whether anything answered it. */
+  const [openingPay, setOpeningPay] = useState(false)
 
   /** The two waits with nothing else on screen: finding the wallet, and asking the relay. */
   const waiting = status === "detecting" || status === "preparing"
@@ -126,13 +135,49 @@ export function WelcomeScreen({
                 answers `nimiqpay://` — but the alternative is guessing at the
                 device from its user agent, and a guess that goes the other way
                 costs a phone user the app entirely. */}
+            {/* Above the buttons, where this screen already puts what it has
+                to say — `explain` sits in the same place. It keeps the two ways
+                in next to each other as the pair of choices they are, rather
+                than splitting them with a paragraph.
+
+                Only after a tap that led nowhere, and said in place rather than
+                by navigating away: the second way in is the button below, and
+                somebody who has just learned they need an app they have not got
+                should not have to find their way back to it. */}
+            {payMissing && (
+              <p className="text-muted-foreground px-2 text-center text-[13px] leading-snug text-balance">
+                {t("welcome.payMissing")}{" "}
+                <a
+                  href={NIMIQ_PAY_PAGE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground font-semibold underline underline-offset-2"
+                >
+                  {t("welcome.getPay")}
+                </a>
+              </p>
+            )}
+
             <Button
               size="lg"
+              disabled={openingPay}
               className="h-13 w-full rounded-2xl text-base"
-              onClick={() => window.location.assign(nimiqPayDeeplink())}
+              onClick={() => {
+                setOpeningPay(true)
+                setPayMissing(false)
+                openNimiqPay((answered) => {
+                  setOpeningPay(false)
+                  // Inside Nimiq Pay the app is installed by definition, so a
+                  // host that answers slowly is not a missing app and must not
+                  // be reported as one.
+                  if (!answered && !inPay) setPayMissing(true)
+                })
+              }}
             >
               {t("welcome.openInPay")}
-              <ArrowUpRight />
+              {/* The wait is a second and a half of a tap having visibly done
+                  nothing, which is the complaint this screen started with. */}
+              {openingPay ? <Loader2 className="animate-spin" /> : <ArrowUpRight />}
             </Button>
 
             {/* The second way in, and deliberately the quieter one. Both work,

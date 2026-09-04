@@ -70,6 +70,65 @@ export function nimiqPayDeeplink(): string {
   return `nimiqpay://miniapp?url=${encodeURIComponent(here)}`
 }
 
+/** Where to get Nimiq Pay, for a device that has not got it. */
+export const NIMIQ_PAY_PAGE = "https://www.nimiq.com/nimiq-pay"
+
+/**
+ * How long to wait before deciding that nothing answered.
+ *
+ * Long enough for a phone to bring an app to the front, short enough that a
+ * dead button is not left looking alive. Erring long on purpose: telling
+ * somebody who has Nimiq Pay that they have not got it is worse than a moment
+ * of nothing.
+ */
+const PAY_GRACE = 1500
+
+/**
+ * Open this app inside Nimiq Pay, and say so when nothing does.
+ *
+ * `nimiqpay://` has no answer on a desktop, and none on a phone without the app
+ * — the navigation simply does nothing, or raises a system alert, and the
+ * button reads as broken either way. Neither does the `https://nimpay.app/…`
+ * form help: it is a universal link that opens the app when installed and a
+ * 404 when not, so there is no page for it to fall back to. Somebody has to
+ * notice, and it has to be us.
+ *
+ * Noticed rather than predicted. Deciding from the user agent whether this is a
+ * phone would put every misread device on the wrong branch, and a guess that
+ * goes the wrong way costs a phone user the app entirely. So this asks, waits,
+ * and reports what happened: an app that opens takes the page into the
+ * background, and the listeners below see that. Still here when the clock runs
+ * out means nothing took it.
+ */
+export function openNimiqPay(whenSettled: (answered: boolean) => void): void {
+  let done = false
+
+  const finish = (answered: boolean) => {
+    if (done) return
+    done = true
+    window.removeEventListener("pagehide", left)
+    document.removeEventListener("visibilitychange", hidden)
+    whenSettled(answered)
+  }
+
+  // Both outcomes are reported, not only the dead end: whatever is showing that
+  // this is in progress has to be taken down again, including for the person
+  // whose app *did* open and who comes back to this page half a minute later.
+  const left = () => finish(true)
+  const hidden = () => {
+    if (document.visibilityState === "hidden") finish(true)
+  }
+
+  // Attached before the attempt, so a host that switches away immediately is
+  // still seen doing it.
+  window.addEventListener("pagehide", left)
+  document.addEventListener("visibilitychange", hidden)
+
+  window.setTimeout(() => finish(document.visibilityState !== "visible"), PAY_GRACE)
+
+  window.location.assign(nimiqPayDeeplink())
+}
+
 /**
  * Dev identities are real Ed25519 keypairs from fixed seeds, not fake addresses.
  *
