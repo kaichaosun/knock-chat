@@ -542,6 +542,7 @@ export const zh: Dictionary = {
     giftPlaced: "红包已发出，现在在群里了。",
     needsPayForGift: "发红包需要 Nimiq Pay。请在那里打开应用继续。",
     giftNotTaken: "中继没有接受，但你的 NIM 是安全的。",
+    giftsPaused: "这个中继目前无法发红包，请稍后再试。",
     stillFailed: "仍然发送失败",
     sendThatFailed: "发送失败",
     knocked: "已敲门。对方下次打开 Knock 时会看到。",

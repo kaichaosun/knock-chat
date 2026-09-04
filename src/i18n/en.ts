@@ -580,6 +580,7 @@ export const en = {
     giftPlaced: "Your gift went through — it's in the room now.",
     needsPayForGift: "Leaving a gift needs Nimiq Pay. Open the app there to continue.",
     giftNotTaken: "The relay didn't take it, but your NIM is safe.",
+    giftsPaused: "Gifts aren't available on this relay right now. Try again later.",
     stillFailed: "Still couldn't send",
     sendThatFailed: "Couldn't send that",
     knocked: "Knocked. They'll see it next time they open Knock.",

@@ -282,10 +282,10 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [scanning, setScanning] = useState(false)
   const [gifting, setGifting] = useState(false)
   /**
-   * The relay's terms for holding a gift, or null on a relay that holds none.
+   * The relay's terms for holding a gift, or null until it has quoted them.
    *
-   * Asked once: the funding address cannot be guessed, and a relay without a
-   * wallet should show no gift controls at all rather than ones that fail.
+   * Fetched ahead so opening the sheet is instant. A failure is not an answer —
+   * [`startGift`] asks again at the moment it matters.
    */
   const [giftTerms, setGiftTerms] = useState<GiftTerms | null>(null)
 
@@ -295,6 +295,34 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       .then(setGiftTerms)
       .catch(() => setGiftTerms(null))
   }, [owner])
+
+  /**
+   * What the gift row does.
+   *
+   * The row is always there. Whether the relay holds gifts today is its
+   * business and changes without the app being rebuilt, so the app asks and
+   * reports what it is told — hiding the row would make Knock a different shape
+   * for different people with nothing on screen to say why. Asking again here
+   * is also what makes a relay that came back on work on the next tap.
+   */
+  const startGift = useCallback(async () => {
+    if (giftTerms) {
+      setGifting(true)
+      return
+    }
+    try {
+      setGiftTerms(await getGiftTerms())
+      setGifting(true)
+    } catch (error) {
+      // 501 is the relay declining to offer this — paused, or no wallet at
+      // all. Our words rather than its: the refusal is only written in English.
+      toast.error(
+        error instanceof RelayError && error.status === 501
+          ? t("app.giftsPaused")
+          : reason(error, t("app.giftsPaused")),
+      )
+    }
+  }, [giftTerms, t])
 
   /**
    * Whichever thread is open, if either is.
@@ -1333,7 +1361,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         onOpenChat={openThread}
         onOpenInvite={openInvite}
         onInvite={onInviteToRoom}
-        onGift={giftTerms ? () => setGifting(true) : undefined}
+        onGift={() => void startGift()}
         onShowSidebar={wide && !sidebarOpen ? () => setSidebarOpen(true) : undefined}
       />
     ) : null

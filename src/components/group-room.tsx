@@ -118,8 +118,11 @@ export function GroupRoom({
   onShareContact: (address: string) => void
   /** Send this room's invite into your chat with somebody. */
   onInvite: (address: string) => void
-  /** Leave a pot in the room. Absent on a relay that doesn't hold gifts. */
-  onGift?: () => void
+  /**
+   * Leave a pot in the room, or say why it cannot be left just now. Always
+   * passed: asking is how anybody finds out whether this relay holds gifts.
+   */
+  onGift: () => void
   /** Restore the desktop thread list after it has been hidden. */
   onShowSidebar?: () => void
   /** Whether the room has older messages left to fetch. */
@@ -927,16 +930,13 @@ export function GroupRoom({
       </div>
 
       {member ? (
-        /* `+` appears only when there is something behind it — a relay
-           without a wallet holds no gifts, and an empty menu is worse than
-           no button. */
         <Composer
           ref={composer}
           onSend={(body) => {
             onSay(body)
             setAnswering(null)
           }}
-          onAttach={onGift && (() => setAttaching(true))}
+          onAttach={() => setAttaching(true)}
           onMentionSearch={searchMembers}
           replyingTo={answering}
           onCancelReply={() => setAnswering(null)}
@@ -1020,26 +1020,24 @@ export function GroupRoom({
         }}
       />
 
-      {onGift && (
-        <AttachMenu
-          open={attaching}
-          onOpenChange={setAttaching}
-          actions={[
-            {
-              icon: GiftIcon,
-              label: t("room.leaveGift"),
-              description: t("room.leaveGiftNote"),
-              onSelect: onGift,
-            },
-            {
-              icon: UserRound,
-              label: t("shareContact.action"),
-              description: t("shareContact.actionNote"),
-              onSelect: () => setSharing(true),
-            },
-          ]}
-        />
-      )}
+      <AttachMenu
+        open={attaching}
+        onOpenChange={setAttaching}
+        actions={[
+          {
+            icon: GiftIcon,
+            label: t("room.leaveGift"),
+            description: t("room.leaveGiftNote"),
+            onSelect: onGift,
+          },
+          {
+            icon: UserRound,
+            label: t("shareContact.action"),
+            description: t("shareContact.actionNote"),
+            onSelect: () => setSharing(true),
+          },
+        ]}
+      />
 
       <PickContactSheet
         open={sharing}
