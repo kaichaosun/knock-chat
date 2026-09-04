@@ -18,10 +18,17 @@
 /**
  * Where a scratch element has to live to be copyable: inside the open modal, if
  * there is one, so its focus trap has nothing to fight.
+ *
+ * The *innermost* one, not the first found. A sheet can open a sheet — the QR
+ * code lives inside the profile — and then two are open at once, with the trap
+ * that matters belonging to the newer. Radix portals in mount order, so the
+ * last match is the one on top. Appending to the outer one puts the scratch
+ * element under a trap that takes focus straight back, which is this file's
+ * original bug wearing a second sheet.
  */
 function copyContainer(): HTMLElement {
-  const dialog = document.querySelector<HTMLElement>('[role="dialog"][data-state="open"]')
-  return dialog ?? document.body
+  const open = document.querySelectorAll<HTMLElement>('[role="dialog"][data-state="open"]')
+  return open[open.length - 1] ?? document.body
 }
 
 function copyViaTextarea(text: string): boolean {
@@ -44,6 +51,12 @@ function copyViaTextarea(text: string): boolean {
     textarea.select()
     // iOS ignores `select()` on a readonly field; this is what actually selects.
     textarea.setSelectionRange(0, text.length)
+    // Checked rather than assumed. `execCommand` answers true for a copy that
+    // took nothing — that is how this failed silently before, with the toast
+    // saying the link was copied and the clipboard still holding whatever it
+    // held. If something pulled focus away the selection is gone, and that is
+    // visible from here.
+    if (textarea.selectionEnd - textarea.selectionStart !== text.length) return false
     return document.execCommand("copy")
   } catch {
     return false
