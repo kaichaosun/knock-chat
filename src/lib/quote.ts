@@ -112,8 +112,15 @@ const ID = /^[0-9a-f]{8}$/
  * that happens to begin with "> " from being read as a reply. Neither part can
  * span a line, and there has to be something after the quote for it to be a
  * reply to.
+ *
+ * Unicode-aware, so that `.` counts a code point and the caps here mean the
+ * same thing [`oneLine`] means by them. Without the flag `.` counts UTF-16
+ * units, an emoji counts twice, and a quote cut to exactly 120 characters
+ * measured 121 and did not parse — leaving the quote line sitting in the
+ * message as literal text. It took an emoji *and* a long enough line to show
+ * up, which is why it survived this long.
  */
-const QUOTE = /^> (.{1,48}?)(?: #([0-9a-f]{8}))?: (.{1,120})\n([\s\S]+)$/
+const QUOTE = /^> (.{1,48}?)(?: #([0-9a-f]{8}))?: (.{1,120})\n([\s\S]+)$/u
 
 /** A reply: the quote line, then the words. */
 export function quoted(quote: Quote, body: string): string {

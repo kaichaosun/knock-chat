@@ -103,3 +103,41 @@ describe("unquote", () => {
     expect(body).toBe("hello")
   })
 })
+
+describe("counting characters", () => {
+  // Both ends have to agree on what a character is. `oneLine` cuts by code
+  // point so a surrogate pair is never sliced in half; the pattern has to read
+  // it back the same way, or a quote it wrote is a quote it cannot parse.
+  const LINK =
+    "https://snowflakes.nimpowered.com/snowflakes/c2e7b2bed7dbc3a750869a8410f3dcea0e3bd81dd3807520ed31707a11536d20"
+
+  it("reads back a quote long enough to be cut, with an emoji in it", () => {
+    // The message that found this: an emoji, then a link long enough to push
+    // the line past the cap. One without the other parses either way.
+    const said = `Yay! That means we will see a beautiful snowflake right there 👇\n${LINK}`
+    const wire = quoted({ author: "Alice", said, id: "deadbeef" }, "nice one")
+
+    const back = unquote(wire)
+    expect(back.quote).not.toBeNull()
+    expect(back.quote?.author).toBe("Alice")
+    expect(back.quote?.id).toBe("deadbeef")
+    expect(back.body).toBe("nice one")
+    // The whole point of the cut: what was written is what comes back.
+    expect(back.quote?.said).toBe(wire.slice(wire.indexOf(": ") + 2, wire.indexOf("\n")))
+  })
+
+  it("reads back an author cut to the cap with an emoji in it", () => {
+    // 47 letters and an emoji: 48 code points, 49 UTF-16 units. The cap is 48,
+    // so the two ways of counting disagree about whether this fits.
+    const author = `${"a".repeat(47)}👋 and more`
+    const wire = quoted({ author, said: "hello" }, "hi")
+    expect(unquote(wire).quote?.author).toBe(`${"a".repeat(47)}👋`)
+  })
+
+  it("still refuses a line that is genuinely too long", () => {
+    // The cap is not being widened, only measured consistently — a hand-written
+    // line over it is still not a reply.
+    const wire = `> Alice: ${"x".repeat(121)}\nbody`
+    expect(unquote(wire).quote).toBeNull()
+  })
+})
