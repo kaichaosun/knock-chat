@@ -279,6 +279,17 @@ function Quoted({
   const tap = useTap(onOpen)
   const className = cn(
     "mb-1.5 flex w-full flex-col border-l-2 pl-2 text-left text-[13px] leading-snug",
+    // A width the snippet may not exceed, so that what is being answered cannot
+    // decide how wide the answer is. `line-clamp-2` and `wrap-anywhere` below
+    // change what is *drawn*; neither changes max-content, which is what the
+    // bubble measures itself against — so one unbreakable 56-character URL in a
+    // quote stretched a bubble saying "hello" across the whole thread.
+    //
+    // 24rem is about sixty characters here, and the snippet is two clamped
+    // lines of at most `MAX_SAID` — a hundred and twenty. So the cap is the
+    // width at which the longest snippet there can be still fits in the two
+    // lines it is given.
+    "max-w-96",
     outgoing ? "border-white/40 text-quote-on-mine" : "border-border text-muted-foreground",
   )
   const inside = (
