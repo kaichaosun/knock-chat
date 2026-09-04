@@ -355,14 +355,68 @@ function language(): string {
   return getHostLanguage() ?? navigator.language.split("-")[0] ?? "en"
 }
 
+/**
+ * The wallet a browser tab gets: the Nimiq Hub, in a popup of its own.
+ *
+ * A browser tab used to be the end of the road — one screen offering a
+ * `nimiqpay://` link that no desktop can open — and this is what makes it a way
+ * in instead.
+ *
+ * Imported here rather than at the top of the file: this is the only path that
+ * reaches it, and inside Nimiq Pay — every phone, which is most of them — it is
+ * 11 kB of a wallet that will never be asked anything. Fetched while
+ * connecting, long before any click, so the popup still opens on the tap rather
+ * than after an import.
+ */
+async function hubWallet(): Promise<ConnectResult> {
+  try {
+    const HubApiClass = (await import("@nimiq/hub-api")).default
+    const hub = new HubApiClass(HUB_ENDPOINT)
+    return {
+      ok: true,
+      wallet: {
+        mode: "hub",
+        // No Mini App provider — nothing here speaks that dialect. Paying goes
+        // through the Hub's own checkout instead.
+        provider: null,
+        sign: hubSigner(hub),
+        pay: hubPayer(hub),
+        scope: HUB_SCOPE,
+        language: language(),
+      },
+    }
+  } catch {
+    // Nothing left to sign with. Rare enough to have no better answer than the
+    // one that was always here.
+    return {
+      ok: false,
+      reason: "no-host",
+      message: "Knock needs a Nimiq wallet.",
+    }
+  }
+}
+
 export async function connect(): Promise<ConnectResult> {
+  // Asked before the wait rather than after it. `init` runs to
+  // `PROVIDER_TIMEOUT_MS` when nothing answers, and somebody who has just
+  // tapped "use a wallet in this browser" has already said that nothing is
+  // coming — so waiting for it is two and a half seconds spent re-asking a
+  // question they answered, with the screen meanwhile saying it is looking for
+  // a wallet it has been told not to use.
+  //
+  // It also makes this match what `wantsHub` says it does. The flag reads
+  // "reach for the Hub rather than the wallet this device would otherwise
+  // get", and until now it only took effect where there was no other wallet to
+  // get — which is not the same sentence.
+  if (wantsHub()) return hubWallet()
+
   let provider: NimiqProvider
   try {
     provider = await init({ timeout: PROVIDER_TIMEOUT_MS })
   } catch {
     // No Nimiq Pay. In development a dev identity stands in, because two tabs
     // holding a conversation is worth more day to day than a real wallet.
-    if (import.meta.env.DEV && !wantsHub()) {
+    if (import.meta.env.DEV) {
       const asked = requestedDevIdentity() ?? "alice"
       return {
         ok: true,
@@ -395,7 +449,7 @@ export async function connect(): Promise<ConnectResult> {
     // Read from the session rather than kept as a preference of its own, which
     // is what keeps it reversible: signing out clears the session, and the
     // choice comes back with it. There is nothing to be stuck in.
-    if (!wantsHub() && !loadSession(HUB_SCOPE)) {
+    if (!loadSession(HUB_SCOPE)) {
       return {
         ok: false,
         reason: "no-host",
@@ -403,40 +457,7 @@ export async function connect(): Promise<ConnectResult> {
       }
     }
 
-    // Everywhere else the Hub is the wallet. A browser tab used to be the end
-    // of the road here — one screen offering a `nimiqpay://` link that no
-    // desktop can open — and this is what makes it a way in instead.
-    //
-    // Loaded here rather than at the top of the file: this branch is the only
-    // one that reaches it, and inside Nimiq Pay — every phone, which is most
-    // of them — it is 11 kB of a wallet that will never be asked anything.
-    // Fetched while connecting, long before any click, so the popup below
-    // still opens on the tap rather than after an import.
-    try {
-      const HubApiClass = (await import("@nimiq/hub-api")).default
-      const hub = new HubApiClass(HUB_ENDPOINT)
-      return {
-        ok: true,
-        wallet: {
-          mode: "hub",
-          // No Mini App provider — nothing here speaks that dialect. Paying
-          // goes through the Hub's own checkout instead, below.
-          provider: null,
-          sign: hubSigner(hub),
-          pay: hubPayer(hub),
-          scope: HUB_SCOPE,
-          language: language(),
-        },
-      }
-    } catch {
-      // Nothing left to sign with. Rare enough to have no better answer than
-      // the one that was always here.
-      return {
-        ok: false,
-        reason: "no-host",
-        message: "Knock needs a Nimiq wallet.",
-      }
-    }
+    return hubWallet()
   }
 
   // Note the absence of a `listAccounts()` call: the signature carries the
