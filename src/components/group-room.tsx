@@ -155,6 +155,19 @@ export function GroupRoom({
     setScrollerEl(node)
   }, [])
   const [details, setDetails] = useState(false)
+  /**
+   * Open the details, and ask the relay for them on the way.
+   *
+   * The asking used to hang off the sheet's `onOpenChange`, which never runs
+   * for this: Radix calls it when the sheet itself wants a change — a backdrop,
+   * an escape, the close button — and not when the prop below is set from here.
+   * So the guard fired only on the way out, and the one fetch at room-open was
+   * the only one there had ever been.
+   */
+  const showDetails = () => {
+    setDetails(true)
+    onRefreshDetail()
+  }
   /** Whose details are open. A name over a message says who somebody is; it
    *  does not start a conversation, which in a room is never free. */
   const [showing, setShowing] = useState<string | null>(null)
@@ -609,7 +622,7 @@ export function GroupRoom({
 
           <button
             type="button"
-            onClick={() => setDetails(true)}
+            onClick={showDetails}
             aria-label={t("room.details")}
             className="min-w-0 flex-1 px-1 text-left active:opacity-60"
           >
@@ -626,7 +639,7 @@ export function GroupRoom({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setDetails(true)}
+            onClick={showDetails}
             aria-label={t("room.details")}
             className="size-11 shrink-0 rounded-full"
           >
@@ -1079,10 +1092,8 @@ export function GroupRoom({
 
       <GroupSheet
         open={details}
-        onOpenChange={(next) => {
-          setDetails(next)
-          if (next) onRefreshDetail()
-        }}
+        // Only ever called to close: opening goes through `showDetails`.
+        onOpenChange={setDetails}
         group={group}
         detail={detail}
         gone={gone}

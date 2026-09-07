@@ -517,8 +517,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
    */
   const [roomGone, setRoomGone] = useState(false)
 
+  // Waits for a session, and not only because the relay would refuse: a room
+  // restored from the address bar is on screen before the wallet has been asked
+  // for anything, so this fires at mount with no token to send. That 401 is
+  // swallowed below like any other non-404, and nothing asks again — which left
+  // the room's details empty for as long as the tab stayed open. `owner` is in
+  // the deps, so signing in is what asks.
   const refreshGroupDetail = useCallback(async () => {
-    if (!openGroup) return
+    if (!openGroup || !owner) return
     try {
       setGroupDetail(await inspect(openGroup))
       setRoomGone(false)
@@ -532,7 +538,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         markRoomGone(openGroup)
       }
     }
-  }, [openGroup, inspect])
+  }, [openGroup, owner, inspect])
 
   useEffect(() => {
     setRoomGone(false)

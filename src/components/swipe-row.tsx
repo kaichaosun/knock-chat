@@ -298,8 +298,16 @@ export function SwipeRow({
           // Opaque, always: a translucent row would let the Delete panel wash
           // through it while the finger is down.
           surface ?? "bg-background active:bg-muted",
-          // Selected state for desktop - subtle highlight with left border accent
-          selected && "bg-accent/50 border-l-2 border-primary",
+          // Which thread the pane beside this is showing, on a wide window.
+          //
+          // The bar always; the tint only on a row that had no surface of its
+          // own. Half-strength accent is what the pinned block is made of at
+          // full strength, so laying it over one of those rows made it *lighter*
+          // than the rows around it — selection reading as less emphasis rather
+          // than more. There is nothing to say by tinting a row that is already
+          // tinted, and the bar says it on any surface.
+          selected && !surface && "bg-accent/50",
+          selected && "border-l-2 border-primary",
           drag === 0 && "transition-transform",
         )}
       >
