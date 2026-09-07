@@ -8,6 +8,7 @@
  */
 
 import { compact } from "./address"
+import { decode, encode, text, type Parse, type Part } from "./payload"
 import type { Envelope } from "./relay"
 import { sameMinute } from "./time"
 
@@ -492,7 +493,12 @@ export function deleteThread(snapshot: Snapshot, thread: string): Snapshot {
 }
 
 function incomingCount(messages: Message[], thread: string): number {
-  return messages.filter((m) => threadKey(m) === thread && m.direction === "in").length
+  // Counted after joining, and it has to be: `conversations` counts the same
+  // way, and a mark taken on one basis against a count taken on the other
+  // leaves a thread permanently unread by the difference.
+  return joined(messages.filter((m) => threadKey(m) === thread)).filter(
+    (m) => m.direction === "in",
+  ).length
 }
 
 /**
@@ -512,7 +518,83 @@ function sorted(messages: Message[]): Message[] {
 
 export function threadWith(snapshot: Snapshot, thread: string): Message[] {
   const key = normalizeKey(thread)
-  return snapshot.messages.filter((m) => threadKey(m) === key)
+  return joined(snapshot.messages.filter((m) => threadKey(m) === key))
+}
+
+/**
+ * Put an answer that arrived in pieces back together.
+ *
+ * A sender with more to say than a message body holds sends several and marks
+ * them — see `Part` in `lib/payload`. Joining them here, rather than where they
+ * are drawn, is what keeps the rest of the app from having to know: one bubble,
+ * one id, one line in the chat list, one thing to reply to or react to.
+ *
+ * The joined message is the first piece, with the others' words added to it. It
+ * keeps that piece's id, so a quote written before the rest arrived still
+ * points at the same message afterwards.
+ *
+ * Nothing is ever dropped. A piece whose first has not arrived — history loaded
+ * a page at a time can put them either side of the boundary — stands as its own
+ * message rather than waiting for something that may never come.
+ */
+export function joined(messages: Message[]): Message[] {
+  // Nearly every thread, and the whole of every thread between people. Walked
+  // once to find out, so the common case allocates nothing.
+  if (!messages.some((message) => partOf(message))) return messages
+
+  const out: Message[] = []
+  /** Where the first piece of each answer landed in `out`, by its id. */
+  const heads = new Map<string, number>()
+  /** What each of those has collected so far, in the order it arrived. */
+  const said = new Map<string, string>()
+
+  for (const message of messages) {
+    const part = partOf(message)
+    if (!part) {
+      out.push(message)
+      continue
+    }
+    if (!part.head) {
+      heads.set(message.id, out.length)
+      said.set(message.id, textIn(message) ?? "")
+      out.push(message)
+      continue
+    }
+    // The relay's id, as this device files it. See `use-messages`.
+    const head = `relay:${part.head}`
+    const at = heads.get(head)
+    if (at === undefined) {
+      out.push(message)
+      continue
+    }
+    const grown = `${said.get(head) ?? ""}${textIn(message) ?? ""}`
+    said.set(head, grown)
+    out[at] = {
+      ...out[at],
+      // Still marked as a piece until the last one says otherwise, which is how
+      // a bubble knows to say there is more coming.
+      body: encode(text(grown, parseOf(out[at]), part.end ? undefined : { at: 0 })),
+    }
+  }
+  return out
+}
+
+/** The marker on a message that is one piece of a longer answer. */
+function partOf(message: Message): Part | undefined {
+  const payload = decode(message.body)
+  return payload.kind === "text" ? payload.part : undefined
+}
+
+/** What a text message says, or nothing where it is not words. */
+function textIn(message: Message): string | undefined {
+  const payload = decode(message.body)
+  return payload.kind === "text" ? payload.text : undefined
+}
+
+/** How a text message asked to be read. */
+function parseOf(message: Message): Parse | undefined {
+  const payload = decode(message.body)
+  return payload.kind === "text" ? payload.parse : undefined
 }
 
 /** One entry per peer, most recently active first. */
@@ -526,7 +608,10 @@ export function conversations(snapshot: Snapshot): Conversation[] {
   }
 
   const result: Conversation[] = []
-  for (const [key, messages] of byThread) {
+  for (const [key, bucket] of byThread) {
+    // Joined first, so a long answer is one row and counts as one unread rather
+    // than as however many messages it happened to need.
+    const messages = joined(bucket)
     const incoming = messages.filter((m) => m.direction === "in").length
     const last = messages[messages.length - 1]
     result.push({

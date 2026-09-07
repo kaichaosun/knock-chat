@@ -161,8 +161,39 @@ export type Reaction = {
  */
 export type Parse = "markdown"
 
+/**
+ * One piece of an answer too long to send in one message.
+ *
+ * The relay caps a body, and a sender with more to say than that has only one
+ * honest option: send it as several messages and say so. What arrives is joined
+ * back into one before anything draws it — see `joined` in `lib/messages` — so
+ * a long answer is one bubble, with one id, that a reply or a reaction can
+ * point at like any other.
+ *
+ * The pieces are tied together by the relay's own name for the first of them,
+ * rather than by an id the sender invents. That name is what the joined message
+ * already is, so nothing has to carry a second identity beside its real one.
+ *
+ * The end is announced by a flag rather than counted up front, because a sender
+ * writing as it goes does not know how many pieces there will be. A count would
+ * have ruled that out.
+ */
+export type Part = {
+  /**
+   * The relay id of the first piece.
+   *
+   * Absent on that piece itself: at the moment it is sent it has no id yet, and
+   * the one it is given is what the others point at.
+   */
+  head?: string
+  /** Where this piece goes, from zero. */
+  at: number
+  /** Whether this is the last. Absent means more is on its way. */
+  end?: boolean
+}
+
 export type Payload =
-  | { kind: "text"; text: string; parse?: Parse }
+  | { kind: "text"; text: string; parse?: Parse; part?: Part }
   | { kind: "payment"; payment: Payment }
   | { kind: "invite"; invite: Invite }
   | { kind: "gift"; giftNote: GiftNote }
@@ -171,8 +202,11 @@ export type Payload =
   /** A frame this build does not understand — a newer client, or damage. */
   | { kind: "unknown" }
 
-export function text(value: string, parse?: Parse): Payload {
-  return parse ? { kind: "text", text: value, parse } : { kind: "text", text: value }
+export function text(value: string, parse?: Parse, part?: Part): Payload {
+  const said: Payload = { kind: "text", text: value }
+  if (parse) said.parse = parse
+  if (part) said.part = part
+  return said
 }
 
 export function payment(luna: number, reference: string | null): Payload {
@@ -201,8 +235,16 @@ export function encode(payload: Payload): string {
     // Unframed unless it has to be. Every message a person types comes through
     // here, and wrapping those would put a frame on the wire for the sake of a
     // field none of them ever set.
-    if (!payload.parse) return payload.text
-    return FRAME + JSON.stringify({ kind: "text", parse: payload.parse, text: payload.text })
+    if (!payload.parse && !payload.part) return payload.text
+    return (
+      FRAME +
+      JSON.stringify({
+        kind: "text",
+        ...(payload.parse ? { parse: payload.parse } : {}),
+        ...(payload.part ? { part: payload.part } : {}),
+        text: payload.text,
+      })
+    )
   }
   if (payload.kind === "payment") {
     return FRAME + JSON.stringify({ kind: "payment", ...payload.payment })
@@ -222,6 +264,28 @@ export function encode(payload: Payload): string {
   // `unknown` is something this build received and could not read. Re-encoding
   // it would mean claiming to have understood it.
   throw new Error("cannot encode an unknown payload")
+}
+
+/**
+ * One piece of a longer answer, if that is what this frame says it is.
+ *
+ * A piece that does not say where it goes is not a piece — it is a message, and
+ * reading it as anything else would hide it behind an answer that never
+ * arrives. So a malformed marker is dropped and the words stand alone.
+ */
+function partIn(value: unknown): Part | null {
+  if (!value || typeof value !== "object") return null
+  const said = value as Record<string, unknown>
+  const at = said.at
+  if (typeof at !== "number" || !Number.isSafeInteger(at) || at < 0) return null
+  const head = typeof said.head === "string" ? said.head : undefined
+  // Everything after the first has to name the first. Without that there is
+  // nothing to join it to, and it would wait forever.
+  if (at > 0 && !head) return null
+  const part: Part = { at }
+  if (head) part.head = head
+  if (said.end === true) part.end = true
+  return part
 }
 
 /** Read the plaintext of a message. Never throws; anything odd is `unknown`. */
@@ -305,9 +369,11 @@ export function decode(plain: string): Payload {
       // message. An unrecognised parse mode falls back to plain rather than
       // being refused: the words are still the words.
       if (typeof value.text !== "string") return { kind: "unknown" }
-      return value.parse === "markdown"
-        ? { kind: "text", text: value.text, parse: "markdown" }
-        : { kind: "text", text: value.text }
+      const said: Payload = { kind: "text", text: value.text }
+      if (value.parse === "markdown") said.parse = "markdown"
+      const part = partIn(value.part)
+      if (part) said.part = part
+      return said
     }
 
     if (value.kind === "invite") {

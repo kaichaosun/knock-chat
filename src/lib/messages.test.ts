@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
 
+import { decode, encode } from "./payload"
 import {
   applyFeed,
   carriesTime,
   conversations,
+  joined,
   deleteThread,
   dropStrandedCopies,
   emptySnapshot,
@@ -711,5 +713,64 @@ describe("a message of your own, once the relay has named it", () => {
     expect(snapshot.messages[0].id).toBe(named)
     expect(snapshot.messages[0].status).toBe("sent")
     expect(tagOf(snapshot.messages[0].id)).toBe("9d23068a")
+  })
+})
+
+const BOT = "NQ75 248H 7RGK 4V8V 84HS PSA3 QYE8 EA1T 7HYT"
+
+describe("an answer that arrived in pieces", () => {
+  const said = (text: string, part?: { head?: string; at: number; end?: true }) =>
+    encode({ kind: "text", text, parse: "markdown", ...(part ? { part } : {}) })
+
+  const message = (id: string, body: string): Message => ({
+    id,
+    peer: BOT,
+    direction: "in",
+    body,
+    at: "2026-01-01T10:00:00Z",
+    status: "sent",
+  })
+
+  it("is one message, keeping the first piece's id", () => {
+    const [only, ...rest] = joined([
+      message("relay:aaa", said("first ", { at: 0 })),
+      message("relay:bbb", said("second ", { head: "aaa", at: 1 })),
+      message("relay:ccc", said("third", { head: "aaa", at: 2, end: true })),
+    ])
+    expect(rest).toEqual([])
+    expect(only.id).toBe("relay:aaa")
+    expect(decode(only.body)).toEqual({ kind: "text", text: "first second third", parse: "markdown" })
+  })
+
+  it("says it is still coming until the last piece says otherwise", () => {
+    const [only] = joined([
+      message("relay:aaa", said("first ", { at: 0 })),
+      message("relay:bbb", said("second", { head: "aaa", at: 1 })),
+    ])
+    const payload = decode(only.body)
+    expect(payload.kind === "text" && payload.part?.end).toBeUndefined()
+  })
+
+  it("leaves a piece whose first has not arrived standing on its own", () => {
+    // History loads a page at a time and can put them either side of a
+    // boundary. Waiting for something that may never come would lose it.
+    const orphan = message("relay:bbb", said("second", { head: "aaa", at: 1 }))
+    expect(joined([orphan])).toEqual([orphan])
+  })
+
+  it("leaves an ordinary thread untouched", () => {
+    const plain = [message("relay:aaa", "hello"), message("relay:bbb", "there")]
+    expect(joined(plain)).toBe(plain)
+  })
+
+  it("counts as one unread, not as however many it needed", () => {
+    const snapshot = {
+      ...emptySnapshot(),
+      messages: [
+        message("relay:aaa", said("first ", { at: 0 })),
+        message("relay:bbb", said("second", { head: "aaa", at: 1, end: true })),
+      ],
+    }
+    expect(conversations(snapshot)[0].unread).toBe(1)
   })
 })

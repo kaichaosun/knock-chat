@@ -109,6 +109,7 @@ export const zh: Dictionary = {
   },
   bubble: {
     locked: "无法在此设备上打开",
+    stillComing: "还在输入",
     sent: "已发送",
     received: "已收到",
     groupInvite: "群组邀请",

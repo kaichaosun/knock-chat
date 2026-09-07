@@ -127,7 +127,17 @@ export function MessageBubble({
     // thread; with nothing on that side it was a margin nothing went in.
     <div className="flex w-full justify-start">
       <div
-        className="max-w-[92%]"
+        // A share of the thread, and never more than a comfortable measure.
+        // The share is what a phone goes by; the measure is for a wide window,
+        // where a long answer would otherwise run the width of a monitor — past
+        // a hundred characters a line, which is where reading turns into work.
+        //
+        // It is also what bounds every panel inside a message. A bubble is
+        // sized by its content, so a code block wanted to be as wide as its
+        // longest line and took the thread and the page sideways with it.
+        // Capping here rather than on each block means one number decides, and
+        // a block can simply fill what it is given.
+        className="max-w-[min(92%,42rem)]"
         // A long press on a link is answered by the browser with a menu of its
         // own — Open in new tab, Copy link address — and raising it cancels the
         // pointer stream, which takes the room's hold timer down with it. So a
@@ -185,14 +195,34 @@ export function MessageBubble({
             )}
           >
             {payload.kind === "text" ? (
-              <Answering
-                text={payload.text}
-                parse={payload.parse}
-                outgoing={outgoing}
-                onOpen={onOpenMention}
-                onOpenQuote={onOpenQuote}
-                onOpenCode={onOpenCode}
-              />
+              <>
+                <Answering
+                  text={payload.text}
+                  parse={payload.parse}
+                  outgoing={outgoing}
+                  onOpen={onOpenMention}
+                  onOpenQuote={onOpenQuote}
+                  onOpenCode={onOpenCode}
+                />
+                {/* An answer still arriving. `joined` leaves the marker on
+                    until the last piece says it is the last, so this is the
+                    difference between a message that stops and one that has not
+                    finished — which without it read as the same thing. */}
+                {payload.part && !payload.part.end && (
+                  <span
+                    aria-label={t("bubble.stillComing")}
+                    className="ml-1 inline-flex translate-y-px gap-0.5 align-baseline"
+                  >
+                    {[0, 1, 2].map((dot) => (
+                      <span
+                        key={dot}
+                        className="size-1 animate-pulse rounded-full bg-current opacity-50"
+                        style={{ animationDelay: `${dot * 150}ms` }}
+                      />
+                    ))}
+                  </span>
+                )}
+              </>
             ) : (
               // Something a newer build sent that this one has no way to draw.
               // Shown as a gap on purpose: silently dropping it would leave the
@@ -386,14 +416,29 @@ function Words({
               </blockquote>
             )
           case "code":
-            // Its own scroller: a long line of code is the one thing in a
-            // message that must not be broken to fit, and wrapping it is worse
-            // than making it slide.
+            // Wrapped, not slid. This was a scroller first, on the theory
+            // that a line of code should not be broken to fit — but a long
+            // line then sat off the side of a message with nothing to say it
+            // was there, and a message you cannot see all of is the one thing
+            // this app does not do. Indentation is kept, so the shape of the
+            // code survives; only the wrapping is given up, and only on lines
+            // too long for a bubble.
+            //
+            // Fills the bubble, and the bubble is what is bounded — see the
+            // measure above. A width of its own was tried both ways and each
+            // was wrong somewhere: a cap left the panel stopping short of the
+            // bubble's edge on a wide window, and a floor was wider than a
+            // phone's bubble and burst out of it, since a minimum width beats a
+            // maximum and no cap here could hold it in.
             return (
               <pre
                 key={index}
                 className={cn(
-                  "scrollbar-none my-1 overflow-x-auto rounded-lg px-2.5 py-2 text-[13px]",
+                  "my-1 w-full rounded-lg px-2.5 py-2 text-[13px]",
+                  // `pre` carries `white-space: pre` from the browser itself,
+                  // which beats anything inherited from the bubble — so a block
+                  // that wraps has to say so here.
+                  "whitespace-pre-wrap wrap-anywhere",
                   outgoing ? "bg-black/15" : "bg-foreground/8",
                 )}
               >

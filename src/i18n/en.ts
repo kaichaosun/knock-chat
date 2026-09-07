@@ -111,6 +111,7 @@ export const en = {
   },
   bubble: {
     locked: "Can't be opened on this device",
+    stillComing: "Still writing",
     sent: "Sent",
     received: "Received",
     groupInvite: "Group invite",
