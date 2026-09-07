@@ -32,6 +32,7 @@ import { t } from "i18next"
 
 import { addressFrom, shortenAddress } from "./address"
 import { groupIdFrom } from "./group-link"
+import { unmarked } from "./markup"
 import { segments } from "./mentions"
 import { labelIn, snapshot } from "./names"
 import { firstEmoji } from "./emoji"
@@ -142,8 +143,26 @@ export type Reaction = {
   emoji: string[]
 }
 
+/**
+ * How the words of a message are to be read.
+ *
+ * A dimension of a text message rather than a kind of its own: the content is
+ * still text, and everything that only wants the words — a chat row, a quote, a
+ * push notification — keeps reading `text` and never has to know about this.
+ *
+ * Absent means plain, and plain is what a person sends. Nothing infers this
+ * from the characters: guessing is what makes `2 * 3 * 4` come out in italics
+ * for somebody doing arithmetic, and a sender who wants shaping can say so.
+ *
+ * It is a claim, not a credential — anybody can set it, and the app has no
+ * notion of which addresses are bots. So it decides only what is *ambiguous*,
+ * never what is *unsafe*: see `lib/markup` for what it does and does not turn
+ * on.
+ */
+export type Parse = "markdown"
+
 export type Payload =
-  | { kind: "text"; text: string }
+  | { kind: "text"; text: string; parse?: Parse }
   | { kind: "payment"; payment: Payment }
   | { kind: "invite"; invite: Invite }
   | { kind: "gift"; giftNote: GiftNote }
@@ -152,8 +171,8 @@ export type Payload =
   /** A frame this build does not understand — a newer client, or damage. */
   | { kind: "unknown" }
 
-export function text(value: string): Payload {
-  return { kind: "text", text: value }
+export function text(value: string, parse?: Parse): Payload {
+  return parse ? { kind: "text", text: value, parse } : { kind: "text", text: value }
 }
 
 export function payment(luna: number, reference: string | null): Payload {
@@ -178,7 +197,13 @@ export function reaction(to: string, emoji: string[]): Payload {
 
 /** Turn a payload into the plaintext that gets encrypted. */
 export function encode(payload: Payload): string {
-  if (payload.kind === "text") return payload.text
+  if (payload.kind === "text") {
+    // Unframed unless it has to be. Every message a person types comes through
+    // here, and wrapping those would put a frame on the wire for the sake of a
+    // field none of them ever set.
+    if (!payload.parse) return payload.text
+    return FRAME + JSON.stringify({ kind: "text", parse: payload.parse, text: payload.text })
+  }
   if (payload.kind === "payment") {
     return FRAME + JSON.stringify({ kind: "payment", ...payload.payment })
   }
@@ -275,6 +300,16 @@ export function decode(plain: string): Payload {
       return { kind: "reaction", reaction: { to, emoji } }
     }
 
+    if (value.kind === "text") {
+      // The words are the whole of it, so a frame without them is not a
+      // message. An unrecognised parse mode falls back to plain rather than
+      // being refused: the words are still the words.
+      if (typeof value.text !== "string") return { kind: "unknown" }
+      return value.parse === "markdown"
+        ? { kind: "text", text: value.text, parse: "markdown" }
+        : { kind: "text", text: value.text }
+    }
+
     if (value.kind === "invite") {
       // A room id that is not a room id points at nothing openable, and a card
       // for it would be a button that cannot work.
@@ -306,7 +341,13 @@ export function preview(plain: string, direction: "in" | "out"): string {
     case "text": {
       // The words, not what they answer. A list of threads showing every reply
       // as the message before it would be a list of the wrong messages.
-      const text = spoken(unquote(payload.text).body)
+      // Markup off before the words are counted: a row has no room to be a
+      // list and nowhere to put a strong run, and leaving the characters in
+      // would show `**` about a message the thread draws in bold. Only for a
+      // message that asked to be read that way — everything else is already
+      // exactly what somebody typed.
+      const body = unquote(payload.text).body
+      const text = spoken(payload.parse === "markdown" ? unmarked(body) : body)
       return direction === "out" ? t("preview.youSaid", { text }) : text
     }
     case "payment": {

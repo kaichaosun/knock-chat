@@ -25,6 +25,38 @@ describe("text", () => {
   })
 })
 
+describe("a text message that says how to read it", () => {
+  it("takes a frame only because it has something to declare", () => {
+    const said = encode(text("**hi**", "markdown"))
+    expect(said.startsWith(FRAME)).toBe(true)
+    expect(decode(said)).toEqual({ kind: "text", text: "**hi**", parse: "markdown" })
+  })
+
+  it("leaves every message that declares nothing unframed", () => {
+    // The wire is what it always was for anybody typing. Only a sender with an
+    // opinion about its words pays for a frame.
+    expect(encode(text("**hi**"))).toBe("**hi**")
+  })
+
+  it("reads a mode it does not know as plain, keeping the words", () => {
+    const forged = FRAME + JSON.stringify({ kind: "text", parse: "rst", text: "hello" })
+    expect(decode(forged)).toEqual({ kind: "text", text: "hello" })
+  })
+
+  it("is not a message at all without the words", () => {
+    const forged = FRAME + JSON.stringify({ kind: "text", parse: "markdown" })
+    expect(decode(forged)).toEqual({ kind: "unknown" })
+  })
+
+  it("reads as its words in a chat row, with the markup off", () => {
+    expect(preview(encode(text("# Done\n- **one**", "markdown")), "in")).toBe("Done\none")
+  })
+
+  it("leaves the same characters alone in a row when nothing was declared", () => {
+    expect(preview(encode(text("# Done")), "in")).toBe("# Done")
+  })
+})
+
 describe("payment", () => {
   it("survives a round trip", () => {
     const encoded = encode(payment(1_000_000, "abc123"))

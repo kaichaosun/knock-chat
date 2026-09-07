@@ -16,13 +16,14 @@ import { AddressAvatar } from "@/components/address-avatar"
 import { GiftCard } from "@/components/gift-card"
 import { useNames } from "@/hooks/use-names"
 import type { Message } from "@/lib/messages"
+import { blocks, type Block, type Piece } from "@/lib/markup"
 import { segments } from "@/lib/mentions"
 import { labelIn } from "@/lib/names"
 import { useLinkPreview } from "@/hooks/use-link-preview"
 import { bannerSources } from "@/lib/avatar"
 import type { Reacted } from "@/lib/reactions"
 import { ownCode, type Code } from "@/lib/knock-code"
-import { decode, type ContactNote, type Invite, type Payment } from "@/lib/payload"
+import { decode, type ContactNote, type Invite, type Parse, type Payment } from "@/lib/payload"
 import { unquote, type Quote } from "@/lib/quote"
 import { shortenAddress } from "@/lib/address"
 import { formatNim } from "@/lib/postage"
@@ -186,6 +187,7 @@ export function MessageBubble({
             {payload.kind === "text" ? (
               <Answering
                 text={payload.text}
+                parse={payload.parse}
                 outgoing={outgoing}
                 onOpen={onOpenMention}
                 onOpenQuote={onOpenQuote}
@@ -236,17 +238,23 @@ export function MessageBubble({
  */
 function Answering({
   text,
+  parse,
   outgoing,
   onOpen,
   onOpenQuote,
   onOpenCode,
 }: {
   text: string
+  /** How the words are to be read. Absent is plain — see `lib/payload`. */
+  parse?: Parse
   outgoing: boolean
   onOpen?: (address: string) => void
   onOpenQuote?: () => void
   onOpenCode?: (code: Code) => void
 }) {
+  // The quote line is taken off before the body is read as anything. It is
+  // this app's own shape rather than markdown's, and a message whose answer
+  // opens with a blockquote must not have that read as who it was answering.
   const { quote, body } = unquote(text)
   return (
     <>
@@ -256,7 +264,13 @@ function Answering({
         // than no control.
         <Quoted quote={quote} outgoing={outgoing} onOpen={quote.id ? onOpenQuote : undefined} />
       )}
-      <Words text={body} outgoing={outgoing} onOpen={onOpen} onOpenCode={onOpenCode} />
+      <Words
+        text={body}
+        parse={parse}
+        outgoing={outgoing}
+        onOpen={onOpen}
+        onOpenCode={onOpenCode}
+      />
     </>
   )
 }
@@ -319,33 +333,153 @@ function Quoted({
  */
 function Words({
   text,
+  parse,
   outgoing,
   onOpen,
   onOpenCode,
 }: {
   text: string
+  parse?: Parse
   outgoing: boolean
   onOpen?: (address: string) => void
   onOpenCode?: (code: Code) => void
 }) {
-  const parts = useMemo(() => segments(text), [text])
+  // A plain message is one block of exactly what it says. `lib/markup` is never
+  // asked about it: reading marks out of writing nobody meant as markup is the
+  // thing the mode exists to avoid.
+  const shape = useMemo(
+    () =>
+      parse === "markdown"
+        ? blocks(text)
+        : [{ kind: "lines", pieces: segments(text) } satisfies Block],
+    [text, parse],
+  )
+  const inside = (pieces: Piece[]) => (
+    <Pieces pieces={pieces} outgoing={outgoing} onOpen={onOpen} onOpenCode={onOpenCode} />
+  )
   return (
     <>
-      {parts.map((part, index) =>
-        part.kind === "text" ? (
-          <Fragment key={index}>{part.text}</Fragment>
-        ) : part.kind === "link" ? (
-          <Link
+      {shape.map((block, index) => {
+        switch (block.kind) {
+          case "lines":
+            return <Fragment key={index}>{inside(block.pieces)}</Fragment>
+          case "heading":
+            // One weight for every depth. A heading is a message somebody sent
+            // you, and `#` must not be a way to be louder than the app.
+            return (
+              <p key={index} className="font-semibold">
+                {inside(block.pieces)}
+              </p>
+            )
+          case "quote":
+            // The same rule down the side that a reply is drawn with, so the
+            // two read as the same idea — words that are not the sender's own.
+            return (
+              <blockquote
+                key={index}
+                className={cn(
+                  "my-0.5 border-l-2 pl-2.5",
+                  outgoing ? "border-current/35" : "border-border",
+                )}
+              >
+                {inside(block.pieces)}
+              </blockquote>
+            )
+          case "code":
+            // Its own scroller: a long line of code is the one thing in a
+            // message that must not be broken to fit, and wrapping it is worse
+            // than making it slide.
+            return (
+              <pre
+                key={index}
+                className={cn(
+                  "scrollbar-none my-1 overflow-x-auto rounded-lg px-2.5 py-2 text-[13px]",
+                  outgoing ? "bg-black/15" : "bg-foreground/8",
+                )}
+              >
+                <code className="font-mono">{block.text}</code>
+              </pre>
+            )
+          case "list":
+            // No margins. A list is a block box, so it takes its own line —
+            // which is the newline the parse consumed on the way in, and the
+            // reason a message keeps the spacing it was written with.
+            return (
+              <ul key={index}>
+                {block.items.map((item, at) => (
+                  <li key={at} className="flex gap-1.5">
+                    {/* Drawn, never selected: what somebody copies out of a
+                        message should be what they could send back. */}
+                    <span className="shrink-0 select-none tabular-nums">{item.marker}</span>
+                    <span className="min-w-0">{inside(item.pieces)}</span>
+                  </li>
+                ))}
+              </ul>
+            )
+        }
+      })}
+    </>
+  )
+}
+
+/** The runs of one line, drawn. */
+function Pieces({
+  pieces,
+  outgoing,
+  onOpen,
+  onOpenCode,
+}: {
+  pieces: Piece[]
+  outgoing: boolean
+  onOpen?: (address: string) => void
+  onOpenCode?: (code: Code) => void
+}) {
+  return (
+    <>
+      {pieces.map((part, index) => {
+        const drawn =
+          part.kind === "text" ? (
+            <Fragment key={index}>{part.text}</Fragment>
+          ) : part.kind === "link" ? (
+            <Link
+              key={index}
+              text={part.text}
+              href={part.href}
+              outgoing={outgoing}
+              onOpenCode={onOpenCode}
+            />
+          ) : (
+            <Mention key={index} address={part.address} outgoing={outgoing} onOpen={onOpen} />
+          )
+        // Nothing to say about how it is written, which is every run of every
+        // message anybody types.
+        if (!part.bold && !part.italic && !part.strike && !part.code) return drawn
+        // One element carrying all of them, rather than one nested per mark:
+        // `**bold *and* italic**` is a single run either way, and the classes
+        // do not care which order they were written in.
+        //
+        // `font-semibold`, not `font-bold`: a bubble's own name and its unread
+        // count are already the heaviest things on screen, and a sentence
+        // written strongly is meant to stand out from the sentence around it
+        // rather than from the app.
+        return (
+          <span
             key={index}
-            text={part.text}
-            href={part.href}
-            outgoing={outgoing}
-            onOpenCode={onOpenCode}
-          />
-        ) : (
-          <Mention key={index} address={part.address} outgoing={outgoing} onOpen={onOpen} />
-        ),
-      )}
+            className={cn(
+              part.bold && "font-semibold",
+              part.italic && "italic",
+              part.strike && "line-through",
+              part.code &&
+                cn(
+                  "rounded px-1 py-px font-mono text-[0.9em]",
+                  outgoing ? "bg-black/15" : "bg-foreground/8",
+                ),
+            )}
+          >
+            {drawn}
+          </span>
+        )
+      })}
     </>
   )
 }
