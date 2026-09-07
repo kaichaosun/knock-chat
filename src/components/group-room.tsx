@@ -751,6 +751,11 @@ export function GroupRoom({
                               // gesture has to be claimed rather than shared.
                               onPointerDown={(event) => holdStart(() => openFor(message), event)}
                               onContextMenu={(event) => {
+                                // Something highlighted goes to the browser, whose Copy
+                                // takes the selection — ours would take the whole message,
+                                // which is not what somebody who has just dragged across
+                                // half a sentence is asking for.
+                                if (document.getSelection()?.isCollapsed === false) return
                                 // The pointer's way to the hold. Its own menu
                                 // is refused because ours is the one with
                                 // anything in it — and Copy, the only thing the
@@ -768,7 +773,7 @@ export function GroupRoom({
                                   itself to a share of whatever it sits in, so a
                                   wrapper that shrinks to its own content makes a
                                   short line wrap for no reason. */}
-                              <div className="min-w-0 flex-1 [-webkit-touch-callout:none] select-none">
+                              <div className="min-w-0 flex-1 [-webkit-touch-callout:none] pointer-fine:select-text select-none">
                                 <MessageBubble
                                   message={message}
                                   onRetry={onRetrySay}
@@ -882,6 +887,11 @@ export function GroupRoom({
                             className="group/msg relative flex items-start"
                             onPointerDown={(event) => holdStart(() => openFor(message), event)}
                             onContextMenu={(event) => {
+                              // Something highlighted goes to the browser, whose Copy
+                              // takes the selection — ours would take the whole message,
+                              // which is not what somebody who has just dragged across
+                              // half a sentence is asking for.
+                              if (document.getSelection()?.isCollapsed === false) return
                               // The pointer's way to the hold. Its own menu is
                               // refused because ours is the one with anything
                               // in it — and Copy, the only thing the browser's
@@ -894,7 +904,7 @@ export function GroupRoom({
                             onPointerCancel={holdCancel}
                             onPointerLeave={holdCancel}
                           >
-                            <div className="min-w-0 flex-1 [-webkit-touch-callout:none] select-none">
+                            <div className="min-w-0 flex-1 [-webkit-touch-callout:none] pointer-fine:select-text select-none">
                               <MessageBubble
                                 message={message}
                                 onRetry={onRetrySay}

@@ -147,7 +147,17 @@ export function MessageBubble({
         //
         // Only where the press already means something. A one-to-one thread has
         // no message menu, and there the browser's own is the only one there is.
-        onContextMenu={selectable ? undefined : (event) => event.preventDefault()}
+        onContextMenu={
+          selectable
+            ? undefined
+            : (event) => {
+                // Something highlighted means the browser's own menu is the
+                // useful one: its Copy takes what was selected, and the menu
+                // this makes room for would take the whole message.
+                if (document.getSelection()?.isCollapsed === false) return
+                event.preventDefault()
+              }
+        }
       >
         {payload.kind === "payment" ? (
           <PaymentCard payment={payload.payment} outgoing={outgoing} faded={failed} />
@@ -187,7 +197,16 @@ export function MessageBubble({
               // its own, and that callout is switched off separately from the
               // selection. It inherits, so setting it here reaches the links
               // inside.
-              selectable ? "select-text" : "select-none [-webkit-touch-callout:none]",
+              selectable
+                ? "select-text"
+                : // A finger cannot select and press at the same time — the
+                  // browser starts highlighting long before a 500ms timer could
+                  // fire, and on iOS puts its own Copy callout over whatever
+                  // opens next. A pointer has no such conflict: the press is
+                  // touch-only, and a right-click is a separate gesture. So the
+                  // refusal is about the finger rather than about the message,
+                  // and lifts wherever there is a real pointer.
+                  "select-none [-webkit-touch-callout:none] pointer-fine:select-text",
               outgoing
                 ? "bg-bubble-mine text-bubble-mine-foreground rounded-br-md shadow-sm"
                 : "bg-muted text-foreground rounded-bl-md",

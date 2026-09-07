@@ -442,6 +442,11 @@ export function Conversation({
                             className="group/msg relative flex items-start"
                             onPointerDown={(event) => holdStart(() => openFor(message), event)}
                             onContextMenu={(event) => {
+                              // Something highlighted goes to the browser, whose Copy
+                              // takes the selection — ours would take the whole message,
+                              // which is not what somebody who has just dragged across
+                              // half a sentence is asking for.
+                              if (document.getSelection()?.isCollapsed === false) return
                               // The pointer's way to the hold. Its own menu is
                               // refused because ours is the one with anything
                               // in it — and Copy, the only thing the browser's
@@ -454,7 +459,7 @@ export function Conversation({
                             onPointerCancel={holdCancel}
                             onPointerLeave={holdCancel}
                           >
-                            <div className="min-w-0 flex-1 select-none [-webkit-touch-callout:none]">
+                            <div className="min-w-0 flex-1 [-webkit-touch-callout:none] pointer-fine:select-text select-none">
                               <MessageBubble
                                 message={message}
                                 onRetry={onRetry}
