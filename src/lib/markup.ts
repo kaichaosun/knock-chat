@@ -200,7 +200,15 @@ export function blocks(text: string): Block[] {
   const flush = () => {
     // Only one of the three is ever waiting: starting any of them ends the
     // others. Written as three so that stays true without being remembered.
-    if (plain.length > 0) out.push({ kind: "lines", pieces: pieces(plain.join("\n")) })
+    //
+    // Trimmed, and this is not tidiness. A blank line before a heading is a
+    // separator, not something said — but left in the text it becomes a
+    // trailing newline, and a browser drops one of those at the end of a block
+    // while rendering a *leading* one as an empty line. So the same blank line
+    // showed as a gap under a heading and as nothing above it. The space
+    // between blocks is a margin now, where it can be the same on both sides.
+    const said = plain.join("\n").trim()
+    if (said) out.push({ kind: "lines", pieces: pieces(said) })
     if (items.length > 0) out.push({ kind: "list", items })
     if (quoted.length > 0) out.push({ kind: "quote", pieces: pieces(quoted.join("\n")) })
     plain = []

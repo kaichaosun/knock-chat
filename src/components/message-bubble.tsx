@@ -426,8 +426,12 @@ function Words({
           case "heading":
             // One weight for every depth. A heading is a message somebody sent
             // you, and `#` must not be a way to be louder than the app.
+            //
+            // More space above than below, because a heading belongs to what
+            // follows it. `first:mt-0` so an answer opening with one does not
+            // start with a gap inside the bubble.
             return (
-              <p key={index} className="font-semibold">
+              <p key={index} className="mt-3 mb-0.5 font-semibold first:mt-0">
                 {inside(block.pieces)}
               </p>
             )
@@ -438,7 +442,7 @@ function Words({
               <blockquote
                 key={index}
                 className={cn(
-                  "my-0.5 border-l-2 pl-2.5",
+                  "my-1.5 border-l-2 pl-2.5",
                   outgoing ? "border-current/35" : "border-border",
                 )}
               >
@@ -476,11 +480,11 @@ function Words({
               </pre>
             )
           case "list":
-            // No margins. A list is a block box, so it takes its own line —
-            // which is the newline the parse consumed on the way in, and the
-            // reason a message keeps the spacing it was written with.
+            // The gap is a margin rather than a blank line. What stood here
+            // belonged to the source and not to what was said, so it is
+            // trimmed off and drawn instead — see the trim in `blocks`.
             return (
-              <ul key={index}>
+              <ul key={index} className="my-1.5 first:mt-0">
                 {block.items.map((item, at) => (
                   <li key={at} className="flex gap-1.5">
                     {/* Drawn, never selected: what somebody copies out of a

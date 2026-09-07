@@ -135,7 +135,21 @@ describe("blocks", () => {
   })
 
   it("says nothing about an empty message", () => {
-    expect(blocks("")).toEqual([{ kind: "lines", pieces: [] }])
+    expect(blocks("")).toEqual([])
+    expect(blocks("\n\n  \n")).toEqual([])
+  })
+
+  it("keeps the blank lines inside a passage and drops the ones between blocks", () => {
+    // The one in the middle is what somebody wrote. The ones against the
+    // heading are how markdown separates blocks, and drawing them made a
+    // heading sit tight against the words above it and loose against the
+    // words below — the same blank line rendering on one side and not the
+    // other. Spacing is a margin now; see `message-bubble`.
+    expect(blocks("one\n\ntwo\n\n# Heading\n\nthree")).toEqual([
+      { kind: "lines", pieces: [{ kind: "text", text: "one\n\ntwo" }] },
+      { kind: "heading", pieces: [{ kind: "text", text: "Heading" }] },
+      { kind: "lines", pieces: [{ kind: "text", text: "three" }] },
+    ])
   })
 })
 
