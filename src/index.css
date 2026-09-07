@@ -479,3 +479,25 @@
 @utility pb-float {
   padding-bottom: max(var(--safe-bottom, env(safe-area-inset-bottom)), 2rem);
 }
+
+/* Three dots under a message that has not finished arriving.
+   
+   A lift rather than a fade: an answer being written is something happening,
+   and a pulse reads as something waiting. Small enough to be noticed only when
+   looked at — it sits under every streamed answer for as long as one takes. */
+@keyframes thinking {
+  0%,
+  70%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@utility thinking {
+  animation: thinking 1.3s ease-in-out infinite;
+}

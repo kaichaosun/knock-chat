@@ -214,34 +214,14 @@ export function MessageBubble({
             )}
           >
             {payload.kind === "text" ? (
-              <>
-                <Answering
-                  text={payload.text}
-                  parse={payload.parse}
-                  outgoing={outgoing}
-                  onOpen={onOpenMention}
-                  onOpenQuote={onOpenQuote}
-                  onOpenCode={onOpenCode}
-                />
-                {/* An answer still arriving. `joined` leaves the marker on
-                    until the last piece says it is the last, so this is the
-                    difference between a message that stops and one that has not
-                    finished — which without it read as the same thing. */}
-                {payload.part && !payload.part.end && (
-                  <span
-                    aria-label={t("bubble.stillComing")}
-                    className="ml-1 inline-flex translate-y-px gap-0.5 align-baseline"
-                  >
-                    {[0, 1, 2].map((dot) => (
-                      <span
-                        key={dot}
-                        className="size-1 animate-pulse rounded-full bg-current opacity-50"
-                        style={{ animationDelay: `${dot * 150}ms` }}
-                      />
-                    ))}
-                  </span>
-                )}
-              </>
+              <Answering
+                text={payload.text}
+                parse={payload.parse}
+                outgoing={outgoing}
+                onOpen={onOpenMention}
+                onOpenQuote={onOpenQuote}
+                onOpenCode={onOpenCode}
+              />
             ) : (
               // Something a newer build sent that this one has no way to draw.
               // Shown as a gap on purpose: silently dropping it would leave the
@@ -251,6 +231,37 @@ export function MessageBubble({
                 {t("misc.unsupported")}
               </span>
             )}
+          </div>
+        )}
+
+        {/* An answer still being written.
+            
+            Under the bubble rather than inside it, because it is not something
+            the sender said — it is this device saying the message is not
+            finished. Inside, it sat at the end of the last sentence and read as
+            punctuation somebody had typed.
+            
+            `joined` leaves the marker on until the last piece says it is the
+            last, so this is the difference between a message that stopped and
+            one that has not finished — which without it looked the same. */}
+        {payload.kind === "text" && payload.part && !payload.part.end && (
+          <div
+            role="status"
+            aria-label={t("bubble.stillComing")}
+            className={cn(
+              "mt-1 flex w-fit items-center gap-1 rounded-full px-2.5 py-1.5",
+              outgoing ? "bg-bubble-mine/60" : "bg-muted",
+            )}
+          >
+            {[0, 1, 2].map((dot) => (
+              <span
+                key={dot}
+                // Staggered, so the three read as one thing travelling rather
+                // than three things blinking together.
+                style={{ animationDelay: `${dot * 160}ms` }}
+                className="bg-muted-foreground/70 thinking size-1.5 rounded-full"
+              />
+            ))}
           </div>
         )}
 
