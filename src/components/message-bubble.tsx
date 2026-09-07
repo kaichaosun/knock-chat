@@ -119,11 +119,11 @@ export function MessageBubble({
   }
 
   const payload = decode(message.body)
-  // An answer that has been opened and has nothing in it yet. The dots below
-  // stand alone for it: an empty bubble is a shape with nothing to say, and the
-  // pair read as two things when they are one.
-  const onlyOpened =
-    payload.kind === "text" && !payload.text && Boolean(payload.part) && !payload.part?.end
+  // A message with no words in it: an answer opened before there was any of
+  // it, or one closed without any. No bubble is drawn for it — an empty one is
+  // a shape with nothing to say, and beside the dots the pair read as two
+  // things when they are one.
+  const wordless = payload.kind === "text" && !payload.text
 
   return (
     // Always the left, whichever way it went: the face beside a message says
@@ -181,7 +181,7 @@ export function MessageBubble({
             faded={failed}
             onOpen={() => onOpenInvite(payload.invite.group)}
           />
-        ) : onlyOpened ? null : (
+        ) : wordless ? null : (
           <div
             className={cn(
               "rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug whitespace-pre-wrap",
@@ -256,7 +256,7 @@ export function MessageBubble({
             className={cn(
               "flex w-fit items-center gap-1 rounded-full px-2.5 py-1.5",
               // Nothing to sit under where the bubble was not drawn.
-              onlyOpened ? "mt-0" : "mt-1",
+              wordless ? "mt-0" : "mt-1",
               outgoing ? "bg-bubble-mine/60" : "bg-muted",
             )}
           >
