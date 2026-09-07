@@ -414,6 +414,10 @@ export function preview(plain: string, direction: "in" | "out"): string {
       // exactly what somebody typed.
       const body = unquote(payload.text).body
       const text = spoken(payload.parse === "markdown" ? unmarked(body) : body)
+      // An answer opened before there was any of it — see `Part`. A row is the
+      // one place that cannot show three dots, so it says the same thing in
+      // words rather than going blank.
+      if (!text && payload.part && !payload.part.end) return t("preview.writing")
       return direction === "out" ? t("preview.youSaid", { text }) : text
     }
     case "payment": {

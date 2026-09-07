@@ -281,3 +281,25 @@ describe("a message that names somebody", () => {
     expect(preview(`hey ${mentionOf(ALICE)}`, "in")).toBe("hey @Alice")
   })
 })
+
+describe("an answer opened before there was any of it", () => {
+  const opener = FRAME + JSON.stringify({ kind: "text", parse: "markdown", part: { at: 0 }, text: "" })
+
+  it("is a text message with nothing said and more coming", () => {
+    expect(decode(opener)).toEqual({
+      kind: "text",
+      text: "",
+      parse: "markdown",
+      part: { at: 0 },
+    })
+  })
+
+  it("reads as writing in a chat row rather than as a blank line", () => {
+    expect(preview(opener, "in")).toBe("Writing…")
+  })
+
+  it("says nothing of the sort once there are words", () => {
+    const said = FRAME + JSON.stringify({ kind: "text", part: { at: 0 }, text: "half an answer" })
+    expect(preview(said, "in")).toBe("half an answer")
+  })
+})

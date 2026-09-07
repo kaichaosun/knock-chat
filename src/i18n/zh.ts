@@ -49,6 +49,7 @@ export const zh: Dictionary = {
     places: "旅行与地点",
   },
   preview: {
+    writing: "正在输入…",
     youSaid: "你：{{text}}",
     sent: "已发送 {{amount}}",
     received: "收到 {{amount}}",

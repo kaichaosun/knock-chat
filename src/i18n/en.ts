@@ -47,6 +47,7 @@ export const en = {
     places: "Travel & places",
   },
   preview: {
+    writing: "Writing…",
     youSaid: "You: {{text}}",
     sent: "Sent {{amount}}",
     received: "Received {{amount}}",
