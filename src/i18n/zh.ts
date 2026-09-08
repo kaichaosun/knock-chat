@@ -609,4 +609,9 @@ export const zh: Dictionary = {
       host: "跟随系统",
     },
   },
+  oneTab: {
+    title: "Knock 已在另一个标签页中打开",
+    note: "消息只投递一次，因此只能由一个标签页接收。",
+    action: "在这里聊天",
+  },
 }

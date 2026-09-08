@@ -2,6 +2,7 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 
 import App from "@/App"
+import { OneTab } from "@/components/one-tab"
 import { Toaster } from "@/components/ui/sonner"
 import { start as startI18n } from "@/i18n"
 import { start as startPrefs } from "@/lib/prefs"
@@ -23,9 +24,14 @@ startPrefs()
 // After the preferences, which is where a chosen language is kept.
 startI18n()
 
+// Everything inside is mounted only in the tab that holds the lock, and torn
+// down whole in one that hands it over — which is what makes standing down
+// mean something. See `lib/one-tab`.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
-    <Toaster />
+    <OneTab>
+      <App />
+      <Toaster />
+    </OneTab>
   </StrictMode>,
 )

@@ -649,6 +649,12 @@ export const en = {
       host: "Follow system",
     },
   },
+  /** The screen every tab but one shows. See `lib/one-tab`. */
+  oneTab: {
+    title: "Knock is open in another tab",
+    note: "Messages are delivered once, so only one tab can collect them.",
+    action: "Chat here",
+  },
 } as const
 
 /**
