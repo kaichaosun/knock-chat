@@ -3,20 +3,9 @@
 A Nimiq Pay Mini App for messaging between wallets, where spam is priced out
 instead of guessed at.
 
-> **Status.** Authenticated, end-to-end encrypted messages over
-> [knock-relay](../knock-relay), with NIM postage on knocks. Not deployed —
-> see [ROADMAP.md](./ROADMAP.md).
+## Development
 
-## Run it
-
-Two processes. The relay first:
-
-```sh
-cd ../knock-relay
-KNOCK_RELAY_MEMORY=1 cargo run     # no database needed
-```
-
-Then the app:
+Run the app:
 
 ```sh
 npm install
@@ -189,4 +178,4 @@ what is built and what is left.
 
 ## License
 
-Copyright 2026 KEYRING Pte. Ltd. Apache-2.0 — see [LICENSE](./LICENSE).
+Copyright 2026 KEYRING Pte. Ltd. MIT — see [LICENSE](./LICENSE).

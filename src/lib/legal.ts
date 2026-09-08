@@ -24,7 +24,7 @@ const COMPANY = "KEYRING Pte. Ltd."
 const CONTACT = "support@keyring.so"
 const JURISDICTION = "Singapore"
 const MINIMUM_AGE = 18
-const UPDATED = "3 September 2026"
+const UPDATED = "8 September 2026"
 
 export type LegalSection = {
   heading: string
@@ -104,7 +104,7 @@ export const TERMS: LegalDoc = {
     {
       heading: "The code",
       body: [
-        "Knock's client and relay are published under the Apache License 2.0. That licence covers the source code; it is not a licence to the service we operate, and running your own relay is not covered by these terms.",
+        "Knock's client is published under the MIT License. That licence covers the source code; it is not a licence to the service we operate, and running your own relay is not covered by these terms.",
       ],
     },
     {
