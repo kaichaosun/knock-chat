@@ -286,13 +286,26 @@ export function useMessages(
     [update],
   )
 
-  const conversations = useMemo(() => history.conversations(snapshot), [snapshot])
+  // An answer being written is the one thing here that changes while nothing
+  // happens: it stops being written by the clock running out, not by anything
+  // arriving. So one timer, aimed at the moment the nearest one falls quiet —
+  // and none at all when nothing is waiting, which is nearly always. Without it
+  // the dots would hang until something else happened to redraw the thread.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const due = history.quietAt(snapshot.messages, now)
+    if (due === null) return
+    const timer = window.setTimeout(() => setNow(Date.now()), due - Date.now())
+    return () => window.clearTimeout(timer)
+  }, [snapshot, now])
+
+  const conversations = useMemo(() => history.conversations(snapshot, now), [snapshot, now])
   // Exposed so the caller can fold in rooms without resurrecting the ones whose
   // chat was deleted — this hook knows nothing about rooms.
   const dismissed = snapshot.dismissed
   const threadWith = useCallback(
-    (peer: string) => history.threadWith(snapshot, peer),
-    [snapshot],
+    (peer: string) => history.threadWith(snapshot, peer, now),
+    [snapshot, now],
   )
 
   return {

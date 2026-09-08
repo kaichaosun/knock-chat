@@ -13,6 +13,8 @@ import {
   markRead,
   mergeIncoming,
   opensTurn,
+  QUIET_MS,
+  quietAt,
   recordOutgoing,
   resend,
   save,
@@ -722,14 +724,19 @@ describe("an answer that arrived in pieces", () => {
   const said = (text: string, part?: { head?: string; at: number; end?: true }) =>
     encode({ kind: "text", text, parse: "markdown", ...(part ? { part } : {}) })
 
-  const message = (id: string, body: string): Message => ({
+  const OPENED = Date.parse("2026-01-01T10:00:00Z")
+
+  const message = (id: string, body: string, after = 0): Message => ({
     id,
     peer: BOT,
     direction: "in",
     body,
-    at: "2026-01-01T10:00:00Z",
+    at: new Date(OPENED + after).toISOString(),
     status: "sent",
   })
+
+  /** While the answer is plainly still being written. */
+  const writing = OPENED + 1_000
 
   it("is one message, keeping the first piece's id", () => {
     const [only, ...rest] = joined([
@@ -743,19 +750,105 @@ describe("an answer that arrived in pieces", () => {
   })
 
   it("says it is still coming until the last piece says otherwise", () => {
-    const [only] = joined([
-      message("relay:aaa", said("first ", { at: 0 })),
-      message("relay:bbb", said("second", { head: "aaa", at: 1 })),
-    ])
+    const [only] = joined(
+      [
+        message("relay:aaa", said("first ", { at: 0 })),
+        message("relay:bbb", said("second", { head: "aaa", at: 1 })),
+      ],
+      writing,
+    )
     const payload = decode(only.body)
-    expect(payload.kind === "text" && payload.part?.end).toBeUndefined()
+    expect(payload.kind === "text" && payload.part).toEqual({ at: 0 })
   })
 
   it("leaves a piece whose first has not arrived standing on its own", () => {
     // History loads a page at a time and can put them either side of a
     // boundary. Waiting for something that may never come would lose it.
     const orphan = message("relay:bbb", said("second", { head: "aaa", at: 1 }))
-    expect(joined([orphan])).toEqual([orphan])
+    expect(joined([orphan], writing)).toEqual([orphan])
+  })
+
+  it("stops saying more is coming once it has been quiet too long", () => {
+    // The last piece never came: the sender died mid-answer, or another tab of
+    // this browser collected it and the relay deleted it on the way. What
+    // arrived is still worth showing; the promise of more is not.
+    const pieces = [
+      message("relay:aaa", said("first ", { at: 0 })),
+      message("relay:bbb", said("second", { head: "aaa", at: 1 }), 1_000),
+    ]
+    const [only] = joined(pieces, OPENED + 1_000 + QUIET_MS)
+    expect(decode(only.body)).toEqual({
+      kind: "text",
+      text: "first second",
+      parse: "markdown",
+    })
+  })
+
+  it("measures the silence from the newest piece, not the first", () => {
+    // Otherwise an answer longer than a minute would be declared over halfway
+    // through writing itself.
+    const pieces = [
+      message("relay:aaa", said("first ", { at: 0 })),
+      message("relay:bbb", said("second", { head: "aaa", at: 1 }), 5 * QUIET_MS),
+    ]
+    const [only] = joined(pieces, OPENED + 5 * QUIET_MS + 1_000)
+    const payload = decode(only.body)
+    expect(payload.kind === "text" && payload.part).toEqual({ at: 0 })
+  })
+
+  it("leaves an answer that was opened and never written as nothing at all", () => {
+    // The three dots arrive before the words do, so this is what a bot that
+    // fell over between the two leaves behind. A bubble with nothing in it is
+    // drawn as nothing — better than dots that never stop.
+    const opener = message("relay:aaa", said("", { at: 0 }))
+    const [only] = joined([opener], OPENED + QUIET_MS)
+    expect(decode(only.body)).toEqual({ kind: "text", text: "", parse: "markdown" })
+  })
+
+  it("stops a lone piece saying it too, having nothing to join it to", () => {
+    const orphan = message("relay:bbb", said("second", { head: "aaa", at: 1 }))
+    const [only] = joined([orphan], OPENED + QUIET_MS)
+    expect(decode(only.body)).toEqual({ kind: "text", text: "second", parse: "markdown" })
+  })
+
+  it("keeps a finished answer whatever the clock says", () => {
+    const done = [
+      message("relay:aaa", said("first ", { at: 0 })),
+      message("relay:bbb", said("second", { head: "aaa", at: 1, end: true })),
+    ]
+    const [only] = joined(done, OPENED + 100 * QUIET_MS)
+    expect(decode(only.body)).toEqual({
+      kind: "text",
+      text: "first second",
+      parse: "markdown",
+    })
+  })
+
+  describe("when to look again", () => {
+    it("is a minute after the newest piece of the earliest unfinished answer", () => {
+      const pieces = [
+        message("relay:aaa", said("first ", { at: 0 })),
+        message("relay:bbb", said("second", { head: "aaa", at: 1 }), 1_000),
+      ]
+      expect(quietAt(pieces, writing)).toBe(OPENED + 1_000 + QUIET_MS)
+    })
+
+    it("is nothing where every answer is finished", () => {
+      const done = [
+        message("relay:aaa", said("first ", { at: 0 })),
+        message("relay:bbb", said("second", { head: "aaa", at: 1, end: true })),
+      ]
+      expect(quietAt(done, writing)).toBeNull()
+    })
+
+    it("is nothing where the moment has already passed, so waking up settles", () => {
+      const pieces = [message("relay:aaa", said("first ", { at: 0 }))]
+      expect(quietAt(pieces, OPENED + QUIET_MS)).toBeNull()
+    })
+
+    it("is nothing at all for a thread of ordinary messages", () => {
+      expect(quietAt([message("relay:aaa", "hello")], writing)).toBeNull()
+    })
   })
 
   it("leaves an ordinary thread untouched", () => {

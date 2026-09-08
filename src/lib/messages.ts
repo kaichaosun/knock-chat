@@ -73,6 +73,26 @@ export function threadKey(message: Message): string {
 export const TURN_GAP_MS = 5 * 60_000
 
 /**
+ * How long an unfinished answer may hear nothing before it is presumed over.
+ *
+ * A message arriving in pieces says so, and the thread shows three dots until
+ * the piece that says it was the last — see [`joined`]. Nothing guarantees that
+ * piece ever comes: the sender can die mid-answer, and a direct message is
+ * deleted from the relay as it is collected, so a piece that went to another
+ * tab of this same browser is gone rather than late. Without a limit those dots
+ * are permanent, and a promise the device cannot keep is worse than an answer
+ * that plainly stopped.
+ *
+ * A minute, because it is measured from the *newest* piece rather than the
+ * first: an answer still being written resets it every few seconds, so this is
+ * the length of a silence in the middle of one, not the length of one.
+ *
+ * Only what is drawn changes. The pieces are left exactly as they arrived, so a
+ * straggler that turns up late still joins on the next read.
+ */
+export const QUIET_MS = 60_000
+
+/**
  * Whether two messages are the same person still talking.
  *
  * Outgoing is always you; incoming is somebody in particular, which only
@@ -496,6 +516,10 @@ function incomingCount(messages: Message[], thread: string): number {
   // Counted after joining, and it has to be: `conversations` counts the same
   // way, and a mark taken on one basis against a count taken on the other
   // leaves a thread permanently unread by the difference.
+  //
+  // No clock is passed, and none is needed: falling quiet changes how an answer
+  // is drawn and never how many messages there are, so this agrees with
+  // `conversations` whenever it is asked.
   return joined(messages.filter((m) => threadKey(m) === thread)).filter(
     (m) => m.direction === "in",
   ).length
@@ -516,9 +540,12 @@ function sorted(messages: Message[]): Message[] {
   return [...messages].sort((a, b) => a.at.localeCompare(b.at))
 }
 
-export function threadWith(snapshot: Snapshot, thread: string): Message[] {
+export function threadWith(snapshot: Snapshot, thread: string, now?: number): Message[] {
   const key = normalizeKey(thread)
-  return joined(snapshot.messages.filter((m) => threadKey(m) === key))
+  return joined(
+    snapshot.messages.filter((m) => threadKey(m) === key),
+    now,
+  )
 }
 
 /**
@@ -536,8 +563,14 @@ export function threadWith(snapshot: Snapshot, thread: string): Message[] {
  * Nothing is ever dropped. A piece whose first has not arrived — history loaded
  * a page at a time can put them either side of the boundary — stands as its own
  * message rather than waiting for something that may never come.
+ *
+ * `now` decides which answers are still being written. One that has heard
+ * nothing for [`QUIET_MS`] loses its marker and is drawn as what it is: a
+ * message that stopped. Passed in rather than read here so this stays a
+ * function of what it is given, and so a caller redrawing on a timer and this
+ * agree about the time — see [`quietAt`].
  */
-export function joined(messages: Message[]): Message[] {
+export function joined(messages: Message[], now: number = Date.now()): Message[] {
   // Nearly every thread, and the whole of every thread between people. Walked
   // once to find out, so the common case allocates nothing.
   if (!messages.some((message) => partOf(message))) return messages
@@ -576,7 +609,88 @@ export function joined(messages: Message[]): Message[] {
       body: encode(text(grown, parseOf(out[at]), part.end ? undefined : { at: 0 })),
     }
   }
-  return out
+
+  // Last, so it sees answers as they will be drawn rather than as they arrived:
+  // by here a first piece carries everything joined to it, and its marker means
+  // what the thread will show.
+  const waiting = stillComing(messages)
+  return out.map((message) => {
+    const heard = waiting.get(message.id)
+    return heard !== undefined && now - heard >= QUIET_MS ? stopped(message) : message
+  })
+}
+
+/**
+ * When the earliest unfinished answer here falls quiet, or null where none is
+ * waiting on one.
+ *
+ * For a caller that draws these: the dots stop being true at a moment when
+ * nothing else is happening — no message arrives, nothing is tapped — so
+ * something has to wake up for it. One timer for the nearest deadline is enough
+ * and is not a clock; a thread with nothing pending asks for none at all.
+ *
+ * Never returns a deadline that has already passed, so waking for one and
+ * asking again terminates.
+ */
+export function quietAt(messages: Message[], now: number = Date.now()): number | null {
+  let due: number | null = null
+  for (const heard of stillComing(messages).values()) {
+    const falls = heard + QUIET_MS
+    if (falls > now && (due === null || falls < due)) due = falls
+  }
+  return due
+}
+
+/**
+ * The pieces here that still say more is coming, and when each last heard
+ * something.
+ *
+ * Keyed by the message the marker will sit on once [`joined`] has run: a first
+ * piece for an answer that has one, and the piece itself for one whose first
+ * never arrived — which stands alone and so waits alone.
+ *
+ * An answer is measured from its *newest* piece. From the first, a long answer
+ * would be declared over while it was still being written.
+ */
+function stillComing(messages: Message[]): Map<string, number> {
+  /** When each answer last heard a piece. */
+  const heard = new Map<string, number>()
+  /** Those whose last piece said it was the last. */
+  const closed = new Set<string>()
+
+  for (const message of messages) {
+    const part = partOf(message)
+    if (!part) continue
+    // Read in order, as `joined` reads them, so "has a first" means one that
+    // has already gone past rather than one anywhere in the thread.
+    const answer = part.head && heard.has(`relay:${part.head}`) ? `relay:${part.head}` : message.id
+    heard.set(answer, when(message))
+    // The last piece decides, as it does in `joined`.
+    if (part.end) closed.add(answer)
+    else closed.delete(answer)
+  }
+
+  for (const id of closed) heard.delete(id)
+  return heard
+}
+
+/** The same message, no longer claiming there is more of it to come. */
+function stopped(message: Message): Message {
+  const payload = decode(message.body)
+  if (payload.kind !== "text") return message
+  return { ...message, body: encode(text(payload.text, payload.parse)) }
+}
+
+/**
+ * When a message was said, as a number to compare.
+ *
+ * The relay's clock, against this device's — so a device an hour ahead calls a
+ * live answer quiet and one an hour behind waits an hour longer. Both are
+ * already visible in the times beside every message, and both fail as a drawing
+ * rather than as a loss: the pieces are untouched either way.
+ */
+function when(message: Message): number {
+  return new Date(message.at).getTime()
 }
 
 /** The marker on a message that is one piece of a longer answer. */
@@ -597,8 +711,14 @@ function parseOf(message: Message): Parse | undefined {
   return payload.kind === "text" ? payload.parse : undefined
 }
 
-/** One entry per peer, most recently active first. */
-export function conversations(snapshot: Snapshot): Conversation[] {
+/**
+ * One entry per peer, most recently active first.
+ *
+ * `now` is only what [`joined`] needs of it: a row says "writing…" for an
+ * answer opened before there was any of it, and has to stop saying so at the
+ * same moment the thread stops showing dots.
+ */
+export function conversations(snapshot: Snapshot, now?: number): Conversation[] {
   const byThread = new Map<string, Message[]>()
   for (const message of snapshot.messages) {
     const key = threadKey(message)
@@ -611,7 +731,7 @@ export function conversations(snapshot: Snapshot): Conversation[] {
   for (const [key, bucket] of byThread) {
     // Joined first, so a long answer is one row and counts as one unread rather
     // than as however many messages it happened to need.
-    const messages = joined(bucket)
+    const messages = joined(bucket, now)
     const incoming = messages.filter((m) => m.direction === "in").length
     const last = messages[messages.length - 1]
     result.push({
