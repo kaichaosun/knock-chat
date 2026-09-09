@@ -186,6 +186,35 @@ export type Names = Record<string, string>
 export type Profile = { name: string | null }
 
 /**
+ * The most addresses one directory lookup may name, mirroring the relay's own
+ * ceiling. Asking for more is refused, not truncated.
+ */
+export const MAX_LOOKUP = 200
+
+/**
+ * What a set of addresses call themselves right now.
+ *
+ * Every other answer carries names because it was already carrying the
+ * addresses — a contact list, a page of members. A room's messages are the case
+ * that does not fit: whoever is talking in a room is not whoever its details
+ * name, which is only its first few members, so a room has to ask about the
+ * people it is actually drawing.
+ *
+ * Believable about absence, unlike the maps hanging off a list: this names the
+ * addresses it asks about, so one missing from `names` has no name — see
+ * `rememberAll`.
+ *
+ * A POST for a read, because what it carries is addresses and those have no
+ * business in a URL.
+ */
+export function lookUpNames(addresses: string[]): Promise<{ names: Names; faces?: Faces }> {
+  return request<{ names: Names; faces?: Faces }>("/v1/directory", {
+    method: "POST",
+    body: JSON.stringify({ addresses }),
+  })
+}
+
+/**
  * The longest name the relay will accept, in characters. Mirrored here so the
  * field can stop you before a round trip, not so the client can be trusted —
  * the relay checks the same thing again.

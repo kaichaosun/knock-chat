@@ -10,12 +10,14 @@ import {
   labelIn,
   nameIn,
   remember,
+  rememberAll,
   rememberFace,
   rememberOne,
   rename,
   sanitize,
   snapshot,
 } from "./names"
+import { compact } from "./address"
 import { MAX_NAME_LEN } from "./relay"
 
 const ALICE = "NQ97 V68G X92J 86C2 7P1E ALS6 6CGG 0V5E JLKY"
@@ -131,6 +133,55 @@ describe("the directory", () => {
     remember({ [ALICE]: "alice" })
     const settled = snapshot()
     remember({ [ALICE]: "alice" })
+    expect(snapshot()).toBe(settled)
+  })
+})
+
+describe("an answer about addresses that were asked about", () => {
+  it("takes a new name, which is the rename landing", () => {
+    remember({ [ALICE]: "alice" })
+    rememberAll([ALICE], { [ALICE]: "alicia" })
+    expect(nameIn(snapshot(), ALICE)).toBe("alicia")
+  })
+
+  it("drops a name the answer left out, unlike a list", () => {
+    // The whole difference. A list saying nothing about an address means it was
+    // not asked; this was asked, so silence is the answer.
+    remember({ [ALICE]: "alice", [BOB]: "bob" })
+    rememberAll([ALICE, BOB], { [BOB]: "bob" })
+    expect(nameIn(snapshot(), ALICE)).toBeNull()
+    expect(nameIn(snapshot(), BOB)).toBe("bob")
+  })
+
+  it("says nothing about anyone it was not asked about", () => {
+    remember({ [ALICE]: "alice", [BOB]: "bob" })
+    rememberAll([BOB], { [BOB]: "bobby" })
+    expect(nameIn(snapshot(), ALICE)).toBe("alice")
+  })
+
+  it("matches however either side spaced the address", () => {
+    rememberAll([compact(ALICE)], { [ALICE]: "alice" })
+    expect(nameIn(snapshot(), ALICE)).toBe("alice")
+  })
+
+  it("leaves the name you chose alone, name or no name", () => {
+    rename(ALICE, "the neighbour")
+    rememberAll([ALICE], {})
+    expect(nameIn(snapshot(), ALICE)).toBe("the neighbour")
+  })
+
+  it("takes a picture off the address that stopped wearing one", () => {
+    const face = "a".repeat(64)
+    rememberAll([ALICE], { [ALICE]: "alice" }, { [ALICE]: face })
+    expect(faceIn(snapshot(), ALICE)).toBe(face)
+    rememberAll([ALICE], { [ALICE]: "alice" })
+    expect(faceIn(snapshot(), ALICE)).toBeNull()
+  })
+
+  it("does not churn when nothing about anybody changed", () => {
+    rememberAll([ALICE], { [ALICE]: "alice" })
+    const settled = snapshot()
+    rememberAll([ALICE], { [ALICE]: "alice" })
     expect(snapshot()).toBe(settled)
   })
 })

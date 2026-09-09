@@ -249,6 +249,68 @@ export function remember(names: Names, faces?: Faces): void {
 }
 
 /**
+ * Take in an answer about a set of addresses that were named in the asking.
+ *
+ * The difference from [`remember`] is the whole reason this exists: a list says
+ * nothing about an address it does not mention, because it never claimed to be
+ * about that address. A lookup did. So an address that was asked about and came
+ * back without a name has no name, and the one this device has been showing
+ * since whenever it last heard is wrong and goes.
+ *
+ * Which is what makes a rename land. `remember` can only ever replace a name
+ * with another name; without this, somebody who cleared theirs would go on
+ * being called the old one everywhere it had already been seen.
+ *
+ * One commit for the lot, so a screenful of people is one re-render.
+ */
+export function rememberAll(asked: string[], names: Names, faces?: Faces): void {
+  const given = { ...directory.given }
+  const withFaces = { ...directory.faces }
+  let changed = false
+  let facesChanged = false
+
+  // Keyed the way this file keys everything, so it does not matter which of
+  // them wrote the address grouped and which wrote it compact.
+  const answered = new Map<string, string>()
+  for (const [address, raw] of Object.entries(names)) answered.set(key(address), raw)
+  const worn = new Map<string, string>()
+  for (const [address, print] of Object.entries(faces ?? {})) worn.set(key(address), print)
+
+  for (const address of asked) {
+    const at = key(address)
+
+    const name = sanitize(answered.get(at) ?? "")
+    if (name === null) {
+      if (at in given) {
+        delete given[at]
+        changed = true
+      }
+    } else if (given[at] !== name) {
+      given[at] = name
+      changed = true
+    }
+
+    const face = worn.get(at) ?? null
+    if (face === null || !isFingerprint(face)) {
+      if (at in withFaces) {
+        delete withFaces[at]
+        facesChanged = true
+      }
+    } else if (withFaces[at] !== face) {
+      withFaces[at] = face
+      facesChanged = true
+    }
+  }
+
+  if (changed || facesChanged) {
+    commit({
+      ...(changed ? { given } : {}),
+      ...(facesChanged ? { faces: withFaces } : {}),
+    })
+  }
+}
+
+/**
  * Record one address's name, including the fact that it has none.
  *
  * Used where the relay answered about a single address and so can be believed

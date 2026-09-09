@@ -27,6 +27,7 @@ import { MessageBubble } from "@/components/message-bubble"
 import { Button } from "@/components/ui/button"
 import { PullIndicator } from "@/components/pull-indicator"
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
+import { useDirectory } from "@/hooks/use-directory"
 import { useMentionSearch } from "@/hooks/use-mention-search"
 import { useNames } from "@/hooks/use-names"
 import type { Code } from "@/lib/knock-code"
@@ -135,6 +136,10 @@ export function GroupRoom({
 }) {
   const { t } = useTranslation()
   const names = useNames()
+  // What to call the people talking here, asked for the people talking here.
+  // A room's own details only name the handful of members it carries, who are
+  // whoever joined first — see `use-directory`.
+  useDirectory(messages.map((message) => message.peer))
   /** Who the composer's `@` can reach, by published name or by one of yours. */
   const searchMembers = useMentionSearch(group.id, owner)
   const composer = useRef<ComposerHandle>(null)
