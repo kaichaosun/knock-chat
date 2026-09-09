@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   adopt,
   chosenNameIn,
+  directoryChangedAt,
   faceIn,
   forget,
   givenNameIn,
   isFingerprint,
   labelIn,
   nameIn,
+  noteDirectoryChange,
   remember,
   rememberAll,
   rememberFace,
@@ -16,6 +18,7 @@ import {
   rename,
   sanitize,
   snapshot,
+  subscribe,
 } from "./names"
 import { compact } from "./address"
 import { MAX_NAME_LEN } from "./relay"
@@ -183,6 +186,52 @@ describe("an answer about addresses that were asked about", () => {
     const settled = snapshot()
     rememberAll([ALICE], { [ALICE]: "alice" })
     expect(snapshot()).toBe(settled)
+  })
+})
+
+describe("when the relay says the directory moved", () => {
+  // Module state, deliberately: there is one relay and one answer from it. So
+  // it has to be put back, or each test here would inherit the last one's.
+  beforeEach(() => noteDirectoryChange(null))
+
+  it("is nothing until the relay says, which is not the same as up to date", () => {
+    expect(directoryChangedAt()).toBeNull()
+  })
+
+  it("keeps what the relay said, to be compared and not read", () => {
+    noteDirectoryChange("2026-09-09T10:31:04Z")
+    expect(directoryChangedAt()).toBe("2026-09-09T10:31:04Z")
+  })
+
+  it("wakes whoever is watching when it moves", () => {
+    const woken = vi.fn()
+    const stop = subscribe(woken)
+    noteDirectoryChange("2026-09-09T10:31:04Z")
+    expect(woken).toHaveBeenCalledTimes(1)
+    stop()
+  })
+
+  it("says nothing when it has not moved, which is nearly every poll", () => {
+    // Arrives every three seconds with the same value. Announcing each time
+    // would wake every screen in the app to tell it nothing.
+    noteDirectoryChange("2026-09-09T10:31:04Z")
+    const woken = vi.fn()
+    const stop = subscribe(woken)
+    noteDirectoryChange("2026-09-09T10:31:04Z")
+    expect(woken).not.toHaveBeenCalled()
+    stop()
+  })
+
+  it("treats a relay that does not say as no reason to look", () => {
+    // An older relay sends no field at all. Undefined and null are the same
+    // silence, and neither should read as a change.
+    noteDirectoryChange(undefined)
+    const woken = vi.fn()
+    const stop = subscribe(woken)
+    noteDirectoryChange(undefined)
+    expect(woken).not.toHaveBeenCalled()
+    expect(directoryChangedAt()).toBeNull()
+    stop()
   })
 })
 

@@ -1,7 +1,7 @@
-import { useEffect } from "react"
+import { useEffect, useSyncExternalStore } from "react"
 
 import { compact } from "@/lib/address"
-import { rememberAll } from "@/lib/names"
+import { directoryChangedAt, rememberAll, subscribe } from "@/lib/names"
 import { MAX_LOOKUP, lookUpNames } from "@/lib/relay"
 
 /**
@@ -15,16 +15,23 @@ import { MAX_LOOKUP, lookUpNames } from "@/lib/relay"
  * the old thing in every room they spoke in, while a direct chat with them
  * showed the new one, because opening a chat asks about that one address.
  *
- * So the screen asks about the people it is drawing. Once when it opens, and
- * again whenever somebody new appears in it — never for a new message from
- * somebody already here, which is the common case and would be a request per
- * message.
+ * So the screen asks about the people it is drawing: when it opens, when
+ * somebody new appears in it, and when the relay says a name somewhere has
+ * changed. Never for a new message from somebody already here, which is the
+ * common case and would be a request per message.
+ *
+ * That third one is what makes this work while somebody is sitting in a room
+ * rather than only when they open one. The feed already polls every few seconds
+ * and now carries a stamp saying when the directory last moved — see
+ * `noteDirectoryChange`. It sits still almost always, so this asks almost never;
+ * when it does move, every open screen catches up within a poll.
  */
 export function useDirectory(addresses: string[]): void {
   // A stable description of who is on screen. Order is the caller's, which for
   // a thread is the order people first spoke, so a new message from somebody
   // already here leaves this untouched and nothing is asked.
   const who = [...new Set(addresses.map(compact))].slice(0, MAX_LOOKUP).join(",")
+  const changed = useSyncExternalStore(subscribe, directoryChangedAt, directoryChangedAt)
 
   useEffect(() => {
     if (!who) return
@@ -45,5 +52,7 @@ export function useDirectory(addresses: string[]): void {
     return () => {
       cancelled = true
     }
-  }, [who])
+    // `changed` is not read in here on purpose: what it means is "ask again",
+    // and asking again is the whole body above.
+  }, [who, changed])
 }

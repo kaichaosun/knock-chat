@@ -40,6 +40,16 @@ export type FetchResult = {
   deleted?: string[]
   /** Opaque — hand it straight back next time and never interpret it. */
   next: string
+  /**
+   * When anybody last changed a display name or a picture.
+   *
+   * Not a cursor and not about this device: one stamp the relay publishes for
+   * everyone. Different from the one held last time means something in the
+   * directory moved and the names on screen are worth asking about again — see
+   * [`lookUpNames`]. Absent from a relay that predates it, which reads as no
+   * reason to look rather than as an error.
+   */
+  directory_at?: string | null
 }
 
 /**

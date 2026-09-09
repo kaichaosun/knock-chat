@@ -148,6 +148,19 @@ export function isFingerprint(value: string): boolean {
 let owner: string | null = null
 let directory: Directory = { given: {}, chosen: {}, faces: {} }
 const listeners = new Set<() => void>()
+/**
+ * When the relay last saw anybody's name or picture change.
+ *
+ * Not part of the directory and not about any address in it: one stamp the
+ * relay publishes for everyone, which arrives on the feed every few seconds and
+ * sits still until somebody, somewhere, renames themselves. What reads it is a
+ * screen deciding whether the names it is drawing are worth asking about again
+ * — see `use-directory`.
+ *
+ * Not stored. A fresh start has nothing to be out of date about yet, and the
+ * first poll fills it in.
+ */
+let changedAt: string | null = null
 
 function storageKey(forOwner: string): string {
   return `${STORAGE_PREFIX}${key(forOwner)}`
@@ -417,6 +430,32 @@ export function subscribe(listener: () => void): () => void {
 /** The current directory. Stable between changes, so it is safe to compare by reference. */
 export function snapshot(): Directory {
   return directory
+}
+
+/**
+ * Take the relay's word for when the directory last moved.
+ *
+ * Called on every poll with the same value almost every time, so it announces
+ * only on a real change — otherwise every screen would be woken every few
+ * seconds to be told nothing.
+ */
+export function noteDirectoryChange(at: string | null | undefined): void {
+  const next = at ?? null
+  if (next === changedAt) return
+  changedAt = next
+  announce()
+}
+
+/**
+ * When the relay last saw a name or a picture change, as it last said.
+ *
+ * A string to compare, never to read: what it means is "different from the one
+ * you had", and a client that tried to interpret it would be inventing a
+ * meaning the relay did not promise. `null` before the first poll, and on a
+ * relay too old to say.
+ */
+export function directoryChangedAt(): string | null {
+  return changedAt
 }
 
 /**

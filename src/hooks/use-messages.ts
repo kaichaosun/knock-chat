@@ -4,6 +4,7 @@ import { compact } from "@/lib/address"
 import { decryptBody, encryptBody } from "@/lib/crypto"
 import { forgetPeerKey, keyForPeer } from "@/lib/keys"
 import * as history from "@/lib/messages"
+import { noteDirectoryChange } from "@/lib/names"
 import type { Message, MessageStatus, OpenedEnvelope, Snapshot } from "@/lib/messages"
 import { RelayError, ackMessages, fetchMessages, sendMessage } from "@/lib/relay"
 import type { Envelope } from "@/lib/relay"
@@ -89,6 +90,11 @@ export function useMessages(
         const result = await fetchMessages(owner, settled)
         if (cancelled) return
         setRelayStatus("online")
+
+        // Nothing to do with messages, and it rides here because this is the
+        // one request already being made every few seconds. Whoever is drawing
+        // names decides what to do about it; this only passes it on.
+        noteDirectoryChange(result.directory_at)
 
         // Decrypt before merging, so local history stays plain and the store
         // stays a pure function of what it is given.
