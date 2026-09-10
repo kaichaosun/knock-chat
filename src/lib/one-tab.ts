@@ -31,6 +31,28 @@ export const ONE_TAB = "knock:one-tab"
 const CLAIM = "claim"
 
 /**
+ * Which page is asking.
+ *
+ * A channel never delivers to the object that posted on it, which is all the
+ * telling-apart needed where a page sets one up once and keeps it. React mounts
+ * every effect twice in development, so a page has two of them for an instant,
+ * and the second would hear the first ask and hand over what it had only just
+ * been given. So what gets named is the page rather than the channel: made once
+ * per load, and an argument so that a test can be several pages at once.
+ */
+const THIS_PAGE = Math.random().toString(36).slice(2)
+
+/** What goes over the channel: what is wanted, and who is asking for it. */
+function asking(page: string): string {
+  return `${CLAIM}:${page}`
+}
+
+/** Whether that was somebody else asking. A page's own voice is not an answer. */
+function heard(data: unknown, page: string): boolean {
+  return typeof data === "string" && data.startsWith(`${CLAIM}:`) && data !== asking(page)
+}
+
+/**
  * How long to say nothing while it is settled.
  *
  * A tab that is given the lock straight away — the ordinary case, one tab —
@@ -77,6 +99,7 @@ export function oneTab(
   gate: LockGate,
   room: Room,
   told: (state: TabState) => void,
+  page: string = THIS_PAGE,
 ): () => void {
   const going = new AbortController()
   /** Hands the lock back. Null whenever this tab is not the one holding it. */
@@ -91,6 +114,17 @@ export function oneTab(
         { signal: going.signal },
         () =>
           new Promise<void>((done) => {
+            // It can arrive after `stop`, and does on every mount in
+            // development: aborting only takes a request out of the line, and
+            // the first one in line was given the lock before anybody asked to
+            // leave. Hand it straight back — a tab that has gone is not
+            // listening for anybody asking, so holding on would be holding on
+            // for good, with every other tab queued behind a page that no
+            // longer exists.
+            if (going.signal.aborted) {
+              done()
+              return
+            }
             letGo = done
             clearTimeout(settling)
             told("held")
@@ -111,7 +145,7 @@ export function oneTab(
   }
 
   room.addEventListener("message", (event) => {
-    if (event.data !== CLAIM) return
+    if (!heard(event.data, page)) return
     // Only whoever has it can give it up. A tab that is waiting has nothing to
     // hand over and is already in the line — and answering would be how two
     // tabs that started together could pass it back and forth forever.
@@ -121,7 +155,7 @@ export function oneTab(
   // Queued before anybody is told, so a holder letting go cannot be overtaken:
   // by the time it hears, this tab's place in the line is already taken.
   queue()
-  room.postMessage(CLAIM)
+  room.postMessage(asking(page))
 
   // Only for the tab that has to wait and will not be handed anything: two tabs
   // opened together queue behind each other, and the one that loses hears
@@ -147,6 +181,6 @@ export function oneTab(
  * For the tab that is standing by: it is already in the queue, so all this does
  * is get the holder to let go and let the line move.
  */
-export function claim(room: Room): void {
-  room.postMessage(CLAIM)
+export function claim(room: Room, page: string = THIS_PAGE): void {
+  room.postMessage(asking(page))
 }

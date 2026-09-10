@@ -92,12 +92,14 @@ function bus() {
 /** Let every pending `then` run. */
 const settle = () => new Promise((done) => setTimeout(done, 0))
 
-/** One tab, remembering what it has been told. */
-function tab(gate: LockGate, wires: ReturnType<typeof bus>) {
+/** One tab, remembering what it has been told. Each is its own page. */
+let pages = 0
+function tab(gate: LockGate, wires: ReturnType<typeof bus>, page = `page-${++pages}`) {
   const said: TabState[] = []
   const room = wires.join()
-  const stop = oneTab(gate, room, (state) => said.push(state))
+  const stop = oneTab(gate, room, (state) => said.push(state), page)
   return {
+    page,
     room,
     stop,
     said,
@@ -150,7 +152,7 @@ describe("one tab at a time", () => {
     const second = tab(gate, wires)
     await settle()
 
-    claim(first.room)
+    claim(first.room, first.page)
     await settle()
 
     expect(first.state).toBe("held")
@@ -217,5 +219,44 @@ describe("one tab at a time", () => {
 
     expect(second.said).toEqual([])
     expect(first.state).toBe("held")
+  })
+
+  it("hands back a lock it was given after it was told to stop", async () => {
+    // The first in line is given the lock before it has asked for anything
+    // else, so a tab that goes away in the meantime — every effect in
+    // development — cannot take the request out of the queue any more. If it
+    // keeps what it was handed, every tab after it waits behind a page that is
+    // no longer there, and asking cannot help: its channel is closed.
+    const gate = locks()
+    const wires = bus()
+    const first = tab(gate, wires)
+    first.stop()
+
+    const second = tab(gate, wires)
+    await settle()
+
+    expect(second.state).toBe("held")
+    expect(first.said).toEqual([])
+  })
+
+  it("does not hand over to the tab it was a moment ago", async () => {
+    // A channel does not deliver to itself, but a page in development has two
+    // of them, and the ask posted by the first can land on the second after it
+    // holds the lock. Standing down for that means the app falls over and gets
+    // up again for no reason at all.
+    const gate = locks()
+    const wires = bus()
+    const only = tab(gate, wires, "one-page")
+    await settle()
+    expect(only.said).toEqual(["held"])
+
+    claim(wires.join(), "one-page")
+    await settle()
+    expect(only.said).toEqual(["held"])
+
+    // Somebody else asking is still somebody else asking.
+    claim(wires.join(), "another-page")
+    await settle()
+    expect(only.said).toEqual(["held", "waiting", "held"])
   })
 })
