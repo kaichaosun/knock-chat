@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { listContacts, removeContact, setAuthToken } from "./relay"
+import { discover, listContacts, removeContact, setAuthToken } from "./relay"
 
 /** Capture what the client actually put on the wire. */
 function stubFetch(response: { ok?: boolean; status?: number; body?: unknown }) {
@@ -73,5 +73,42 @@ describe("listContacts", () => {
 
     expect(calls[0].url).toBe("/api/v1/contacts")
     expect(result.contacts).toHaveLength(1)
+  })
+})
+
+describe("discover", () => {
+  it("browses when nothing is typed, rather than searching for nothing", async () => {
+    // A blank `q` on the wire would be a search for the empty string, which is
+    // a different question from "what is here" — and the answer the relay gives
+    // it carries no featured list.
+    const calls = stubFetch({ body: { featured: [], results: [], names: {} } })
+
+    await discover("")
+    await discover("   ")
+    await discover()
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "/api/v1/discover",
+      "/api/v1/discover",
+      "/api/v1/discover",
+    ])
+  })
+
+  it("trims the search and escapes it into the query", async () => {
+    const calls = stubFetch({ body: { featured: [], results: [], names: {} } })
+
+    await discover("  nimiq builders  ")
+
+    expect(calls[0].url).toBe("/api/v1/discover?q=nimiq+builders")
+  })
+
+  it("puts a wildcard on the wire as itself", async () => {
+    // The relay takes `%` literally; what this checks is that the client does
+    // not mangle it on the way there.
+    const calls = stubFetch({ body: { featured: [], results: [], names: {} } })
+
+    await discover("100%")
+
+    expect(calls[0].url).toBe("/api/v1/discover?q=100%25")
   })
 })

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { Link as LinkIcon, PanelLeftClose, PenLine, Plus, ScanLine, Users } from "lucide-react"
+import { Compass, Link as LinkIcon, PanelLeftClose, PenLine, Plus, ScanLine, Users } from "lucide-react"
 
 import { AddressAvatar } from "@/components/address-avatar"
 
@@ -22,6 +22,7 @@ import { AttachMenu } from "@/components/attach-menu"
 import { TabBar, type Tab } from "@/components/tab-bar"
 import { Button } from "@/components/ui/button"
 import { CreateGroupSheet } from "@/components/create-group-sheet"
+import { DiscoverSheet } from "@/components/discover-sheet"
 import { GroupRoom } from "@/components/group-room"
 import { NoThread } from "@/components/no-thread"
 import { JoinByLinkSheet } from "@/components/join-by-link-sheet"
@@ -279,6 +280,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [pasting, setPasting] = useState(false)
+  const [discovering, setDiscovering] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [gifting, setGifting] = useState(false)
   /**
@@ -1239,6 +1241,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onSelect: () => setCreatingGroup(true),
         },
         {
+          // Above the link, because a directory is the better first answer to
+          // wanting to be somewhere: a link needs somebody to have sent you one.
+          icon: Compass,
+          label: t("app.discover"),
+          description: t("app.discoverNote"),
+          onSelect: () => setDiscovering(true),
+        },
+        {
           // The Groups tab offers this too, but only while the tab is empty —
           // once you are in one room, the way into a second one disappeared.
           icon: LinkIcon,
@@ -1264,6 +1274,12 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
           onSelect: () => setCreatingGroup(true),
         },
         {
+          icon: Compass,
+          label: t("app.discover"),
+          description: t("app.discoverNote"),
+          onSelect: () => setDiscovering(true),
+        },
+        {
           icon: LinkIcon,
           label: t("app.joinGroup"),
           description: t("app.joinGroupNote"),
@@ -1286,6 +1302,16 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         }}
       />
       <JoinByLinkSheet open={pasting} onOpenChange={setPasting} onFound={openInvite} />
+      {/* A room found here goes to the same door a link leads to, rather than
+          to a shortcut of its own: the price, the owner's whole address and
+          the fact that rooms are not encrypted are said in one place. The
+          listing knows none of `full`, `joined` or the terms as of this second,
+          so the id is looked up again exactly as a pasted one is. */}
+      <DiscoverSheet
+        open={discovering}
+        onOpenChange={setDiscovering}
+        onPick={(group) => openInvite(group.id)}
+      />
       <ScanSheet open={scanning} onOpenChange={setScanning} onFound={openCode} />
       <JoinGroupSheet
         open={inviteOpen}

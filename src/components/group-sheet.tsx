@@ -42,6 +42,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { Switch } from "@/components/ui/switch"
 import { useNames } from "@/hooks/use-names"
 import { shortenAddress } from "@/lib/address"
 import { copyText } from "@/lib/clipboard"
@@ -267,7 +268,9 @@ export function GroupSheet({
   // value after the owner changed it on another device.
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
-  const [saving, setSaving] = useState<"name" | "price" | "door" | "past" | "window" | null>(null)
+  const [saving, setSaving] = useState<
+    "name" | "price" | "door" | "past" | "window" | "directory" | null
+  >(null)
   const [iconMenu, setIconMenu] = useState(false)
   const [iconBusy, setIconBusy] = useState(false)
   const iconPicker = useRef<HTMLInputElement>(null)
@@ -286,6 +289,14 @@ export function GroupSheet({
    * exactly what such a relay does.
    */
   const sharesHistory = Boolean(group.share_history)
+  /**
+   * Whether this room is in the directory.
+   *
+   * The owner's half of the answer. The relay can keep a room out whatever this
+   * says and does not report that it has — which is why this reads as "listed",
+   * not "findable": the second is a promise this switch cannot keep.
+   */
+  const inDirectory = Boolean(group.discoverable)
   // Held until confirmed. It is a small icon in a list of faces, and getting
   // somebody back in can cost them money — or be up to the owner entirely.
   const [removing, setRemoving] = useState<string | null>(null)
@@ -431,6 +442,19 @@ export function GroupSheet({
       await updateGroup(group.id, { delete_window_secs: windowSecs })
       onChanged()
       toast.success(t("groupSheet.takeBackSaved"))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const setDirectory = async (discoverable: boolean) => {
+    setSaving("directory")
+    try {
+      await updateGroup(group.id, { discoverable })
+      onChanged()
+      toast.success(discoverable ? t("groupSheet.listedOn") : t("groupSheet.listedOff"))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("groupSheet.saveFailed"))
     } finally {
@@ -808,6 +832,46 @@ export function GroupSheet({
                 {sharesHistory && (
                   <p className="text-warning mt-2 text-[12px] leading-snug">
                     {t("groupSheet.pastSharedWarning")}
+                  </p>
+                )}
+              </section>
+            )}
+
+            {/* A switch rather than the pair of cards the door and the past
+                use. Those two are a choice between two states that each need
+                explaining, and both are confirmed before they take. This is one
+                state that is on or off, undone by tapping the same control
+                again, and the only thing it changes is whether strangers can
+                find the room. */}
+            {mine && (
+              <section>
+                <div className="flex items-center justify-between gap-4">
+                  <h3 id="room-discoverable" className="text-sm font-semibold">
+                    {t("roomSettings.directoryTitle")}
+                  </h3>
+                  <Switch
+                    checked={inDirectory}
+                    disabled={saving === "directory"}
+                    onCheckedChange={(next) => void setDirectory(next)}
+                    aria-labelledby="room-discoverable"
+                  />
+                </div>
+                <p className="text-muted-foreground mt-1 text-[13px] leading-snug">
+                  {t("roomSettings.directoryNote")}
+                </p>
+                {/* The combination the create sheet already warns about, and
+                    listing is what turns "somebody might fill your queue" into
+                    "anybody can". */}
+                {inDirectory && group.requires_approval && group.join_price_luna === 0 && (
+                  <p className="text-warning mt-2 text-[12px] leading-snug">
+                    {t("groupSheet.listedFreeAsking")}
+                  </p>
+                )}
+                {/* Worth saying again here rather than only at creation: a room
+                    strangers can find is a different bet on the same fact. */}
+                {inDirectory && (
+                  <p className="text-muted-foreground mt-2 text-[12px] leading-snug">
+                    {t("groupSheet.listedNotEncrypted")}
                   </p>
                 )}
               </section>

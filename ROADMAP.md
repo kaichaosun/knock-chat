@@ -25,7 +25,8 @@ Two repos: this app, and the relay at `../knock-relay`.
 | Policy | Per-address price for strangers, `0` to waive. Default 1 NIM. |
 | Contacts | Channels as the durable record of who can reach whom, so a fresh device knows without local history. |
 | Remove contact | `DELETE /v1/contacts/{address}`. One normalised row, so closing is symmetric by construction. |
-| Groups | `chat_group` / `group_member` / `group_request`, plus a `group_id` on delivered messages. A room is a lobby, not a shortcut: membership opens no channel, so reaching a member privately still costs their postage. The door mirrors a knock — pay the owner, get in forever — with the price defaulting to 0 and an optional approval queue. Owner-only moderation, link-only distribution, no ban list. **Bodies are plain text**; the relay can read them. |
+| Groups | `chat_group` / `group_member` / `group_request`, plus a `group_id` on delivered messages. A room is a lobby, not a shortcut: membership opens no channel, so reaching a member privately still costs their postage. The door mirrors a knock — pay the owner, get in forever — with the price defaulting to 0 and an optional approval queue. Owner-only moderation, no ban list. **Bodies are plain text**; the relay can read them. |
+| Discovery | `GET /v1/discover` — rooms an owner listed, by name or by browsing. Three parties held apart: `chat_group.discoverable` is the owner's (off for every room that existed, so shipping a directory published nobody), `group_featured` and `group_blocked` are the operator's, behind the same admin secret as `/v1/stats`. Listed means discoverable **and** not blocked, and featured resolves through that same rule — an owner who unlists leaves the front page, and a block beats a feature. Blocking is a refusal to advertise, not a shutdown: the room keeps working and its link still opens. Featured order is `weight BIGINT` descending, ties to whoever has been there longest; the column is luna-shaped because a stake is what replaces a hand-set rank — see Next. Search takes `%` and `_` as characters, not wildcards. Publishes a member count, which `GET /v1/groups/{id}` still withholds from non-members, and never the membership. |
 | Gifts | A pot dropped in a room, taken first-come-first-served — even or random shares, whatever is unclaimed returned after 24 hours. **The one place the relay holds money**: a pot must be funded before anyone knows who will claim it. Funding is verified on chain and spent once, the same rule postage runs under. Shares are decided at creation, so claiming is only ever "take the next unclaimed row" — `FOR UPDATE … SKIP LOCKED` plus a partial unique index, so simultaneous taps get different shares and nobody gets two. Payout is signed locally with `core-rs-albatross` crates (git, `tag = v2.0.0`) and broadcast through the same public nodes the relay already reads from, so no node of our own is needed. A relay without `KNOCK_RELAY_WALLET` answers 501 and is otherwise unchanged. |
 | Chain reads | A node that cannot answer is told apart from a transaction that is not there: the first a 502 that says nothing about the payment, the second a 402. Pinned to the exact bodies real nodes send — including the prose `rpc.nimiqwatch.com` returned while it was down, which read as "not found" tells someone who has just paid that their payment does not exist. Configuration moved into `.env` / `.env.example`, since `KNOCK_NIMIQ_RPC` was previously discoverable only by reading `main.rs`. |
 | Display names | `PUT /v1/profile`, and the name served with reachability, contacts and knocks. Normalised and refused — not truncated, not stripped — if it carries invisible or text-reordering characters. Lists carry names in a map beside them rather than on each entry, so a name is looked up when read rather than frozen into a knock. |
@@ -56,6 +57,7 @@ in-memory.
 | Being removed from a room | The thread stays and stays readable — the relay describes a room to anyone, just without its members — and the composer is replaced by a line saying you are not in it. Opening it no longer mistakes the room's id for an address, which is what produced "address has the wrong length" from a reachability check on a uuid. |
 | Adding somebody to a room | **Add someone** in the group's info picks from your contacts and posts an invite card into your chat with them. A third payload kind (`invite`), so it rides inside the **encrypted** body — the relay never learns which room was shared — and because it is an ordinary message it can only reach someone who has already let you in. A group therefore cannot become a way around postage. The card carries the sender's copy of the name so it draws at once; tapping it opens the join sheet, which fetches what the room really is and what it costs before anything is paid. Anyone in the room can invite; the door still decides who gets through. |
 | Gifts in a room | `+` in a room leaves a pot: an amount, how many can take a share, even or random, and a word. Funded from the wallet to the relay, then announced as a card. The card carries only what cannot change — id, total, share count — and asks the relay for how many are left and whether you already took one, since both move after the message was sent. A share that is yours but not yet transferred says **sending** rather than claiming the money has arrived. Tapping the card opens the breakdown: who took a share, how long after the pot appeared, and how much — ordered by who got there first, with the biggest share crowned once a random split is fully taken. `+` appears only on a relay that holds gifts. |
+| Discover | **Discover groups** in the `+` sheet, above joining by link — a directory is the better first answer to wanting to be somewhere, since a link needs somebody to have sent you one. Featured while browsing, results while searching, never the same room twice. A row shows size, price and who runs it, then leads to the same door a link leads to, so the price, the owner's whole address and the not-encrypted notice are said in one place rather than two. An empty directory says so plainly; it is a different state from a search that found nothing. Owners list a room from its settings, not at creation — making one stays a name and a tap, and a room is worth listing once there is something in it. |
 | Groups tab | A third tab after Contacts, listing the rooms you are in. Swipe to **Leave** — the durable act, behind a confirmation that says what getting back in would cost. Deleting a room's chat in Chats stays what it always was: tidying this device. Same shape as Chats / Contacts, where the thread is a view and the tab beside it is the thing itself. |
 | Payment cards | Not chat bubbles: bordered, tailless, laid out in rows and given a minimum width, so a payment is distinguishable from something someone said without reading either. Reports what the sender said they paid, and nothing more. |
 | Paid postage survives a failure | A knock is a payment then a request, and the wallet returns before the transaction is in a block — so the relay used to refuse the knock for being early, after the money had gone. The proof is now written to storage *before* the relay is told anything, the request retries on a 1/2/4/8s backoff, and a payment already made is always reused. Paying twice would strand the first payment forever: its commitment binds a nonce only that device ever had. A sweep on every foreground finishes anything still owed, so the guarantee is "once you have paid, the knock is sent" rather than "…if you come back and tap again". |
@@ -187,9 +189,12 @@ in-memory.
   somebody who joins later starts from an empty room. Fixing it means either
   keeping room messages server-side and serving a backlog, or fanning out on
   read — both change what the relay stores and for how long.
-- **No group discovery.** Groups travel by link only. A public directory is
-  what would make them serve finding people rather than only talking to people
-  already found, and it brings public content and moderation with it.
+- **Moderating the directory means reaching for curl.** Featuring and blocking
+  are admin endpoints behind `KNOCK_RELAY_ADMIN_SECRET`, with nothing to look
+  at: no way to see what is listed, no report button, and no way for anybody but
+  the operator to say a room should not be advertised. Fine while the directory
+  is small and one person curates it; the first thing to feel thin when it is
+  not.
 
 - **A payment card is a claim, not a receipt.** Nothing checks it against the
   chain, so anyone can send a card saying they paid you. The card is worded as
@@ -234,6 +239,29 @@ in-memory.
   abuse cheaper.
 - **Staker exemption.** Cut. `getStaker` is refused by public nodes, so free
   passage for stakers has no way to be checked.
+
+### Next
+
+- **Seeding the directory.** It ships empty, and it stays empty until owners
+  list rooms — which they will not do until it is worth searching. Featured is
+  the way out of that and the reason it was built at the same time rather than
+  after: a curated handful is what makes a first search worth running. Nothing
+  about this is a code change.
+- **Curation by stake.** Featured order starts hand-ranked, which does not
+  survive the directory getting large: somebody has to decide, and that
+  somebody is us. The intended replacement is staking — NIM committed to a room
+  is a signal nobody gets for free, and the directory orders by it instead of by
+  an operator's list. Ordering becomes a market rather than an editorial
+  decision, and a room's members get something to do with the room besides talk
+  in it.
+
+  The schema is shaped for this now: `group_featured.weight` is a descending
+  `BIGINT` keyed by room, which is the shape a staked amount of luna already
+  has — a stake takes the hand-set number's place without moving anything else. What is not decided, and should not be guessed at
+  before a directory exists to observe: who may stake, whether a stake comes
+  back, what it earns, and what stops a room simply buying the top slot. It
+  also runs into the question gifts already raised — the relay cannot hold
+  money without being custodial — so that answer comes first.
 
 ### Polish
 

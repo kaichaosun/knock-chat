@@ -377,6 +377,15 @@ export type Group = {
   /** Whether the owner still has to say yes after they have paid. */
   requires_approval: boolean
   /**
+   * Whether the room can be found by name, rather than only through its link.
+   *
+   * The owner's switch, and off until they throw it — see [`discover`]. Not the
+   * whole story about whether a stranger sees the room: the relay can keep one
+   * out of the directory whatever this says, and does not report that it has.
+   * Absent from a relay that predates the directory, which reads as not listed.
+   */
+  discoverable?: boolean
+  /**
    * Whether somebody joining can read what the room said before they arrived.
    *
    * Off by default: a room is heard from the moment you are in it. The past
@@ -522,6 +531,7 @@ export function updateGroup(
     requires_approval?: boolean
     share_history?: boolean
     delete_window_secs?: number
+    discoverable?: boolean
   },
 ): Promise<Group> {
   return request<Group>(`/v1/groups/${encodeURIComponent(id)}`, {
@@ -664,6 +674,66 @@ export function removeGroupMember(id: string, address: string): Promise<{ addres
     `/v1/groups/${encodeURIComponent(id)}/members/${encodeURIComponent(address)}`,
     { method: "DELETE" },
   )
+}
+
+// -- discovery -------------------------------------------------------------
+
+/**
+ * A room as somebody who is not in it sees it in the directory.
+ *
+ * Carries the member count, which `getGroup` withholds from non-members. A room
+ * in the directory is one whose owner asked for it to be found, and the count is
+ * the most useful thing there is for telling two rooms of the same name apart.
+ * Who is *in* it is still not published — that is something you get by being one
+ * of them.
+ */
+export type Listing = {
+  group: Group
+  member_count: number
+}
+
+/**
+ * What the directory answers with.
+ *
+ * `featured` is what the relay chose to put there, and is filled only when
+ * nothing was searched for — a curated list sitting on top of a search would be
+ * an advertisement rather than an answer. `results` is what the search found,
+ * or, with no search, the rest of the directory by size. A room is never in
+ * both.
+ *
+ * `names` and `faces` are the rooms' **owners**, not their members: a room
+ * wearing the right logo is easy to make, and the address behind it is the part
+ * that can be checked. See `JoinGroupSheet`, which draws it unshortened.
+ */
+export type Discovery = {
+  featured: Listing[]
+  results: Listing[]
+  names: Names
+  faces?: Faces
+}
+
+/**
+ * The longest a search may be, mirroring the relay's own ceiling.
+ */
+export const MAX_QUERY_LEN = 64
+
+/**
+ * Rooms anybody may find, by name or by browsing.
+ *
+ * Safe to have at all for a reason particular to this app: a room is a lobby,
+ * so being found costs its members nothing but company. Writing to one of them
+ * privately still costs that person's postage, exactly as if the room had never
+ * existed — which is why a directory here cannot become a way into anybody's
+ * inbox.
+ *
+ * A blank `q` browses. Anything else searches, and the relay takes `%` and `_`
+ * as the characters somebody typed rather than as wildcards.
+ */
+export function discover(q?: string): Promise<Discovery> {
+  const params = new URLSearchParams()
+  if (q?.trim()) params.set("q", q.trim())
+  const query = params.toString()
+  return request<Discovery>(`/v1/discover${query ? `?${query}` : ""}`)
 }
 
 // -- gifts -----------------------------------------------------------------

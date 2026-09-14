@@ -11,7 +11,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { useDirectory } from "@/hooks/use-directory"
+import { useNames } from "@/hooks/use-names"
 import { formatAddress } from "@/lib/address"
+import { nameIn } from "@/lib/names"
 import { formatNim } from "@/lib/postage"
 import type { Group } from "@/lib/relay"
 
@@ -52,6 +55,14 @@ export function JoinGroupSheet({
   onOpen: (group: Group) => void
 }) {
   const { t } = useTranslation()
+  const names = useNames()
+  // Ask about the one address on this screen.
+  //
+  // Arriving from the directory brings the owner's name with it, because the
+  // listing carried it. Arriving from a link does not — a room's detail names
+  // its members, and somebody standing outside is not one — so without this the
+  // same door would name its owner or not depending on how you reached it.
+  useDirectory(open && group ? [group.owner] : [])
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState("")
 
@@ -75,6 +86,8 @@ export function JoinGroupSheet({
   }
 
   const free = group?.join_price_luna === 0
+  /** What the owner calls themselves, if this device has heard. */
+  const owner = group ? nameIn(names, group.owner) : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -132,7 +145,18 @@ export function JoinGroupSheet({
                   somebody comes to be sure rather than to skim. */}
               <div className="px-1">
                 <p className="text-muted-foreground text-[12px]">{t("joinGroup.runBy")}</p>
-                <p className="select-value font-mono text-[12px] leading-relaxed font-semibold wrap-anywhere">
+                {/* Above the address and never instead of it. A display name is
+                    unverified — anybody may call themselves anything, see
+                    `lib/names` — so on the one screen where somebody is checking
+                    who wants their money, it is the softer of the two facts and
+                    the address is the one that settles it.
+
+                    Absent when nobody has asked about this owner yet: arriving
+                    from the directory fills it in, arriving from a link may not,
+                    and inventing a label for a name this device does not have
+                    would be worse than the line not being there. */}
+                {owner && <p className="text-[13px] leading-tight font-semibold">{owner}</p>}
+                <p className="select-value mt-0.5 font-mono text-[12px] leading-relaxed font-semibold wrap-anywhere">
                   {formatAddress(group.owner)}
                 </p>
               </div>
