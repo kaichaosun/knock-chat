@@ -17,8 +17,9 @@ const SETTLE_MS = 250
 /**
  * Rooms you have not been handed a link to.
  *
- * Until this existed a room travelled by link alone, which made groups good for
- * talking to people already found and useless for finding anybody. Safe to have
+ * Until this existed a group could only be joined with an invitation link,
+ * which made groups good for talking to people already found and useless for
+ * finding anybody. Safe to have
  * at all for a reason particular to this app rather than one that would hold in
  * most: a room is a lobby. Being found costs its members company and nothing
  * else — writing to one of them privately still costs that person's postage,

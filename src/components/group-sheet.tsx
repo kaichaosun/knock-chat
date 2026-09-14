@@ -867,13 +867,6 @@ export function GroupSheet({
                     {t("groupSheet.listedFreeAsking")}
                   </p>
                 )}
-                {/* Worth saying again here rather than only at creation: a room
-                    strangers can find is a different bet on the same fact. */}
-                {inDirectory && (
-                  <p className="text-muted-foreground mt-2 text-[12px] leading-snug">
-                    {t("groupSheet.listedNotEncrypted")}
-                  </p>
-                )}
               </section>
             )}
 

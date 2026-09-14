@@ -61,6 +61,14 @@ export type Prefs = {
    * Nobody else is told, and it is never sent anywhere.
    */
   reactions: string[]
+  /**
+   * The newest release this device has been shown in What's new.
+   *
+   * Empty until somebody opens it, and empty sorts before every release id — so
+   * a device that has never looked has something to look at, which is what puts
+   * the dot on the profile button. See `lib/changelog`.
+   */
+  seen: string
 }
 
 const DEFAULTS: Prefs = {
@@ -69,6 +77,7 @@ const DEFAULTS: Prefs = {
   notify: false,
   previews: true,
   reactions: [],
+  seen: "",
 }
 
 let prefs: Prefs = DEFAULTS
@@ -95,6 +104,9 @@ function read(): Prefs {
             .map((one) => [...one].slice(0, 16).join(""))
             .slice(0, 6)
         : DEFAULTS.reactions,
+      // Bounded like the rest: what this holds is a release id, and storage is
+      // user-writable.
+      seen: typeof stored.seen === "string" ? stored.seen.slice(0, 32) : DEFAULTS.seen,
     }
   } catch {
     // Private mode, no storage, or something that is not JSON.

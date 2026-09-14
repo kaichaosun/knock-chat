@@ -10,6 +10,7 @@ import { Inbox } from "@/components/inbox"
 import { Contacts } from "@/components/contacts"
 import { Groups } from "@/components/groups"
 import { KnockRequests } from "@/components/knock-requests"
+import { WhatsNewCard } from "@/components/whats-new-card"
 import { GroupRequests } from "@/components/group-requests"
 import { JoinQueueSheet } from "@/components/join-queue-sheet"
 import { KnockSheet } from "@/components/knock-sheet"
@@ -22,6 +23,7 @@ import { AttachMenu } from "@/components/attach-menu"
 import { TabBar, type Tab } from "@/components/tab-bar"
 import { Button } from "@/components/ui/button"
 import { CreateGroupSheet } from "@/components/create-group-sheet"
+import { ChangelogSheet } from "@/components/changelog-sheet"
 import { DiscoverSheet } from "@/components/discover-sheet"
 import { GroupRoom } from "@/components/group-room"
 import { NoThread } from "@/components/no-thread"
@@ -232,6 +234,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   /** Whether the sheet was opened to reopen a chat, rather than to start one. */
   const [reopening, setReopening] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  /** Whether What's new is open, from the card above the inbox. */
+  const [newsOpen, setNewsOpen] = useState(false)
   /** Whether the list under the header has been scrolled off its top. */
   const [scrolled, setScrolled] = useState(false)
   // The scrolling list, held as state rather than in a ref: it is mounted and
@@ -1566,6 +1570,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
         {tab === "chats" ? (
           <>
+            {/* Above the knocks, and only ever once: those want an answer from
+                somebody who is waiting, and this wants ten seconds. */}
+            <WhatsNewCard onRead={() => setNewsOpen(true)} />
             <KnockRequests
               knocks={knocks}
               owner={owner}
@@ -1665,6 +1672,8 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       {composeMenu}
       {groupMenu}
       {groupSheets}
+
+      <ChangelogSheet open={newsOpen} onOpenChange={setNewsOpen} />
 
       <ProfileSheet
         open={profileOpen}

@@ -19,17 +19,22 @@ deployed relay with `VITE_RELAY_URL`, or a relay on another port with
 
 ### Two identities, two tabs
 
-Outside Nimiq Pay there is no wallet to talk to, so a dev identity stands in.
-Add `?as=alice`, `?as=bob`, `?as=carol` or `?as=dave` to pick one, and open two
-tabs to hold a real conversation without touching a phone. These are the
-checksummed address vectors from the relay's test suite.
+`?as=alice`, `?as=bob`, `?as=carol` or `?as=dave` signs in as a fixed test
+identity — real Ed25519 keypairs from fixed seeds, and the checksummed address
+vectors from the relay's test suite. Open two tabs to hold a real conversation
+without touching a phone.
+
+They are opt-in, and only on the dev server. Plain `npm run dev` with no `?as=`
+reaches for your own wallet exactly as a phone does: no Nimiq Pay in a desktop
+browser means the welcome screen, where **use a wallet in this browser** hands
+you to the Nimiq Hub. Running the dev server is not a request to be signed in as
+somebody else, so there is no need to set `NODE_ENV=production` to avoid it.
 
 ### On a phone
 
 `npm run dev` binds all interfaces and prints a LAN address. Open the
 mini-apps section of Nimiq Pay and enter `http://<your-ip>:5175`. The app
-detects the injected provider and uses the real wallet address instead of a dev
-identity.
+detects the injected provider and uses the real wallet address.
 
 ## Reaching someone
 
@@ -118,7 +123,7 @@ cannot drift apart.
 
 | Layer | What it does |
 | --- | --- |
-| `lib/wallet.ts` | Waits for Nimiq Pay to inject `window.nimiq` via `@nimiq/mini-app-sdk`; falls back to a dev identity outside it. A wallet here is **only a signer** — it carries no address, because `sign()` returns the public key and the address derives from that. Dev identities are **real Ed25519 keypairs** from fixed seeds, so they sign challenges for real and the relay needs no test-only bypass. |
+| `lib/wallet.ts` | Waits for Nimiq Pay to inject `window.nimiq` via `@nimiq/mini-app-sdk`; signs in as a fixed test identity outside it when the URL asks with `?as=`, and otherwise offers the Hub. A wallet here is **only a signer** — it carries no address, because `sign()` returns the public key and the address derives from that. Dev identities are **real Ed25519 keypairs** from fixed seeds, so they sign challenges for real and the relay needs no test-only bypass. |
 | `lib/auth.ts` | Challenge, sign, verify. The challenge carries this device's encryption key, so one signature both proves identity and publishes the key. Caches the session so `sign()` prompts once per device, not once per request. |
 | `lib/crypto.ts` | X25519 key agreement, HKDF-SHA256, XChaCha20-Poly1305. One conversation key per pair, derived independently by both sides. **No forward secrecy** — a device key opens that conversation's whole history. |
 | `lib/keys.ts` | This device's keypair, and peer certificates — **verified here, not trusted from the relay**, which is the entire point of end-to-end encryption. |

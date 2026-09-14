@@ -45,6 +45,7 @@ describe("preferences", () => {
       notify: false,
       previews: true,
       reactions: [],
+      seen: "",
     })
   })
 

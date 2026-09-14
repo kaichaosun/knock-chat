@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 
 import { BrandMark } from "@/components/brand-mark"
 import { LanguageSheet } from "@/components/language-sheet"
+import { ChangelogSheet } from "@/components/changelog-sheet"
 import { LegalSheet } from "@/components/legal-sheet"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
@@ -59,6 +60,8 @@ export function SettingsSheet({
   /** Whichever document is being read, if either. */
   const [reading, setReading] = useState<LegalDoc | null>(null)
   const [picking, setPicking] = useState(false)
+  /** Whether What's new is open. Named apart from `reading`, which is a document. */
+  const [readingNews, setReadingNews] = useState(false)
 
   const notifications = useNotifications()
 
@@ -226,6 +229,21 @@ export function SettingsSheet({
                 half people actually need, since the screen that asked is one
                 they may never see again. */}
             <div className="mt-3 w-full space-y-1">
+              {/* The archive, not the announcement. Being told what changed
+                  happens above the inbox, once — see `WhatsNewCard`. This is
+                  where somebody comes back to look it up, which is the same
+                  reason the two documents under it are here, and it carries no
+                  mark: nothing in a settings screen should be asking to be
+                  noticed. */}
+              <button
+                type="button"
+                onClick={() => setReadingNews(true)}
+                className="active:bg-muted flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[13px] font-medium transition-colors"
+              >
+                {t("changelog.title")}
+                <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+              </button>
+
               {[
                 { label: t("settingsMore.terms"), doc: TERMS },
                 { label: t("settingsMore.privacy"), doc: PRIVACY },
@@ -246,6 +264,8 @@ export function SettingsSheet({
       </SheetContent>
 
       <LanguageSheet open={picking} onOpenChange={setPicking} />
+
+      <ChangelogSheet open={readingNews} onOpenChange={setReadingNews} />
 
       <LegalSheet
         doc={reading}

@@ -292,6 +292,20 @@ export const en = {
     noMatchNote: "Only groups their owners listed can be found here.",
     loadFailed: "Couldn't load the directory",
   },
+  /**
+   * What changed, release by release. `lib/changelog` holds the order and the
+   * dates; these are the sentences, one key per entry, named for the release
+   * they shipped in so an old one is never quietly reworded into a new one.
+   */
+  changelog: {
+    title: "What's new",
+    /** The card's second line when more than one release went unread. */
+    cardMany: "{{count}} updates since you last looked",
+    dismiss: "Dismiss",
+    discover: "Find groups by name from the + menu — Discover groups — including a few we've picked out.",
+    discoverListing: "Own a group? Turn on Discoverable in its settings and anyone can find it.",
+    discoverDoor: "A group you find shows its price, its owner and what getting in costs before you join.",
+  },
   member: {
     owner: "Owner",
     member: "Member",
@@ -428,10 +442,9 @@ export const en = {
     pastSharedOn: "History is visible to new members.",
     pastSharedOff: "History is hidden from new members.",
     pastSharedWarning: "Anyone who joins can read the whole history.",
-    listedOn: "Listed. People can find this room by name.",
-    listedOff: "Unlisted. This room travels by link again.",
+    listedOn: "Listed. People can find this group by name.",
+    listedOff: "Unlisted. People can only join with an invitation link.",
     listedFreeAsking: "A listed room that's free to ask means anyone can fill your queue.",
-    listedNotEncrypted: "Messages here aren't encrypted, and strangers can now find the room.",
     pastNoRecall: "Messages already read stay on their device.",
     takeBackSaved: "Saved.",
     removedApproval: "Removed. They'd have to ask to come back.",

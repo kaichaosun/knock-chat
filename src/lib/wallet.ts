@@ -14,6 +14,7 @@
  * phone, or `?wallet=hub` to exercise the Hub path instead.
  */
 
+import { DEV_SERVER } from "@/lib/env"
 import { ed25519 } from "@noble/curves/ed25519.js"
 import { init, getHostLanguage, type NimiqProvider } from "@nimiq/mini-app-sdk"
 // Type only. The Hub itself is imported where it is needed, which is never
@@ -316,8 +317,23 @@ export const devIdentities: Array<{ label: string; address: string }> = Object.k
   DEV_SEEDS,
 ).map((label) => ({ label, address: devAddress(label) }))
 
-/** Which dev identity the URL asks for, if any. */
+/**
+ * Which dev identity the URL asks for, if any.
+ *
+ * Asked for, and never assumed. A dev identity used to stand in whenever there
+ * was no Nimiq Pay to talk to, which made `npm run dev` in a desktop browser
+ * sign you in as alice without being asked — so the only way to reach your own
+ * wallet was `NODE_ENV=production npm run dev`, which is a lie told to the
+ * bundler to get a truthful sign-in. These are fixtures for automated and
+ * assisted work; a person at a keyboard wants their own account, and the
+ * browser wallet on the welcome screen is how they get it.
+ *
+ * A shipped build must never hand out a key from a seed, and this is the one
+ * place that decides it — every caller inherits the answer. See [`DEV_SERVER`]
+ * for why that question is `MODE` and not `DEV`.
+ */
 export function requestedDevIdentity(): string | null {
+  if (!DEV_SERVER) return null
   const asked = new URLSearchParams(window.location.search).get("as")
   return asked && asked in DEV_SEEDS ? asked : null
 }
@@ -414,10 +430,13 @@ export async function connect(): Promise<ConnectResult> {
   try {
     provider = await init({ timeout: PROVIDER_TIMEOUT_MS })
   } catch {
-    // No Nimiq Pay. In development a dev identity stands in, because two tabs
-    // holding a conversation is worth more day to day than a real wallet.
-    if (import.meta.env.DEV) {
-      const asked = requestedDevIdentity() ?? "alice"
+    // No Nimiq Pay. A dev identity stands in only where the URL named one —
+    // `?as=alice` and a second tab as bob is two sides of a conversation
+    // without a phone, which is what they are for. Without one this falls
+    // through to the same answer a phone gets, so running the dev server is
+    // not itself a request to be signed in as somebody else.
+    const asked = requestedDevIdentity()
+    if (asked) {
       return {
         ok: true,
         wallet: {
