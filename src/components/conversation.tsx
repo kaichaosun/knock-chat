@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
@@ -21,6 +21,7 @@ import { SendNimSheet } from "@/components/send-nim-sheet"
 import { ContactSheet } from "@/components/contact-sheet"
 import { PickContactSheet } from "@/components/pick-contact-sheet"
 import { MessageBubble } from "@/components/message-bubble"
+import { JumpToUnread, UnreadLine, useUnreadLine } from "@/components/unread"
 import { Button } from "@/components/ui/button"
 import { useNames } from "@/hooks/use-names"
 import type { Code } from "@/lib/knock-code"
@@ -56,6 +57,7 @@ export function Conversation({
   peer,
   owner,
   messages,
+  unreadFrom = null,
   reach,
   onBack,
   onSend,
@@ -74,6 +76,8 @@ export function Conversation({
   /** Your address, for the face over your own messages. */
   owner: string
   messages: Message[]
+  /** The first message that was unread when the thread was opened, if any was. */
+  unreadFrom?: string | null
   /** Null while it is still being fetched; assume the channel is open until told otherwise. */
   reach: Reachability | null
   onBack: () => void
@@ -139,6 +143,22 @@ export function Conversation({
   const cost = reach?.policy.amount_luna ?? 0
 
   /**
+   * Whether the reader is at the end of the thread, and when this component
+   * last moved it itself — the same pair a room keeps, for the same reason. A
+   * reader who has gone back up to read what was unread is not to be pulled
+   * down again by a link card finishing its lookup.
+   */
+  const atEnd = useRef(true)
+  const moved = useRef(0)
+  const watchEnd = () => {
+    const element = scroller.current
+    if (!element) return
+    // Ours, not a reader's: `goToEnd` raises a scroll event like any other.
+    if (Date.now() - moved.current < 200) return
+    atEnd.current = element.scrollHeight - element.clientHeight - element.scrollTop < 32
+  }
+
+  /**
    * Put the end of the thread on screen.
    *
    * `scrollTop` rather than `scrollIntoView` on the last element: this is the
@@ -149,6 +169,8 @@ export function Conversation({
   const goToEnd = useCallback(() => {
     const element = scroller.current
     if (!element) return
+    moved.current = Date.now()
+    atEnd.current = true
     element.scrollTop = element.scrollHeight
   }, [])
 
@@ -165,6 +187,7 @@ export function Conversation({
     const element = scroller.current
     if (!element || typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver(() => {
+      if (!atEnd.current) return
       goToEnd()
     })
     observer.observe(element)
@@ -174,6 +197,14 @@ export function Conversation({
     if (content.current) observer.observe(content.current)
     return () => observer.disconnect()
   }, [goToEnd])
+
+  const unread = useUnreadLine(
+    scroller,
+    unreadFrom,
+    useCallback(() => {
+      atEnd.current = false
+    }, []),
+  )
 
   /** How long a finger has to stay put before it counts as a press. */
   const HOLD_MS = 500
@@ -377,131 +408,139 @@ export function Conversation({
         </div>
       </header>
 
-      <div
-        ref={scroller}
-        className="scrollbar-none flex-1 overflow-y-auto overscroll-contain px-3.5 py-4"
-      >
-        {/* One box to measure. The scroller is sized by flex, so its own
-            height says nothing about how tall the thread inside it is. */}
-        <div ref={content}>
-          {groups.length === 0 ? (
-            <ThreadIntro peer={peer} name={name} />
-          ) : (
-            groups.map((group) => (
-              <section key={group.label} className="mb-1">
-                {/* In the thread, not above it. A pinned pill keeps the date in
-                    reach on a long day, but it does it by crossing whatever is
-                    passing underneath — and a date is not worth reading over
-                    somebody's words. It scrolls away with the day it opens. */}
-                <div className="my-3 flex justify-center">
-                  <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
-                    {group.label}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {group.messages.map((message, index) => {
-                    const outgoing = message.direction === "out"
-                    const opens = opensTurn(group.messages[index - 1], message)
-                    return (
-                      <div key={message.id} className="flex items-start gap-2">
-                        {/* A gutter held open for the whole run, so the rest of
-                            what somebody says does not step out from under the
-                            face that opened it. */}
-                        <div className="w-8 shrink-0">
-                          {opens &&
-                            (outgoing ? (
-                              // Nothing to open about yourself here: a thread has
-                              // one other person in it, and they are who the
-                              // sheet is about.
-                              <AddressAvatar address={owner} size="sm" />
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setShowing(true)}
-                                aria-label={t("chat.about", { name: labelIn(names, peer) })}
-                                className="block active:opacity-60"
-                              >
-                                <AddressAvatar address={peer} size="sm" />
-                              </button>
-                            ))}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          {opens && (
-                            <p className="text-muted-foreground mb-0.5 ml-1 max-w-full truncate text-[13px] font-semibold">
-                              {outgoing ? t("chat.you") : labelIn(names, peer)}
-                            </p>
-                          )}
-                          {/* The same gesture a room's messages have, for the
-                              same two things: answering one, and copying it.
-                              Never deleting — a message here is already the
-                              other side's, and nothing can call it back. */}
-                          <div
-                            ref={(node) => {
-                              rows.current.set(message.id, node)
-                            }}
-                            className="group/msg relative flex items-start"
-                            onPointerDown={(event) => holdStart(() => openFor(message), event)}
-                            onContextMenu={(event) => {
-                              // Something highlighted goes to the browser, whose Copy
-                              // takes the selection — ours would take the whole message,
-                              // which is not what somebody who has just dragged across
-                              // half a sentence is asking for.
-                              if (document.getSelection()?.isCollapsed === false) return
-                              // The pointer's way to the hold. Its own menu is
-                              // refused because ours is the one with anything
-                              // in it — and Copy, the only thing the browser's
-                              // would have offered, is already a row of ours.
-                              event.preventDefault()
-                              openFor(message)
-                            }}
-                            onPointerMove={holdMove}
-                            onPointerUp={holdCancel}
-                            onPointerCancel={holdCancel}
-                            onPointerLeave={holdCancel}
-                          >
-                            <div className="min-w-0 flex-1 [-webkit-touch-callout:none] pointer-fine:select-text select-none">
-                              <MessageBubble
-                                message={message}
-                                onRetry={onRetry}
-                                onOpenInvite={onOpenInvite}
-                                onOpenContact={onOpenContact}
-                                onOpenCode={onOpenCode}
-                                onOpenQuote={() => jumpTo(message)}
-                                channelOpen={!shut}
-                                reactions={on.get(message.id)}
-                                onReact={(emoji) => react(message, emoji)}
-                                onShowReactors={setReactors}
-                                owner={owner}
-                                stamped={carriesTime(message, group.messages[index + 1])}
-                                // The press belongs to the message now, so the
-                                // browser's own long press has to stand aside.
-                                // Copy moved into the menu in exchange.
-                                selectable={false}
-                              />
+      {/* Relative, for the button floated over the top of the thread. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {unread.offer && <JumpToUnread onJump={unread.jump} />}
+        <div
+          ref={scroller}
+          onScroll={watchEnd}
+          className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 py-4"
+        >
+          {/* One box to measure. The scroller is sized by flex, so its own
+              height says nothing about how tall the thread inside it is. */}
+          <div ref={content}>
+            {groups.length === 0 ? (
+              <ThreadIntro peer={peer} name={name} />
+            ) : (
+              groups.map((group) => (
+                <section key={group.label} className="mb-1">
+                  {/* In the thread, not above it. A pinned pill keeps the date in
+                      reach on a long day, but it does it by crossing whatever is
+                      passing underneath — and a date is not worth reading over
+                      somebody's words. It scrolls away with the day it opens. */}
+                  <div className="my-3 flex justify-center">
+                    <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
+                      {group.label}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {group.messages.map((message, index) => {
+                      const outgoing = message.direction === "out"
+                      const opens = opensTurn(group.messages[index - 1], message)
+                      return (
+                        <Fragment key={message.id}>
+                          {message.id === unreadFrom && <UnreadLine ref={unread.holdLine} />}
+                          <div className="flex items-start gap-2">
+                            {/* A gutter held open for the whole run, so the rest of
+                                what somebody says does not step out from under the
+                                face that opened it. */}
+                            <div className="w-8 shrink-0">
+                              {opens &&
+                                (outgoing ? (
+                                  // Nothing to open about yourself here: a thread has
+                                  // one other person in it, and they are who the
+                                  // sheet is about.
+                                  <AddressAvatar address={owner} size="sm" />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowing(true)}
+                                    aria-label={t("chat.about", { name: labelIn(names, peer) })}
+                                    className="block active:opacity-60"
+                                  >
+                                    <AddressAvatar address={peer} size="sm" />
+                                  </button>
+                                ))}
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={() => openFor(message)}
-                              aria-label={t("room.messageMenu")}
-                              className={cn(
-                                "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                "absolute top-1 right-0 hidden rounded-lg p-1 opacity-0 transition-opacity lg:block",
-                                "focus-visible:opacity-100 group-hover/msg:opacity-100",
+                            <div className="min-w-0 flex-1">
+                              {opens && (
+                                <p className="text-muted-foreground mb-0.5 ml-1 max-w-full truncate text-[13px] font-semibold">
+                                  {outgoing ? t("chat.you") : labelIn(names, peer)}
+                                </p>
                               )}
-                            >
-                              <MoreVertical className="size-4" />
-                            </button>
+                              {/* The same gesture a room's messages have, for the
+                                  same two things: answering one, and copying it.
+                                  Never deleting — a message here is already the
+                                  other side's, and nothing can call it back. */}
+                              <div
+                                ref={(node) => {
+                                  rows.current.set(message.id, node)
+                                }}
+                                className="group/msg relative flex items-start"
+                                onPointerDown={(event) => holdStart(() => openFor(message), event)}
+                                onContextMenu={(event) => {
+                                  // Something highlighted goes to the browser, whose Copy
+                                  // takes the selection — ours would take the whole message,
+                                  // which is not what somebody who has just dragged across
+                                  // half a sentence is asking for.
+                                  if (document.getSelection()?.isCollapsed === false) return
+                                  // The pointer's way to the hold. Its own menu is
+                                  // refused because ours is the one with anything
+                                  // in it — and Copy, the only thing the browser's
+                                  // would have offered, is already a row of ours.
+                                  event.preventDefault()
+                                  openFor(message)
+                                }}
+                                onPointerMove={holdMove}
+                                onPointerUp={holdCancel}
+                                onPointerCancel={holdCancel}
+                                onPointerLeave={holdCancel}
+                              >
+                                <div className="min-w-0 flex-1 [-webkit-touch-callout:none] pointer-fine:select-text select-none">
+                                  <MessageBubble
+                                    message={message}
+                                    onRetry={onRetry}
+                                    onOpenInvite={onOpenInvite}
+                                    onOpenContact={onOpenContact}
+                                    onOpenCode={onOpenCode}
+                                    onOpenQuote={() => jumpTo(message)}
+                                    channelOpen={!shut}
+                                    reactions={on.get(message.id)}
+                                    onReact={(emoji) => react(message, emoji)}
+                                    onShowReactors={setReactors}
+                                    owner={owner}
+                                    stamped={carriesTime(message, group.messages[index + 1])}
+                                    // The press belongs to the message now, so the
+                                    // browser's own long press has to stand aside.
+                                    // Copy moved into the menu in exchange.
+                                    selectable={false}
+                                  />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => openFor(message)}
+                                  aria-label={t("room.messageMenu")}
+                                  className={cn(
+                                    "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                    "absolute top-1 right-0 hidden rounded-lg p-1 opacity-0 transition-opacity lg:block",
+                                    "focus-visible:opacity-100 group-hover/msg:opacity-100",
+                                  )}
+                                >
+                                  <MoreVertical className="size-4" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-            ))
-          )}
-          <div ref={bottom} />
+                        </Fragment>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))
+            )}
+            <div ref={bottom} />
+          </div>
         </div>
       </div>
 

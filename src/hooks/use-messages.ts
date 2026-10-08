@@ -27,6 +27,12 @@ export function useMessages(
   const [snapshot, setSnapshot] = useState<Snapshot>(() =>
     owner ? history.load(owner) : history.emptySnapshot(),
   )
+  /**
+   * Whose history `snapshot` is. It trails `owner` by one render when somebody
+   * signs in, because the load below is an effect — and anything that has to
+   * see the history as it was before this session touched it needs to know.
+   */
+  const [loadedFor, setLoadedFor] = useState(owner)
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("connecting")
 
   // Kept in a ref so the polling effect doesn't restart on every message.
@@ -48,6 +54,7 @@ export function useMessages(
     const loaded = owner ? history.load(owner) : history.emptySnapshot()
     snapshotRef.current = loaded
     setSnapshot(loaded)
+    setLoadedFor(owner)
   }, [owner])
 
   // The live poll, so a pull-to-refresh can run the same read rather than a
@@ -313,10 +320,17 @@ export function useMessages(
     (peer: string) => history.threadWith(snapshot, peer, now),
     [snapshot, now],
   )
+  const unreadIn = useCallback(
+    (thread: string) => history.unreadIn(snapshot, thread),
+    [snapshot],
+  )
 
   return {
+    /** The signed-in history is here — not the empty one held while restoring. */
+    loaded: owner !== null && loadedFor === owner,
     conversations,
     threadWith,
+    unreadIn,
     send,
     retry,
     markRead,

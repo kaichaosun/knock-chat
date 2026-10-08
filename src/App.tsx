@@ -58,6 +58,7 @@ import { cn } from "@/lib/utils"
 import { AlreadyPaidError, fundGift } from "@/lib/gift-funding"
 import { all as outstandingGifts, drop as dropGiftReceipt, keep as keepGiftReceipt } from "@/lib/gift-receipts"
 import { messageId, withRooms, type Message } from "@/lib/messages"
+import { firstUnread } from "@/lib/unread"
 import { adopt as adoptNames, givenNameIn, rememberFace, rememberOne } from "@/lib/names"
 import { adopt as adoptPins, unpin } from "@/lib/pins"
 import {
@@ -150,7 +151,9 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
 
   const {
     conversations,
+    loaded: historyLoaded,
     threadWith,
+    unreadIn,
     send,
     retry: retrySend,
     markRead,
@@ -710,6 +713,41 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   const openMessages = openPeer ? threadWith(openPeer) : []
   const roomMessages = openGroup ? threadWith(openGroup) : []
 
+  /**
+   * Where the open thread's unread part began when it was opened.
+   *
+   * Taken once, on the render that opens it, because it cannot be taken later:
+   * the effects below mark the thread read the moment it is on screen, and from
+   * then on nothing in it looks unread. Held for the whole visit, so a message
+   * arriving while you read does not move the line or draw a second one.
+   *
+   * Not before the history is here. A thread reopened with the app is open
+   * while the session is still being restored, and taking it then would find an
+   * empty thread — so the marking below waits for this, rather than the other
+   * way round.
+   */
+  const [unreadLine, setUnreadLine] = useState<{
+    owner: string
+    thread: string
+    from: string | null
+  } | null>(null)
+  const unreadTaken =
+    openThreadKey !== null && unreadLine?.thread === openThreadKey && unreadLine.owner === owner
+  if (openThreadKey && owner && historyLoaded && !unreadTaken) {
+    setUnreadLine({
+      owner,
+      thread: openThreadKey,
+      from: firstUnread(
+        openPeer ? openMessages : roomMessages,
+        unreadIn(openThreadKey) ?? 0,
+        owner,
+      ),
+    })
+  }
+  // Let go on the way out, so coming back to the same thread takes it afresh.
+  if (!openThreadKey && unreadLine) setUnreadLine(null)
+  const unreadFrom = unreadTaken ? (unreadLine?.from ?? null) : null
+
   // Accepting a knock delivers the message to the *recipient*, so the person who
   // knocked is told nothing at all when their door is opened, and their composer
   // would stay shut until they left the thread and came back. So ask — but on a
@@ -743,14 +781,14 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
   // opened — otherwise anything that lands while you are reading stays unread
   // and the badge is waiting for you when you go back.
   useEffect(() => {
-    if (openPeer) markRead(openPeer)
-  }, [openPeer, openMessages.length, markRead])
+    if (openPeer && unreadTaken) markRead(openPeer)
+  }, [openPeer, unreadTaken, openMessages.length, markRead])
 
   // And the same for a room. A separate effect because a room is opened
   // separately — the thing that made this easy to miss in the first place.
   useEffect(() => {
-    if (openGroup) markRead(openGroup)
-  }, [openGroup, roomMessages.length, markRead])
+    if (openGroup && unreadTaken) markRead(openGroup)
+  }, [openGroup, unreadTaken, roomMessages.length, markRead])
 
   /** Leave whichever thread is open. Used by both back buttons. */
   const closeThreadView = useCallback(() => {
@@ -1362,6 +1400,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
         gone={roomGone}
         owner={address}
         messages={roomMessages}
+        unreadFrom={unreadFrom}
         hasEarlier={hasEarlier}
         loadingEarlier={loadingEarlier}
         onLoadEarlier={loadEarlier}
@@ -1408,6 +1447,7 @@ function Messenger({ onRevealProbes }: { onRevealProbes: () => void }) {
       peer={openPeer}
       owner={address}
       messages={openMessages}
+      unreadFrom={unreadFrom}
       reach={openReach}
       onBack={closeThreadView}
       onSend={onSend}

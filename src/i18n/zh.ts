@@ -94,6 +94,8 @@ export const zh: Dictionary = {
     contactInfo: "联系人信息",
     you: "你",
     about: "关于 {{name}}",
+    unreadLine: "未读消息",
+    jumpToUnread: "跳到未读",
     sendNim: "发送 NIM",
     sendNimNote: "从你的钱包直接转给对方。",
     knockSent: "敲门请求已发送。对方回应后你就能继续发消息。",
@@ -279,6 +281,8 @@ export const zh: Dictionary = {
     discover: "在 + 菜单里的「发现群组」中按名字搜索群组，也能看到我们精选的几个。",
     discoverListing: "你是群主？在群设置里打开「可被发现」，任何人都能找到它。",
     discoverDoor: "找到的群会先告诉你价格、群主，以及进群需要什么，然后你再决定。",
+    unreadLine: "聊天依然打开在最新消息处，并用一条分隔线标出你上次读到的位置。",
+    jumpToUnread: "错过了很多消息？点聊天顶部的「跳到未读」，从上次读到的地方接着看。",
   },
   member: {
     owner: "群主",

@@ -45,6 +45,11 @@ export type Release = {
  */
 export const RELEASES: Release[] = [
   {
+    id: "2026-10-08",
+    date: "2026-10-08",
+    items: ["changelog.unreadLine", "changelog.jumpToUnread"],
+  },
+  {
     id: "2026-09-14",
     date: "2026-09-14",
     items: ["changelog.discover", "changelog.discoverListing", "changelog.discoverDoor"],
