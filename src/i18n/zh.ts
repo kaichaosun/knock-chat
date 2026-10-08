@@ -94,6 +94,8 @@ export const zh: Dictionary = {
     contactInfo: "联系人信息",
     you: "你",
     about: "关于 {{name}}",
+    unreadLine: "未读消息",
+    jumpToUnread: "跳到未读",
     sendNim: "发送 NIM",
     sendNimNote: "从你的钱包直接转给对方。",
     knockSent: "敲门请求已发送。对方回应后你就能继续发消息。",

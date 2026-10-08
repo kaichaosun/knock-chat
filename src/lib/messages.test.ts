@@ -21,6 +21,7 @@ import {
   setStatus,
   threadWith,
   settle,
+  unreadIn,
   withRooms,
 } from "./messages"
 import type { Message, Snapshot } from "./messages"
@@ -200,6 +201,22 @@ describe("markRead", () => {
     // An envelope timestamped far in the past still counts as new.
     const backdated = { ...envelope(2, "late arrival", ALICE, "id-old"), created_at: new Date(2000, 0, 1).toISOString() }
     expect(unreadFor(mergeIncoming(snapshot, [backdated], cursor(2), ME), ALICE)).toBe(1)
+  })
+})
+
+describe("unreadIn", () => {
+  it("is null for a thread never read here", () => {
+    const snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1), ME)
+    expect(unreadIn(snapshot, ALICE)).toBeNull()
+  })
+
+  it("counts what arrived since the thread was last read", () => {
+    let snapshot = mergeIncoming(emptySnapshot(), [envelope(1, "hi", ALICE)], cursor(1), ME)
+    snapshot = markRead(snapshot, ALICE)
+    expect(unreadIn(snapshot, ALICE)).toBe(0)
+
+    snapshot = mergeIncoming(snapshot, [envelope(2, "again", ALICE, "id-2b")], cursor(2), ME)
+    expect(unreadIn(snapshot, ALICE)).toBe(1)
   })
 })
 

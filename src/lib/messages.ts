@@ -492,6 +492,21 @@ export function markRead(snapshot: Snapshot, thread: string): Snapshot {
 }
 
 /**
+ * How many of a thread's incoming messages arrived since it was last read.
+ *
+ * Null for a thread that has never been read on this device, which is not the
+ * same as everything in it being new: a room joined with its past already here,
+ * or a chat whose read mark went with a deletion, would otherwise call all of it
+ * unread. Counted on the same basis as `markRead` and `conversations`.
+ */
+export function unreadIn(snapshot: Snapshot, thread: string): number | null {
+  const key = normalizeKey(thread)
+  const read = snapshot.readCount[key]
+  if (read === undefined) return null
+  return Math.max(0, incomingCount(snapshot.messages, key) - read)
+}
+
+/**
  * Delete a conversation from this device.
  *
  * The messages go; the channel does not. You stay connected and can write to

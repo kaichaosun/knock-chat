@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   ChevronLeft,
   DoorClosed,
@@ -24,6 +24,7 @@ import { Composer, type ComposerHandle } from "@/components/composer"
 import { GroupAvatar } from "@/components/group-avatar"
 import { GroupSheet } from "@/components/group-sheet"
 import { MessageBubble } from "@/components/message-bubble"
+import { JumpToUnread, UnreadLine, useUnreadLine } from "@/components/unread"
 import { Button } from "@/components/ui/button"
 import { PullIndicator } from "@/components/pull-indicator"
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh"
@@ -70,6 +71,7 @@ export function GroupRoom({
   gone,
   owner,
   messages,
+  unreadFrom = null,
   onBack,
   onDeleteChat,
   onLeft,
@@ -98,6 +100,8 @@ export function GroupRoom({
   gone: boolean
   owner: string
   messages: Message[]
+  /** The first message that was unread when the room was opened, if any was. */
+  unreadFrom?: string | null
   onBack: () => void
   /** Offered only once the room is gone: the thread is all that is left. */
   onDeleteChat: () => void
@@ -323,6 +327,14 @@ export function GroupRoom({
     if (content.current) observer.observe(content.current, { box: "border-box" })
     return () => observer.disconnect()
   }, [goToEnd])
+
+  const unread = useUnreadLine(
+    scroller,
+    unreadFrom,
+    useCallback(() => {
+      atEnd.current = false
+    }, []),
+  )
 
   /**
    * Pull the top of the room down to reach further back.
@@ -662,6 +674,8 @@ export function GroupRoom({
       <div className="relative flex min-h-0 flex-1 flex-col">
         {/* Only where the pull's own mark is not already saying it. A trackpad
             reaching the top opens no gap, so it needs something of its own. */}
+        {unread.offer && <JumpToUnread onJump={unread.jump} />}
+
         {loadingEarlier && !pullEarlier.refreshing && (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center">
             <span className="bg-card rounded-full p-1.5 shadow-sm">
@@ -826,127 +840,129 @@ export function GroupRoom({
                     const opens = opensTurn(day.messages[index - 1], message)
                     const who = labelIn(names, message.peer)
                     return (
-                      <div
-                        key={message.id}
-                        ref={holdRow}
-                        data-said={message.id}
-                        className={cn(
-                          "flex items-start gap-2 rounded-2xl transition-shadow",
-                          // Long enough to catch the eye after a scroll, and gone on
-                          // its own: a mark that stayed would become a second kind of
-                          // message.
-                          landed === message.id && "ring-primary/40 ring-2",
-                        )}
-                      >
-                        {/* A gutter, held open for the whole run rather than only
-                            where the face is drawn: without it the rest of what
-                            somebody says steps left out from under them. */}
-                        <div className="w-8 shrink-0">
-                          {opens && (
-                            <button
-                              type="button"
-                              onClick={onTap(() => setShowing(message.peer))}
-                              onPointerDown={(event) =>
-                                holdStart(() => nameInBox(message.peer), event)
-                              }
+                      <Fragment key={message.id}>
+                        {message.id === unreadFrom && <UnreadLine ref={unread.holdLine} />}
+                        <div
+                          ref={holdRow}
+                          data-said={message.id}
+                          className={cn(
+                            "flex items-start gap-2 rounded-2xl transition-shadow",
+                            // Long enough to catch the eye after a scroll, and gone on
+                            // its own: a mark that stayed would become a second kind of
+                            // message.
+                            landed === message.id && "ring-primary/40 ring-2",
+                          )}
+                        >
+                          {/* A gutter, held open for the whole run rather than only
+                              where the face is drawn: without it the rest of what
+                              somebody says steps left out from under them. */}
+                          <div className="w-8 shrink-0">
+                            {opens && (
+                              <button
+                                type="button"
+                                onClick={onTap(() => setShowing(message.peer))}
+                                onPointerDown={(event) =>
+                                  holdStart(() => nameInBox(message.peer), event)
+                                }
+                                onPointerMove={holdMove}
+                                onPointerUp={holdCancel}
+                                onPointerCancel={holdCancel}
+                                onPointerLeave={holdCancel}
+                                aria-label={`About ${who}`}
+                                className="block active:opacity-60"
+                              >
+                                <AddressAvatar address={message.peer} size="sm" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            {/* Who spoke, over their first bubble. A face is the thing
+                                a room is read by at a glance, so the name no longer
+                                has to repeat itself down a run to carry that. */}
+                            {opens && (
+                              <button
+                                type="button"
+                                onClick={onTap(() => setShowing(message.peer))}
+                                onPointerDown={(event) =>
+                                  holdStart(() => nameInBox(message.peer), event)
+                                }
+                                onPointerMove={holdMove}
+                                onPointerUp={holdCancel}
+                                onPointerCancel={holdCancel}
+                                onPointerLeave={holdCancel}
+                                // A held name must not also become a selection with a
+                                // Copy / Look Up callout over whatever opens next —
+                                // the same reason a message bubble gives up its own.
+                                className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold select-none [-webkit-touch-callout:none]"
+                              >
+                                {who}
+                              </button>
+                            )}
+                            {/* The same gesture a message of your own has, and now
+                                for the same reason: there is something to do with
+                                somebody else's message too. Answering it, and
+                                copying it — never deleting it, which stays the
+                                author's to do. */}
+                            <div
+                              className="group/msg relative flex items-start"
+                              onPointerDown={(event) => holdStart(() => openFor(message), event)}
+                              onContextMenu={(event) => {
+                                // Something highlighted goes to the browser, whose Copy
+                                // takes the selection — ours would take the whole message,
+                                // which is not what somebody who has just dragged across
+                                // half a sentence is asking for.
+                                if (document.getSelection()?.isCollapsed === false) return
+                                // The pointer's way to the hold. Its own menu is
+                                // refused because ours is the one with anything
+                                // in it — and Copy, the only thing the browser's
+                                // would have offered, is already a row of ours.
+                                event.preventDefault()
+                                openFor(message)
+                              }}
                               onPointerMove={holdMove}
                               onPointerUp={holdCancel}
                               onPointerCancel={holdCancel}
                               onPointerLeave={holdCancel}
-                              aria-label={`About ${who}`}
-                              className="block active:opacity-60"
                             >
-                              <AddressAvatar address={message.peer} size="sm" />
-                            </button>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          {/* Who spoke, over their first bubble. A face is the thing
-                              a room is read by at a glance, so the name no longer
-                              has to repeat itself down a run to carry that. */}
-                          {opens && (
-                            <button
-                              type="button"
-                              onClick={onTap(() => setShowing(message.peer))}
-                              onPointerDown={(event) =>
-                                holdStart(() => nameInBox(message.peer), event)
-                              }
-                              onPointerMove={holdMove}
-                              onPointerUp={holdCancel}
-                              onPointerCancel={holdCancel}
-                              onPointerLeave={holdCancel}
-                              // A held name must not also become a selection with a
-                              // Copy / Look Up callout over whatever opens next —
-                              // the same reason a message bubble gives up its own.
-                              className="text-muted-foreground mb-0.5 ml-1 block max-w-full truncate text-[13px] font-semibold select-none [-webkit-touch-callout:none]"
-                            >
-                              {who}
-                            </button>
-                          )}
-                          {/* The same gesture a message of your own has, and now
-                              for the same reason: there is something to do with
-                              somebody else's message too. Answering it, and
-                              copying it — never deleting it, which stays the
-                              author's to do. */}
-                          <div
-                            className="group/msg relative flex items-start"
-                            onPointerDown={(event) => holdStart(() => openFor(message), event)}
-                            onContextMenu={(event) => {
-                              // Something highlighted goes to the browser, whose Copy
-                              // takes the selection — ours would take the whole message,
-                              // which is not what somebody who has just dragged across
-                              // half a sentence is asking for.
-                              if (document.getSelection()?.isCollapsed === false) return
-                              // The pointer's way to the hold. Its own menu is
-                              // refused because ours is the one with anything
-                              // in it — and Copy, the only thing the browser's
-                              // would have offered, is already a row of ours.
-                              event.preventDefault()
-                              openFor(message)
-                            }}
-                            onPointerMove={holdMove}
-                            onPointerUp={holdCancel}
-                            onPointerCancel={holdCancel}
-                            onPointerLeave={holdCancel}
-                          >
-                            <div className="min-w-0 flex-1 [-webkit-touch-callout:none] pointer-fine:select-text select-none">
-                              <MessageBubble
-                                message={message}
-                                onRetry={onRetrySay}
-                                onOpenInvite={onOpenInvite}
-                                onOpenContact={onOpenContact}
-                                onOpenCode={onOpenCode}
-                                onOpenMention={setShowing}
-                                onOpenQuote={() => jumpTo(message)}
-                                reactions={on.get(message.id)}
-                                onReact={(emoji) => react(message, emoji)}
-                                onShowReactors={setReactors}
-                                channelOpen
-                                owner={owner}
-                                stamped={stamped}
-                                // The press is the room's now, so the browser's own
-                                // long press — a selection, and on iOS a callout over
-                                // whatever opens next — has to stand aside. Copy moved
-                                // into the menu in exchange.
-                                selectable={false}
-                              />
-                            </div>
+                              <div className="min-w-0 flex-1 [-webkit-touch-callout:none] pointer-fine:select-text select-none">
+                                <MessageBubble
+                                  message={message}
+                                  onRetry={onRetrySay}
+                                  onOpenInvite={onOpenInvite}
+                                  onOpenContact={onOpenContact}
+                                  onOpenCode={onOpenCode}
+                                  onOpenMention={setShowing}
+                                  onOpenQuote={() => jumpTo(message)}
+                                  reactions={on.get(message.id)}
+                                  onReact={(emoji) => react(message, emoji)}
+                                  onShowReactors={setReactors}
+                                  channelOpen
+                                  owner={owner}
+                                  stamped={stamped}
+                                  // The press is the room's now, so the browser's own
+                                  // long press — a selection, and on iOS a callout over
+                                  // whatever opens next — has to stand aside. Copy moved
+                                  // into the menu in exchange.
+                                  selectable={false}
+                                />
+                              </div>
 
-                            <button
-                              type="button"
-                              onClick={() => openFor(message)}
-                              aria-label={t("room.messageMenu")}
-                              className={cn(
-                                "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                "absolute top-1 right-0 hidden rounded-lg p-1 opacity-0 transition-opacity lg:block",
-                                "focus-visible:opacity-100 group-hover/msg:opacity-100",
-                              )}
-                            >
-                              <MoreVertical className="size-4" />
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => openFor(message)}
+                                aria-label={t("room.messageMenu")}
+                                className={cn(
+                                  "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                  "absolute top-1 right-0 hidden rounded-lg p-1 opacity-0 transition-opacity lg:block",
+                                  "focus-visible:opacity-100 group-hover/msg:opacity-100",
+                                )}
+                              >
+                                <MoreVertical className="size-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </Fragment>
                     )
                   })}
                 </div>

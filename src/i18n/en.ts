@@ -96,6 +96,10 @@ export const en = {
     contactInfo: "Contact info",
     you: "You",
     about: "About {{name}}",
+    /** Over the first message that was unread when the thread was opened. */
+    unreadLine: "Unread messages",
+    /** Floated over the thread until that line has been seen. */
+    jumpToUnread: "Jump to unread",
     sendNim: "Send NIM",
     sendNimNote: "Straight from your wallet to theirs.",
     knockSent: "Knock sent. You can write again once they answer.",
