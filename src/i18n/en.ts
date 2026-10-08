@@ -309,6 +309,8 @@ export const en = {
     discover: "Find groups by name from the + menu — Discover groups — including a few we've picked out.",
     discoverListing: "Own a group? Turn on Discoverable in its settings and anyone can find it.",
     discoverDoor: "A group you find shows its price, its owner and what getting in costs before you join.",
+    unreadLine: "Chats still open at the newest message, with a line marking where you'd read up to.",
+    jumpToUnread: "Missed a lot? Tap Jump to unread at the top of the chat to catch up from where you left off.",
   },
   member: {
     owner: "Owner",
